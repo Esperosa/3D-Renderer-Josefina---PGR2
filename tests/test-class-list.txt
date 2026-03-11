@@ -1,0 +1,25 @@
+# Regresní a smoke testy spouštěné automatickým runnerem.
+EngineCameraRegressionTests
+RayModuleTests
+RayWorldLightBehaviorTests
+SmoothShadingRegressionTests
+ShadowTerminatorRegressionTests
+engine.render.ray.JointBilateralDenoiserTests
+engine.render.ray.DenoiseScheduleTests
+engine.core.SceneTimelineReleaseTests
+engine.core.EngineSceneImportFocusTests
+engine.core.UndoRedoHistoryTests
+engine.core.EditorShortcutRouterTests
+engine.core.MaterialDockRefactorTests
+ObjMaterialImportTests
+ObjMultiMaterialImportTests
+GltfMaterialExtensionImportTests
+SimulationMaturityTests
+ProjectPresentationTests
+AdvancedMaterialRenderSmokeTests
+MaterialNodeGraphTests
+RayDenoiseSmokeTests
+RasterTiledParallelTests
+PrimitiveLibraryTests
+ImportedTextureRenderSmokeTests
+TemporalNoiseRendererTests

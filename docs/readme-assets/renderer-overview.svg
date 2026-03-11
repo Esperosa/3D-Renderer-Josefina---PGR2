@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+  <title id="title">Renderer overview</title>
+  <desc id="desc">Comparison of raster, ray tracer and path tracer in the project.</desc>
+  <rect width="1280" height="360" rx="24" fill="#11161d"/>
+  <text x="64" y="62" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700">Přehled rendererů</text>
+  <text x="64" y="96" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">Rychlost a kvalita nejsou v projektu zaměnitelné role, ale záměrné workflow vrstvy.</text>
+
+  <g transform="translate(64 132)">
+    <rect width="360" height="170" rx="18" fill="#1a212b" stroke="#36414e"/>
+    <text x="24" y="38" fill="#ffbc77" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700">Raster</text>
+    <text x="24" y="72" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• rychlý viewport preview</text>
+    <text x="24" y="102" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• stylizované režimy</text>
+    <text x="24" y="132" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• poctivé aproximace</text>
+    <text x="24" y="156" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="16">nejrychlejší pracovní vrstva</text>
+  </g>
+
+  <g transform="translate(460 132)">
+    <rect width="360" height="170" rx="18" fill="#1a212b" stroke="#7444ff"/>
+    <text x="24" y="38" fill="#c5b5ff" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700">Ray Tracer</text>
+    <text x="24" y="72" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• kvalitnější offline preview</text>
+    <text x="24" y="102" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• odrazy a přenos</text>
+    <text x="24" y="132" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• silný lookdev režim</text>
+    <text x="24" y="156" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="16">střed mezi rychlostí a kvalitou</text>
+  </g>
+
+  <g transform="translate(856 132)">
+    <rect width="360" height="170" rx="18" fill="#1a212b" stroke="#f48e3d"/>
+    <text x="24" y="38" fill="#ffbc77" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700">Path Tracer</text>
+    <text x="24" y="72" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• referenční kvalita projektu</text>
+    <text x="24" y="102" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• nejlepší světelná odezva</text>
+    <text x="24" y="132" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">• finální output workflow</text>
+    <text x="24" y="156" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="16">nejpomalější, ale nejvěrnější</text>
+  </g>
+</svg>

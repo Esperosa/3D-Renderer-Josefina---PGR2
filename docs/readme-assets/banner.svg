@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
+  <title id="title">3D Render Physics</title>
+  <desc id="desc">Dark orange project banner for the 3D Render Physics repository.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#11161d"/>
+      <stop offset="100%" stop-color="#1d2430"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#f48e3d"/>
+      <stop offset="100%" stop-color="#ffbc77"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="24" fill="url(#bg)"/>
+  <circle cx="1110" cy="86" r="78" fill="#7444ff" opacity="0.18"/>
+  <circle cx="1000" cy="218" r="132" fill="#f48e3d" opacity="0.10"/>
+  <rect x="64" y="62" width="180" height="8" rx="4" fill="url(#accent)"/>
+  <text x="64" y="142" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="56" font-weight="700">3D Render Physics</text>
+  <text x="64" y="194" fill="#c1ccd8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="24">
+    Studentský editor a CPU render sandbox pro počítačovou grafiku
+  </text>
+  <text x="64" y="236" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="20">
+    software raster • ray tracer • path tracer • node-based materiály • output workflow
+  </text>
+  <rect x="64" y="256" width="270" height="6" rx="3" fill="#7444ff" opacity="0.8"/>
+</svg>
