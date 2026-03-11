@@ -296,19 +296,153 @@ $$
 \mathbf{r}(t) = \mathbf{o} + t\mathbf{d}
 $$
 
-Path tracer i ray tracer drží barevný throughput:
+Oba renderery drží barevný throughput:
 
 $$
 \mathbf{T}_{k+1} = \mathbf{T}_{k} \odot \mathbf{w}_{branch}
 $$
 
-Radiance se skládá z emisí, přímého světla a dalších větví:
+Celková radiance se skládá z emisí, přímého světla a navazujících větví:
 
 $$
 \mathbf{L} = \sum_k \mathbf{T}_k \odot \left(\mathbf{L}_{direct,k} + \mathbf{L}_{emission,k}\right)
 $$
 
-Path tracer po několika bounce používá Russian roulette, zatímco ray tracer drží determinističtější větvení s omezenou hloubkou.
+#### Ray tracer
+
+`RayTracerRenderer` je determinističtější offline renderer. V každém zásahu:
+
+- vyhodnotí přímé osvětlení přes směrová a bodová světla,
+- z materiálu odvodí odraz, přenos a lokální váhu povrchového příspěvku,
+- pokračuje jednou dominantní větví, ne plným stochastickým stromem.
+
+Lokální specular term používá half-vector:
+
+$$
+\mathbf{h} = \frac{\mathbf{l} + \mathbf{v}}{\|\mathbf{l} + \mathbf{v}\|}
+$$
+
+$$
+spec = \max(0,\mathbf{n}\cdot\mathbf{h})^{p}
+$$
+
+Reflexní větev používá klasický odraz:
+
+$$
+\mathbf{r} = \mathbf{d} - 2(\mathbf{d}\cdot\mathbf{n})\mathbf{n}
+$$
+
+Přenos používá Snellův lom přes pomocnou vektorovou operaci `refract(...)`, a síla větví se řídí Schlickovým Fresnelem:
+
+```math
+F(\cos\theta) = F_0 + (1-F_0)(1-\cos\theta)^5,\qquad
+F_0 = \left(\frac{1-\eta}{1+\eta}\right)^2
+```
+
+Implementačně je důležité, že ray tracer:
+
+- drží omezenou hloubku `maxDepth`,
+- nepoužívá Monte Carlo větvení přes PDF,
+- nepoužívá Russian roulette,
+- a slouží jako rychlejší offline preview s odrazy, stíny a přenosem.
+
+```mermaid
+flowchart TD
+    A[Primární paprsek] --> B[BVH průsečík]
+    B --> C[Vyhodnocení povrchu]
+    C --> D[Přímé osvětlení a shadow ray]
+    D --> E{Přenos silnější než odraz?}
+    E -- ano --> F[Lom / přenos]
+    E -- ne --> G[Reflexe]
+    F --> H[Další zásah]
+    G --> H
+    H --> I[Konec po maxDepth nebo slabém throughput]
+```
+
+#### Path tracer
+
+`PathTracerRenderer` je v programu skutečně **Monte Carlo path tracer**. Používá náhodné samplování paprsků, branch probability a throughput kompenzaci přes inverzi branch PDF.
+
+V každém bounce se nejdřív odvodí tři pravděpodobnosti:
+
+$$
+p_t = transmissionProbability,\qquad
+p_s = specProbability,\qquad
+p_d = 1 - p_t - p_s
+$$
+
+Pak se náhodně volí jedna větev. Throughput se škáluje praktickým Monte Carlo estimátorem:
+
+```math
+\mathbf{T}_{k+1} =
+\mathbf{T}_{k} \odot \frac{\mathbf{w}_{branch}}{p_{branch}}
+```
+
+Difuzní větev používá cosine-weighted hemisphere sampling:
+
+$$
+\mathbf{\omega}_{sample} \sim p(\omega) = \frac{\max(0,\mathbf{n}\cdot\omega)}{\pi}
+$$
+
+Specular větev vychází z perfektní reflexe a pro nenulovou roughness ji míchá s cosine sample:
+
+$$
+\mathbf{\omega}_{spec} = lerp(\mathbf{r},\mathbf{\omega}_{hemi}, roughness)
+$$
+
+To je zjednodušený, ale prakticky stabilní model, který odpovídá aktuální implementaci v kódu.
+
+Path tracer navíc dělá explicitní next-event lighting pro všechna směrová a bodová světla. To znamená, že kromě nepřímé stochastické větve v každém zásahu ještě:
+
+- vzorkuje světla přímo,
+- vystřelí shadow ray,
+- a přičte viditelný přímý příspěvek.
+
+Od třetího bounce dál používá **Russian roulette**:
+
+```math
+rr = clamp(\max(T_r,T_g,T_b),\ 0.05,\ 0.98)
+```
+
+Paprska buď ukončí s pravděpodobností `1 - rr`, nebo throughput doškáluje:
+
+```math
+\mathbf{T} \leftarrow \frac{\mathbf{T}}{rr}
+```
+
+To snižuje délku dlouhých drah bez systematického biasu. Přesněji řečeno:
+
+- **Monte Carlo** je hlavní integrační metoda,
+- **Russian roulette** je technika ukončování drah uvnitř Monte Carlo integrace.
+
+```mermaid
+flowchart TD
+    A[Primární sample] --> B[BVH průsečík]
+    B --> C[Emission a direct lighting]
+    C --> D{Volba větve podle p_t / p_s / p_d}
+    D --> E[Přenos]
+    D --> F[Specular]
+    D --> G[Diffuse hemisphere sample]
+    E --> H[Throughput / p_branch]
+    F --> H
+    G --> H
+    H --> I{bounce >= 2 ?}
+    I -- ano --> J[Russian roulette]
+    I -- ne --> K[Další zásah]
+    J --> K
+    K --> L[Konec po maxBounces nebo miss]
+```
+
+#### Praktický rozdíl mezi renderery
+
+| Oblast | Ray tracer | Path tracer |
+| --- | --- | --- |
+| Typ integrace | determinističtější větvení | Monte Carlo sampling |
+| Odraz / lom | dominantní větev | stochastická volba větve |
+| Přímé světlo | explicitně | explicitně + nepřímé sample |
+| Throughput/PDF | bez branch PDF kompenzace | branch PDF kompenzace `1 / p_branch` |
+| Russian roulette | ne | ano, od `bounce >= 2` |
+| Typ použití | rychlejší offline preview | referenční kvalitnější výstup |
 
 ### 3. Materiálový preview renderer
 
@@ -332,6 +466,41 @@ $$
 
 `TemporalNoiseRenderer` je v aktuální verzi čistý 2D post-process nad G-bufferem. Nepoužívá subpixelovou advekci, diagonální blur ani deformaci grainu. Všechen pohyb vzniká pouze integer posuvem stabilní 2D noise mřížky.
 
+#### Přesná pipeline
+
+```mermaid
+flowchart LR
+    A[Base Raster Renderer] --> B[G-buffer: objectId, faceId, depth, normal, worldPos]
+    B --> C[Analýza regionů]
+    C --> D[Smooth / planar motion field]
+    D --> E[Edge mask]
+    E --> F[Cell-coherent synthesis]
+    F --> G[Final grayscale frame]
+```
+
+Renderer postupuje takto:
+
+1. `baseRasterRenderer.render(...)` připraví G-buffer.
+2. Z `objectId`, `faceId`, `depth`, `normal` a `worldPos` se odvodí regionální motion parametry.
+3. Motion field se stabilizuje pro smooth a coplanární plochy.
+4. `edgeMask` označí konfliktní přechody.
+5. Finální syntéza vykreslí každou grain buňku jednou společnou hodnotou.
+
+To je důležité proto, že velikost zrna neurčuje jen vzhled, ale i skutečnou vykreslovací mřížku. Hrubší preset `4x4` proto negeneruje jemnější subpixely uvnitř buňky.
+
+```mermaid
+flowchart TD
+    A[objectId / faceId / depth / normal / worldPos] --> B[Face region stats]
+    A --> C[Planar region stats]
+    A --> D[Smooth region sampling]
+    B --> E[Motion region params]
+    C --> E
+    D --> E
+    E --> F[flowX / flowY / speed / phase]
+    F --> G[edgeMask]
+    G --> H[Cell-coherent integer synthesis]
+```
+
 #### Regionální směr
 
 Směr regionu vychází z průměrné regionální normály promítnuté do screen-space:
@@ -348,32 +517,48 @@ $$
 \mathbf{d}_{2D} = (-normalScreenY,\; normalScreenX)
 $$
 
-K tomu se přičítá malý screen-space bias z perspektivní polohy regionu a výsledek se kvantizuje do osových vah `X/Y`.
+K tomu se přičítá malý screen-space bias z perspektivní polohy regionu:
+
+```math
+desired_x = d_{2D,x} + screenBias_x \cdot signBias
+```
+
+```math
+desired_y = d_{2D,y} + screenBias_y \cdot signBias
+```
+
+Výsledek se pak neotáčí libovolně, ale převádí se do stabilních osových vah `X/Y`. Tím:
+
+- zůstává zrno pevné na mřížce,
+- region může běžet po `X`, po `Y` nebo po obou osách současně,
+- ale nevzniká subpixelová deformace patternu.
 
 #### Regionální rychlost
 
 Aktuální implementace skládá rychlost z blízkosti, šikmého úhlu, kontrastu orientace a malého deterministického regionálního biasu:
 
 ```math
-\mathrm{grazing} = 1 - \mathrm{facing}
+grazing = 1 - facing
 ```
 
 ```math
-\mathrm{speed} =
-\mathrm{clamp}\left(
+speed =
+clamp\left(
 0.45 + 1.20 \left(
-0.90\,\mathrm{nearContribution}\,\mathrm{depthNear}
-+ 1.02\,\mathrm{grazingContribution}\,\mathrm{grazing}
-+ 0.46\,\mathrm{orientationContrast}
-+ c\,\mathrm{perspectiveContrast}
+0.90\,nearContribution\,depthNear +
+1.02\,grazingContribution\,grazing +
+0.46\,orientationContrast +
+c\,perspectiveContrast
 \right)
-+ \mathrm{regionBias},
-\mathrm{minSpeed},
-\mathrm{maxSpeed}
++ regionBias,\;
+minSpeed,\;
+maxSpeed
 \right)
 ```
 
 `regionBias` je deterministický hash z `objectId`, kvantizované normály, hloubky a screen-space polohy. Tím se snižuje pravděpodobnost, že dvě různé plochy skončí se stejnou osou i stejnou rychlostí.
+
+V implementaci se rychlost ještě kvantizuje do diskrétních pásem. To zmenšuje shimmering mezi sousedními regiony a zlepšuje čitelnost pohybu na složitějších modelech.
 #### Integer shift a grain
 
 Pro region se počítá diskrétní posuv:
@@ -392,7 +577,7 @@ $$
 \Delta y = sign_y \cdot round\left(shift \cdot \frac{|w_y|}{\max(|w_x|, |w_y|)}\right)
 $$
 
-Noise se pak čte bez interpolace:
+Noise se pak čte **bez interpolace** a bez jakéhokoli warpu:
 
 $$
 a = random01(cell_x + \Delta x,\; cell_y + \Delta y,\; 0,\; seed_A)
@@ -406,7 +591,12 @@ $$
 signal = 0.72a + 0.28b
 $$
 
-Finální hodnota se kvantizuje do palety `2..8` úrovní a mapuje do rozsahu `28..228`.
+Finální hodnota se kvantizuje do palety `2..8` úrovní a mapuje do rozsahu `28..228`. Finální cell-coherent syntéza navíc používá pro celou grain buňku jednoho reprezentanta, takže:
+
+- `1x1` kreslí pixel po pixelu,
+- `2x2` kreslí skutečné `2x2` bloky,
+- `4x4` kreslí skutečné `4x4` bloky,
+- a nevzniká situace, kdy by uvnitř hrubé buňky vznikly menší spoty.
 
 #### Smooth regiony
 
@@ -424,7 +614,60 @@ $$
 \mathbf{n}_i \cdot \mathbf{n}_j \ge 0.97
 $$
 
-To snižuje polygonální rozpad na koulích a zaoblených modelech, ale ostré hrany zůstávají oddělené.
+To snižuje polygonální rozpad na koulích a zaoblených modelech, ale ostré hrany zůstávají oddělené. Nad tím ještě běží:
+
+- `smoothCellMotionField(...)` pro vyhlazení mezi kompatibilními smooth buňkami,
+- `enforcePlanarRegionConsistency(...)` pro sjednocení coplanárních ploch,
+- `normalizeUniformCells(...)` pro zpevnění jednotných grain buněk.
+
+Prakticky to znamená:
+
+- krychle drží jednolitou stěnu,
+- koule se méně rozpadají na trojúhelníkové ostrůvky,
+- a překrývající se vrstvy se méně slévají.
+
+#### Hrany a překryvy
+
+`edgeMask` se staví z rozdílu hloubky, normály a raw flow:
+
+```math
+edge = \max\left(
+boundary,\;
+0.78\,normalTerm + 0.62\,depthTerm + flowTerm
+\right)
+```
+
+kde:
+
+```math
+depthTerm = clamp(|depth_i - depth_j| \cdot 28)
+```
+
+```math
+flowTerm = clamp\left(\|\Delta flow\| \cdot 0.18\right)
+```
+
+Na hraně se neprovádí další blur. Místo toho se jen mírně míchá objektový a background signál:
+
+```math
+signal = lerp(objectSignal,\ backgroundSignal,\ blend)
+```
+
+```math
+blend = clamp(\max(edgeMask \cdot edgeBlendStrength,\ 1-objectCoverage))
+```
+
+Tím se omezí tvrdé seam přechody, ale nesmyje se celé zobrazení do měkké mapy.
+
+#### Proč je režim relativně levný
+
+`Temporal Noise` je rychlejší než ray/path tracing proto, že:
+
+- reuseuje hotový raster G-buffer,
+- neřeší sekundární geometrii ani světelné větvení,
+- nepoužívá subpixelový sampling šumu,
+- nevzorkuje 3D noise pole,
+- a finální pass používá jen integer posuv, dva hash sample kanály a kvantizaci do grayscale palety.
 
 ### 5. Spray / splash simulace
 
