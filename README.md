@@ -462,214 +462,7 @@ $$
 fog = clamp(density \cdot 0.26 + thickness \cdot 0.08)
 $$
 
-### 4. Temporal Noise
-
-`TemporalNoiseRenderer` je v aktuální verzi čistý 2D post-process nad G-bufferem. Nepoužívá subpixelovou advekci, diagonální blur ani deformaci grainu. Všechen pohyb vzniká pouze integer posuvem stabilní 2D noise mřížky.
-
-#### Přesná pipeline
-
-```mermaid
-flowchart LR
-    A[Base Raster Renderer] --> B[G-buffer: objectId, faceId, depth, normal, worldPos]
-    B --> C[Analýza regionů]
-    C --> D[Smooth / planar motion field]
-    D --> E[Edge mask]
-    E --> F[Cell-coherent synthesis]
-    F --> G[Final grayscale frame]
-```
-
-Renderer postupuje takto:
-
-1. `baseRasterRenderer.render(...)` připraví G-buffer.
-2. Z `objectId`, `faceId`, `depth`, `normal` a `worldPos` se odvodí regionální motion parametry.
-3. Motion field se stabilizuje pro smooth a coplanární plochy.
-4. `edgeMask` označí konfliktní přechody.
-5. Finální syntéza vykreslí každou grain buňku jednou společnou hodnotou.
-
-To je důležité proto, že velikost zrna neurčuje jen vzhled, ale i skutečnou vykreslovací mřížku. Hrubší preset `4x4` proto negeneruje jemnější subpixely uvnitř buňky.
-
-```mermaid
-flowchart TD
-    A[objectId / faceId / depth / normal / worldPos] --> B[Face region stats]
-    A --> C[Planar region stats]
-    A --> D[Smooth region sampling]
-    B --> E[Motion region params]
-    C --> E
-    D --> E
-    E --> F[flowX / flowY / speed / phase]
-    F --> G[edgeMask]
-    G --> H[Cell-coherent integer synthesis]
-```
-
-#### Regionální směr
-
-Směr regionu vychází z průměrné regionální normály promítnuté do screen-space:
-
-$$
-normalScreenX = \mathbf{n}\cdot\mathbf{r}
-$$
-
-$$
-normalScreenY = -(\mathbf{n}\cdot\mathbf{u})
-$$
-
-$$
-\mathbf{d}_{2D} = (-normalScreenY,\; normalScreenX)
-$$
-
-K tomu se přičítá malý screen-space bias z perspektivní polohy regionu:
-
-```math
-desired_x = d_{2D,x} + screenBias_x \cdot signBias
-```
-
-```math
-desired_y = d_{2D,y} + screenBias_y \cdot signBias
-```
-
-Výsledek se pak neotáčí libovolně, ale převádí se do stabilních osových vah `X/Y`. Tím:
-
-- zůstává zrno pevné na mřížce,
-- region může běžet po `X`, po `Y` nebo po obou osách současně,
-- ale nevzniká subpixelová deformace patternu.
-
-#### Regionální rychlost
-
-Aktuální implementace skládá rychlost z blízkosti, šikmého úhlu, kontrastu orientace a malého deterministického regionálního biasu:
-
-```math
-grazing = 1 - facing
-```
-
-```math
-speed =
-clamp\left(
-0.45 + 1.20 \left(
-0.90\,nearContribution\,depthNear +
-1.02\,grazingContribution\,grazing +
-0.46\,orientationContrast +
-c\,perspectiveContrast
-\right)
-+ regionBias,\;
-minSpeed,\;
-maxSpeed
-\right)
-```
-
-`regionBias` je deterministický hash z `objectId`, kvantizované normály, hloubky a screen-space polohy. Tím se snižuje pravděpodobnost, že dvě různé plochy skončí se stejnou osou i stejnou rychlostí.
-
-V implementaci se rychlost ještě kvantizuje do diskrétních pásem. To zmenšuje shimmering mezi sousedními regiony a zlepšuje čitelnost pohybu na složitějších modelech.
-#### Integer shift a grain
-
-Pro region se počítá diskrétní posuv:
-
-$$
-shift(t) = \left\lfloor t \cdot temporalTickRate \cdot speed + phase \right\rfloor
-$$
-
-Z něj vznikne společný posuv po `X` a `Y`:
-
-$$
-\Delta x = sign_x \cdot round\left(shift \cdot \frac{|w_x|}{\max(|w_x|, |w_y|)}\right)
-$$
-
-$$
-\Delta y = sign_y \cdot round\left(shift \cdot \frac{|w_y|}{\max(|w_x|, |w_y|)}\right)
-$$
-
-Noise se pak čte **bez interpolace** a bez jakéhokoli warpu:
-
-$$
-a = random01(cell_x + \Delta x,\; cell_y + \Delta y,\; 0,\; seed_A)
-$$
-
-$$
-b = random01(cell_x + \Delta x + 17,\; cell_y + \Delta y - 11,\; 0,\; seed_B)
-$$
-
-$$
-signal = 0.72a + 0.28b
-$$
-
-Finální hodnota se kvantizuje do palety `2..8` úrovní a mapuje do rozsahu `28..228`. Finální cell-coherent syntéza navíc používá pro celou grain buňku jednoho reprezentanta, takže:
-
-- `1x1` kreslí pixel po pixelu,
-- `2x2` kreslí skutečné `2x2` bloky,
-- `4x4` kreslí skutečné `4x4` bloky,
-- a nevzniká situace, kdy by uvnitř hrubé buňky vznikly menší spoty.
-
-#### Smooth regiony
-
-U smooth objektů se region nebere po samotném `faceId`, ale z lokálního sousedství. Soused je považovaný za kompatibilní pouze pokud:
-
-$$
-objectId_i = objectId_j
-$$
-
-$$
-|depth_i - depth_j| \le 0.015
-$$
-
-$$
-\mathbf{n}_i \cdot \mathbf{n}_j \ge 0.97
-$$
-
-To snižuje polygonální rozpad na koulích a zaoblených modelech, ale ostré hrany zůstávají oddělené. Nad tím ještě běží:
-
-- `smoothCellMotionField(...)` pro vyhlazení mezi kompatibilními smooth buňkami,
-- `enforcePlanarRegionConsistency(...)` pro sjednocení coplanárních ploch,
-- `normalizeUniformCells(...)` pro zpevnění jednotných grain buněk.
-
-Prakticky to znamená:
-
-- krychle drží jednolitou stěnu,
-- koule se méně rozpadají na trojúhelníkové ostrůvky,
-- a překrývající se vrstvy se méně slévají.
-
-#### Hrany a překryvy
-
-`edgeMask` se staví z rozdílu hloubky, normály a raw flow:
-
-```math
-edge = \max\left(
-boundary,\;
-0.78\,normalTerm + 0.62\,depthTerm + flowTerm
-\right)
-```
-
-kde:
-
-```math
-depthTerm = clamp(|depth_i - depth_j| \cdot 28)
-```
-
-```math
-flowTerm = clamp\left(\|\Delta flow\| \cdot 0.18\right)
-```
-
-Na hraně se neprovádí další blur. Místo toho se jen mírně míchá objektový a background signál:
-
-```math
-signal = lerp(objectSignal,\ backgroundSignal,\ blend)
-```
-
-```math
-blend = clamp(\max(edgeMask \cdot edgeBlendStrength,\ 1-objectCoverage))
-```
-
-Tím se omezí tvrdé seam přechody, ale nesmyje se celé zobrazení do měkké mapy.
-
-#### Proč je režim relativně levný
-
-`Temporal Noise` je rychlejší než ray/path tracing proto, že:
-
-- reuseuje hotový raster G-buffer,
-- neřeší sekundární geometrii ani světelné větvení,
-- nepoužívá subpixelový sampling šumu,
-- nevzorkuje 3D noise pole,
-- a finální pass používá jen integer posuv, dva hash sample kanály a kvantizaci do grayscale palety.
-
-### 5. Spray / splash simulace
+### 4. Spray / splash simulace
 
 Experimentální water vrstva je ve skutečnosti deterministický CPU částicový spray. Nepoužívá tlakový solve, PBF ani SPH.
 
@@ -786,6 +579,210 @@ flowchart LR
 - objekty posouvají stabilní grain po integer mřížce,
 - grain se nikdy nedeformuje subpixelovou interpolací,
 - zrno lze přepnout mezi `1x1`, `2x2`, `4x4`.
+
+### Přesná pipeline
+
+```mermaid
+flowchart LR
+    A[Base Raster Renderer] --> B[G-buffer: objectId, faceId, depth, normal, worldPos]
+    B --> C[Analýza regionů]
+    C --> D[Smooth / planar motion field]
+    D --> E[Edge mask]
+    E --> F[Cell-coherent synthesis]
+    F --> G[Final grayscale frame]
+```
+
+Renderer postupuje takto:
+
+1. `baseRasterRenderer.render(...)` připraví G-buffer.
+2. Z `objectId`, `faceId`, `depth`, `normal` a `worldPos` se odvodí regionální motion parametry.
+3. Motion field se stabilizuje pro smooth a coplanární plochy.
+4. `edgeMask` označí konfliktní přechody.
+5. Finální syntéza vykreslí každou grain buňku jednou společnou hodnotou.
+
+To je důležité proto, že velikost zrna neurčuje jen vzhled, ale i skutečnou vykreslovací mřížku. Hrubší preset `4x4` proto negeneruje jemnější subpixely uvnitř buňky.
+
+```mermaid
+flowchart TD
+    A[objectId / faceId / depth / normal / worldPos] --> B[Face region stats]
+    A --> C[Planar region stats]
+    A --> D[Smooth region sampling]
+    B --> E[Motion region params]
+    C --> E
+    D --> E
+    E --> F[flowX / flowY / speed / phase]
+    F --> G[edgeMask]
+    G --> H[Cell-coherent integer synthesis]
+```
+
+### Regionální směr
+
+Směr regionu vychází z průměrné regionální normály promítnuté do screen-space:
+
+$$
+normalScreenX = \mathbf{n}\cdot\mathbf{r}
+$$
+
+$$
+normalScreenY = -(\mathbf{n}\cdot\mathbf{u})
+$$
+
+$$
+\mathbf{d}_{2D} = (-normalScreenY,\; normalScreenX)
+$$
+
+K tomu se přičítá malý screen-space bias z perspektivní polohy regionu:
+
+```math
+desired_x = d_{2D,x} + screenBias_x \cdot signBias
+```
+
+```math
+desired_y = d_{2D,y} + screenBias_y \cdot signBias
+```
+
+Výsledek se pak neotáčí libovolně, ale převádí se do stabilních osových vah `X/Y`. Tím:
+
+- zůstává zrno pevné na mřížce,
+- region může běžet po `X`, po `Y` nebo po obou osách současně,
+- ale nevzniká subpixelová deformace patternu.
+
+### Regionální rychlost
+
+Aktuální implementace skládá rychlost z blízkosti, šikmého úhlu, kontrastu orientace a malého deterministického regionálního biasu:
+
+```math
+grazing = 1 - facing
+```
+
+```math
+speed =
+clamp\left(
+0.45 + 1.20 \left(
+0.90\,nearContribution\,depthNear +
+1.02\,grazingContribution\,grazing +
+0.46\,orientationContrast +
+c\,perspectiveContrast
+\right)
++ regionBias,\;
+minSpeed,\;
+maxSpeed
+\right)
+```
+
+`regionBias` je deterministický hash z `objectId`, kvantizované normály, hloubky a screen-space polohy. Tím se snižuje pravděpodobnost, že dvě různé plochy skončí se stejnou osou i stejnou rychlostí.
+
+V implementaci se rychlost ještě kvantizuje do diskrétních pásem. To zmenšuje shimmering mezi sousedními regiony a zlepšuje čitelnost pohybu na složitějších modelech.
+
+### Integer shift a grain
+
+Pro region se počítá diskrétní posuv:
+
+$$
+shift(t) = \left\lfloor t \cdot temporalTickRate \cdot speed + phase \right\rfloor
+$$
+
+Z něj vznikne společný posuv po `X` a `Y`:
+
+$$
+\Delta x = sign_x \cdot round\left(shift \cdot \frac{|w_x|}{\max(|w_x|, |w_y|)}\right)
+$$
+
+$$
+\Delta y = sign_y \cdot round\left(shift \cdot \frac{|w_y|}{\max(|w_x|, |w_y|)}\right)
+$$
+
+Noise se pak čte **bez interpolace** a bez jakéhokoli warpu:
+
+$$
+a = random01(cell_x + \Delta x,\; cell_y + \Delta y,\; 0,\; seed_A)
+$$
+
+$$
+b = random01(cell_x + \Delta x + 17,\; cell_y + \Delta y - 11,\; 0,\; seed_B)
+$$
+
+$$
+signal = 0.72a + 0.28b
+$$
+
+Finální hodnota se kvantizuje do palety `2..8` úrovní a mapuje do rozsahu `28..228`. Finální cell-coherent syntéza navíc používá pro celou grain buňku jednoho reprezentanta, takže:
+
+- `1x1` kreslí pixel po pixelu,
+- `2x2` kreslí skutečné `2x2` bloky,
+- `4x4` kreslí skutečné `4x4` bloky,
+- a nevzniká situace, kdy by uvnitř hrubé buňky vznikly menší spoty.
+
+### Smooth regiony
+
+U smooth objektů se region nebere po samotném `faceId`, ale z lokálního sousedství. Soused je považovaný za kompatibilní pouze pokud:
+
+$$
+objectId_i = objectId_j
+$$
+
+$$
+|depth_i - depth_j| \le 0.015
+$$
+
+$$
+\mathbf{n}_i \cdot \mathbf{n}_j \ge 0.97
+$$
+
+To snižuje polygonální rozpad na koulích a zaoblených modelech, ale ostré hrany zůstávají oddělené. Nad tím ještě běží:
+
+- `smoothCellMotionField(...)` pro vyhlazení mezi kompatibilními smooth buňkami,
+- `enforcePlanarRegionConsistency(...)` pro sjednocení coplanárních ploch,
+- `normalizeUniformCells(...)` pro zpevnění jednotných grain buněk.
+
+Prakticky to znamená:
+
+- krychle drží jednolitou stěnu,
+- koule se méně rozpadají na trojúhelníkové ostrůvky,
+- a překrývající se vrstvy se méně slévají.
+
+### Hrany a překryvy
+
+`edgeMask` se staví z rozdílu hloubky, normály a raw flow:
+
+```math
+edge = \max\left(
+boundary,\;
+0.78\,normalTerm + 0.62\,depthTerm + flowTerm
+\right)
+```
+
+kde:
+
+```math
+depthTerm = clamp(|depth_i - depth_j| \cdot 28)
+```
+
+```math
+flowTerm = clamp\left(\|\Delta flow\| \cdot 0.18\right)
+```
+
+Na hraně se neprovádí další blur. Místo toho se jen mírně míchá objektový a background signál:
+
+```math
+signal = lerp(objectSignal,\ backgroundSignal,\ blend)
+```
+
+```math
+blend = clamp(\max(edgeMask \cdot edgeBlendStrength,\ 1-objectCoverage))
+```
+
+Tím se omezí tvrdé seam přechody, ale nesmyje se celé zobrazení do měkké mapy.
+
+### Proč je režim relativně levný
+
+`Temporal Noise` je rychlejší než ray/path tracing proto, že:
+
+- reuseuje hotový raster G-buffer,
+- neřeší sekundární geometrii ani světelné větvení,
+- nepoužívá subpixelový sampling šumu,
+- nevzorkuje 3D noise pole,
+- a finální pass používá jen integer posuv, dva hash sample kanály a kvantizaci do grayscale palety.
 
 ### Aktuální ovladače
 
