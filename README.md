@@ -354,27 +354,26 @@ K tomu se přičítá malý screen-space bias z perspektivní polohy regionu a v
 
 Aktuální implementace skládá rychlost z blízkosti, šikmého úhlu, kontrastu orientace a malého deterministického regionálního biasu:
 
-$$
-grazing = 1 - facing
-$$
+```math
+\mathrm{grazing} = 1 - \mathrm{facing}
+```
 
-$$
-speed = clamp\left(
-0.45 + 1.20 \cdot
-\left(
-nearContribution \cdot depthNear \cdot 0.90 +
-grazingContribution \cdot grazing \cdot 1.02 +
-orientationContrast \cdot 0.46 +
-perspectiveContrast \cdot c
+```math
+\mathrm{speed} =
+\mathrm{clamp}\left(
+0.45 + 1.20 \left(
+0.90\,\mathrm{nearContribution}\,\mathrm{depthNear}
++ 1.02\,\mathrm{grazingContribution}\,\mathrm{grazing}
++ 0.46\,\mathrm{orientationContrast}
++ c\,\mathrm{perspectiveContrast}
 \right)
- + regionBias,\;
-minSpeed,\;
-maxSpeed
++ \mathrm{regionBias},
+\mathrm{minSpeed},
+\mathrm{maxSpeed}
 \right)
-$$
+```
 
 `regionBias` je deterministický hash z `objectId`, kvantizované normály, hloubky a screen-space polohy. Tím se snižuje pravděpodobnost, že dvě různé plochy skončí se stejnou osou i stejnou rychlostí.
-
 #### Integer shift a grain
 
 Pro region se počítá diskrétní posuv:
@@ -588,7 +587,7 @@ Program obsahuje scénově navázaný emitter částic:
 - kolize používají podlahu a jednoduché AABB proxy scény,
 - runtime i output replay používají shodnou fixed-step logiku.
 
-Poctivé vymezení:
+Vymezení:
 
 - nejde o fluid solver,
 - nejde o PBF/SPH,
