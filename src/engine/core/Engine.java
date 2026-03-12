@@ -172,7 +172,13 @@ public class Engine {
     PointLight coolWorldLight;
     Vec3 worldLightColor;
     Vec3 worldBackgroundColor;
+    String worldPresetKey;
+    double worldSunBaseIntensity;
+    double worldFillBaseIntensity;
+    double worldWarmBaseIntensity;
+    double worldCoolBaseIntensity;
     double worldLightStrength;
+    double worldLightAppliedStrength;
     boolean worldLightAnimationEnabled;
     final WaterSimulation waterSimulation;
     boolean waterSimulationEnabled;
@@ -475,7 +481,13 @@ public class Engine {
         this.selectedForceField = null;
         this.worldLightColor = new Vec3(0.18, 0.20, 0.24);
         this.worldBackgroundColor = new Vec3(0.06, 0.08, 0.11);
+        this.worldPresetKey = "Studio Neutral";
+        this.worldSunBaseIntensity = 1.35;
+        this.worldFillBaseIntensity = 0.42;
+        this.worldWarmBaseIntensity = 0.55;
+        this.worldCoolBaseIntensity = 0.48;
         this.worldLightStrength = 1.0;
+        this.worldLightAppliedStrength = 1.0;
         this.worldLightAnimationEnabled = false;
         this.waterSimulation = new WaterSimulation(5600);
         this.waterSimulationEnabled = true;
@@ -668,6 +680,7 @@ public class Engine {
         refreshSceneOutliner();
         syncOutlinerSelectionToCurrentSelection();
         rebuildSceneDetailsPanel();
+        rebuildWorldTab();
         rebuildMaterialDock();
         refreshUiIndicators();
         refreshTimelineUi();
@@ -1109,6 +1122,7 @@ public class Engine {
 
     void applyWorldPreset(String presetName) {
         applySceneEdit("Změna předvolby prostředí", () -> EngineWorldManager.applyWorldPreset(this, presetName));
+        rebuildWorldTab();
     }
 
     String getLightName(Light light) {
@@ -1167,6 +1181,15 @@ public class Engine {
     void rebuildSceneDetailsPanel() {
         EngineSceneInspector.rebuildSceneDetailsPanel(this);
         rebuildMaterialDock();
+    }
+
+    void rebuildWorldTab() {
+        if (window == null) {
+            return;
+        }
+        JPanel worldTab = EngineScenePanels.buildWorldTab(this);
+        worldTab.revalidate();
+        worldTab.repaint();
     }
     JPanel addCollapsibleSection(JPanel parent, String title, boolean expandedByDefault) {
         return UiBuilder.addCollapsibleSection(parent, title, expandedByDefault, this::focusCanvas);

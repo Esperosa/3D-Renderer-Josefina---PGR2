@@ -9,6 +9,8 @@ engine.render.ray.DenoiseScheduleTests
 engine.core.SceneTimelineReleaseTests
 engine.core.EngineSceneImportFocusTests
 engine.core.UndoRedoHistoryTests
+engine.core.WorldPresetHistoryTests
+engine.core.WorldLightStrengthTests
 engine.core.EditorShortcutRouterTests
 engine.core.MaterialDockRefactorTests
 engine.core.AsciiViewportStabilityTests

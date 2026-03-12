@@ -16,6 +16,7 @@ public class Scene {
     private Entity rootEntity;
     private Vec3 ambientColor = new Vec3(0.1, 0.1, 0.1);
     private Vec3 backgroundColor = new Vec3(0.06, 0.07, 0.09);
+    private double environmentStrength = 1.0;
     private boolean dirty = true;
 
     // Tady spravuju entity.
@@ -91,6 +92,14 @@ public class Scene {
 
     public void setBackgroundColor(Vec3 color) {
         this.backgroundColor = color;
+    }
+
+    public double getEnvironmentStrength() {
+        return environmentStrength;
+    }
+
+    public void setEnvironmentStrength(double environmentStrength) {
+        this.environmentStrength = environmentStrength;
     }
 
     public boolean isDirty() {

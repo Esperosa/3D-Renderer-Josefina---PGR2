@@ -25,9 +25,10 @@ final class EngineAnimationController {
                             0.07 + 0.014 * skyPulse,
                             0.10 + 0.016 * warmPulse
                     );
-                    engine.applyWorldLightSettings();
                 }
             }
+            engine.worldWarmBaseIntensity = 0.48 + (0.5 + 0.5 * Math.sin(elapsedSeconds * 0.45 * 1.3)) * 0.18;
+            engine.worldCoolBaseIntensity = 0.40 + (0.5 + 0.5 * Math.cos((elapsedSeconds * 0.38 + 1.7) * 1.1)) * 0.16;
             if (engine.warmWorldLight != null) {
                 double t = elapsedSeconds * 0.45;
                 engine.warmWorldLight.setPosition(new Vec3(
@@ -35,7 +36,6 @@ final class EngineAnimationController {
                         2.25 + Math.sin(t * 0.6) * 0.22,
                         2.0 + Math.cos(t) * 0.85
                 ));
-                engine.warmWorldLight.setIntensity(0.48 + (0.5 + 0.5 * Math.sin(t * 1.3)) * 0.18);
             }
             if (engine.coolWorldLight != null) {
                 double t = elapsedSeconds * 0.38 + 1.7;
@@ -44,8 +44,8 @@ final class EngineAnimationController {
                         2.0 + Math.cos(t * 0.8) * 0.20,
                         -2.5 + Math.cos(t) * 0.90
                 ));
-                engine.coolWorldLight.setIntensity(0.40 + (0.5 + 0.5 * Math.cos(t * 1.1)) * 0.16);
             }
+            EngineWorldManager.applyStoredWorldLightSettings(engine);
         }
         if (engine.autoRotateDemo && engine.demoEntity != null) {
             engine.demoEntity.getTransform().setEulerAngles(

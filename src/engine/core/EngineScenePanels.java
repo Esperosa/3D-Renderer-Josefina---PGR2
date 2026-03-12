@@ -175,7 +175,7 @@ final class EngineScenePanels {
                         UiStrings.World.PRESET_NIGHT,
                         UiStrings.World.PRESET_CONTRAST
                 },
-                UiStrings.World.PRESET_STUDIO,
+                UiStrings.worldPresetLabel(engine.worldPresetKey),
                 value -> engine.applyWorldPreset(UiStrings.worldPresetKey(value)));
         engine.addBooleanRow(worldSection, "Animovat světlo prostředí", engine.worldLightAnimationEnabled, value ->
                 engine.applySceneEdit("Přepnutí animace prostředí", () -> engine.worldLightAnimationEnabled = value));

@@ -77,9 +77,13 @@ public class RayTracerRenderer implements Renderer {
 
     private DirLightCache[] dirLights = new DirLightCache[0];
     private PointLightCache[] pointLights = new PointLightCache[0];
+    private double ambientR = 0.1;
+    private double ambientG = 0.1;
+    private double ambientB = 0.1;
     private double backgroundR = 0.06;
     private double backgroundG = 0.07;
     private double backgroundB = 0.09;
+    private double environmentStrength = 1.0;
 
     private long geometrySignature = Long.MIN_VALUE;
     private long lightingSignature = Long.MIN_VALUE;
@@ -488,11 +492,14 @@ public class RayTracerRenderer implements Renderer {
                     : 0.0;
             double transmissionStrength = clamp01(ctx.surface.transmission * (1.0 - fresnel));
             double localWeight = clamp01((1.0 - transmissionStrength) * Math.max(0.12, 1.0 - reflectionStrength * 0.35));
+            double ambientLightR = baseR * ambientR * localWeight;
+            double ambientLightG = baseG * ambientG * localWeight;
+            double ambientLightB = baseB * ambientB * localWeight;
             double sheenWeight = Math.pow(1.0 - ndotv, 1.0 + tri.material.getSheenRoughness() * 5.0);
 
-            radianceR += throughputR * (lightR * localWeight + ctx.surface.emissionR + ctx.surface.sheenR * sheenWeight * 0.25);
-            radianceG += throughputG * (lightG * localWeight + ctx.surface.emissionG + ctx.surface.sheenG * sheenWeight * 0.25);
-            radianceB += throughputB * (lightB * localWeight + ctx.surface.emissionB + ctx.surface.sheenB * sheenWeight * 0.25);
+            radianceR += throughputR * (ambientLightR + lightR * localWeight + ctx.surface.emissionR + ctx.surface.sheenR * sheenWeight * 0.25);
+            radianceG += throughputG * (ambientLightG + lightG * localWeight + ctx.surface.emissionG + ctx.surface.sheenG * sheenWeight * 0.25);
+            radianceB += throughputB * (ambientLightB + lightB * localWeight + ctx.surface.emissionB + ctx.surface.sheenB * sheenWeight * 0.25);
 
             if (depth + 1 >= maxDepth) {
                 break;
@@ -1583,12 +1590,19 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private void rebuildLightCache(Scene scene) {
+        Vec3 ambient = scene.getAmbientColor();
         Vec3 background = scene.getBackgroundColor();
+        if (ambient != null) {
+            ambientR = ambient.x;
+            ambientG = ambient.y;
+            ambientB = ambient.z;
+        }
         if (background != null) {
             backgroundR = background.x;
             backgroundG = background.y;
             backgroundB = background.z;
         }
+        environmentStrength = Math.max(0.0, scene.getEnvironmentStrength());
 
         List<DirLightCache> dir = new ArrayList<>();
         List<PointLightCache> points = new ArrayList<>();
@@ -1696,12 +1710,19 @@ public class RayTracerRenderer implements Renderer {
 
     private long computeLightingSignature(Scene scene) {
         long h = 0xcbf29ce484222325L;
+        Vec3 ambient = scene.getAmbientColor();
         Vec3 background = scene.getBackgroundColor();
+        if (ambient != null) {
+            h = mixHash(h, Double.doubleToLongBits(ambient.x));
+            h = mixHash(h, Double.doubleToLongBits(ambient.y));
+            h = mixHash(h, Double.doubleToLongBits(ambient.z));
+        }
         if (background != null) {
             h = mixHash(h, Double.doubleToLongBits(background.x));
             h = mixHash(h, Double.doubleToLongBits(background.y));
             h = mixHash(h, Double.doubleToLongBits(background.z));
         }
+        h = mixHash(h, Double.doubleToLongBits(scene.getEnvironmentStrength()));
         for (Light light : scene.getLights()) {
             if (light == null) {
                 continue;
@@ -1789,6 +1810,7 @@ public class RayTracerRenderer implements Renderer {
             ctx.envB = 0.0;
             return;
         }
+        double envScale = Math.max(0.0, environmentStrength);
         double up = clamp01(dy * 0.5 + 0.5);
         double horizon = 1.0 - Math.abs(dy);
         double zenithR = clamp01(backgroundR * 1.35 + 0.05);
@@ -1814,6 +1836,9 @@ public class RayTracerRenderer implements Renderer {
         ctx.envR = mix(ctx.envR, horizonR, haze);
         ctx.envG = mix(ctx.envG, horizonG, haze);
         ctx.envB = mix(ctx.envB, horizonB, haze);
+        ctx.envR *= envScale;
+        ctx.envG *= envScale;
+        ctx.envB *= envScale;
 
         for (DirLightCache light : dirLights) {
             double sun = Math.max(0.0, dx * light.lx + dy * light.ly + dz * light.lz);
@@ -1833,7 +1858,11 @@ public class RayTracerRenderer implements Renderer {
 
     private void fillBackground(FrameBuffer fb) {
         if (hasVisibleEnvironment()) {
-            Arrays.fill(fb.getColorBuffer(), packColor(backgroundR, backgroundG, backgroundB));
+            Arrays.fill(fb.getColorBuffer(), packColor(
+                    toneMap(backgroundR * environmentStrength),
+                    toneMap(backgroundG * environmentStrength),
+                    toneMap(backgroundB * environmentStrength)
+            ));
         } else {
             Arrays.fill(fb.getColorBuffer(), packColor(0.0, 0.0, 0.0));
         }
@@ -1842,6 +1871,7 @@ public class RayTracerRenderer implements Renderer {
 
     private boolean hasVisibleEnvironment() {
         return skyEnabled
+                && environmentStrength > 1e-6
                 && (backgroundR > 1e-6 || backgroundG > 1e-6 || backgroundB > 1e-6);
     }
 

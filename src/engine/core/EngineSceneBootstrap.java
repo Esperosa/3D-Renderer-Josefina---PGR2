@@ -118,8 +118,15 @@ final class EngineSceneBootstrap {
         EngineWorldManager.registerLightName(engine, engine.coolWorldLight, "Cool Point");
         engine.worldLightColor = new Vec3(0.18, 0.20, 0.24);
         engine.worldBackgroundColor = new Vec3(0.06, 0.08, 0.11);
+        engine.worldPresetKey = "Studio Neutral";
+        engine.worldSunBaseIntensity = 1.35;
+        engine.worldFillBaseIntensity = 0.42;
+        engine.worldWarmBaseIntensity = 0.55;
+        engine.worldCoolBaseIntensity = 0.48;
         engine.worldLightStrength = 1.0;
+        engine.worldLightAppliedStrength = 1.0;
         defaultScene.setAmbientColor(engine.worldLightColor.mul(engine.worldLightStrength));
+        defaultScene.setEnvironmentStrength(engine.worldLightStrength);
         defaultScene.setBackgroundColor(engine.worldBackgroundColor);
         return defaultScene;
     }

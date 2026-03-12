@@ -340,7 +340,13 @@ final class EngineHistoryManager {
         snapshot.forceFields = new ArrayList<>();
         snapshot.worldLightColor = copyVec3(engine.worldLightColor);
         snapshot.worldBackgroundColor = copyVec3(engine.worldBackgroundColor);
+        snapshot.worldPresetKey = engine.worldPresetKey;
+        snapshot.worldSunBaseIntensity = engine.worldSunBaseIntensity;
+        snapshot.worldFillBaseIntensity = engine.worldFillBaseIntensity;
+        snapshot.worldWarmBaseIntensity = engine.worldWarmBaseIntensity;
+        snapshot.worldCoolBaseIntensity = engine.worldCoolBaseIntensity;
         snapshot.worldLightStrength = engine.worldLightStrength;
+        snapshot.worldLightAppliedStrength = engine.worldLightAppliedStrength;
         snapshot.worldLightAnimationEnabled = engine.worldLightAnimationEnabled;
         snapshot.spawnCounter = engine.spawnCounter;
         snapshot.lightCounter = engine.lightCounter;
@@ -438,7 +444,13 @@ final class EngineHistoryManager {
         }
         engine.worldLightColor = copyVec3(snapshot.worldLightColor);
         engine.worldBackgroundColor = copyVec3(snapshot.worldBackgroundColor);
+        engine.worldPresetKey = snapshot.worldPresetKey;
+        engine.worldSunBaseIntensity = snapshot.worldSunBaseIntensity;
+        engine.worldFillBaseIntensity = snapshot.worldFillBaseIntensity;
+        engine.worldWarmBaseIntensity = snapshot.worldWarmBaseIntensity;
+        engine.worldCoolBaseIntensity = snapshot.worldCoolBaseIntensity;
         engine.worldLightStrength = snapshot.worldLightStrength;
+        engine.worldLightAppliedStrength = snapshot.worldLightAppliedStrength;
         engine.worldLightAnimationEnabled = snapshot.worldLightAnimationEnabled;
         engine.spawnCounter = snapshot.spawnCounter;
         engine.lightCounter = snapshot.lightCounter;
@@ -634,7 +646,13 @@ final class EngineHistoryManager {
         }
         if (!vecEquals(a.worldLightColor, b.worldLightColor)
                 || !vecEquals(a.worldBackgroundColor, b.worldBackgroundColor)
+                || !stringEquals(a.worldPresetKey, b.worldPresetKey)
+                || !nearEqual(a.worldSunBaseIntensity, b.worldSunBaseIntensity)
+                || !nearEqual(a.worldFillBaseIntensity, b.worldFillBaseIntensity)
+                || !nearEqual(a.worldWarmBaseIntensity, b.worldWarmBaseIntensity)
+                || !nearEqual(a.worldCoolBaseIntensity, b.worldCoolBaseIntensity)
                 || !nearEqual(a.worldLightStrength, b.worldLightStrength)
+                || !nearEqual(a.worldLightAppliedStrength, b.worldLightAppliedStrength)
                 || a.worldLightAnimationEnabled != b.worldLightAnimationEnabled
                 || a.spawnCounter != b.spawnCounter
                 || a.lightCounter != b.lightCounter
@@ -1002,7 +1020,13 @@ final class EngineHistoryManager {
         List<SceneForceFieldState> forceFields;
         Vec3 worldLightColor;
         Vec3 worldBackgroundColor;
+        String worldPresetKey;
+        double worldSunBaseIntensity;
+        double worldFillBaseIntensity;
+        double worldWarmBaseIntensity;
+        double worldCoolBaseIntensity;
         double worldLightStrength;
+        double worldLightAppliedStrength;
         boolean worldLightAnimationEnabled;
         int spawnCounter;
         int lightCounter;

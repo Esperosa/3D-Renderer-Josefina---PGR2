@@ -81,6 +81,7 @@ public class PathTracerRenderer implements Renderer {
     private double backgroundR = 0.06;
     private double backgroundG = 0.07;
     private double backgroundB = 0.09;
+    private double environmentStrength = 1.0;
 
     private long geometrySignature = Long.MIN_VALUE;
     private long lightingSignature = Long.MIN_VALUE;
@@ -377,10 +378,16 @@ public class PathTracerRenderer implements Renderer {
             double transmissionProbability = clamp01(ctx.surface.transmission * (1.0 - fresnel));
             double specProbability = clamp01(Math.max(ctx.surface.reflectivity, fresnel + tri.material.getClearcoatFactor() * 0.14));
             double diffuseProbability = clamp01(1.0 - transmissionProbability - specProbability);
+            double ambientLightR = baseR * ambientR * diffuseProbability;
+            double ambientLightG = baseG * ambientG * diffuseProbability;
+            double ambientLightB = baseB * ambientB * diffuseProbability;
 
             radianceR += throughputR * ctx.surface.emissionR;
             radianceG += throughputG * ctx.surface.emissionG;
             radianceB += throughputB * ctx.surface.emissionB;
+            radianceR += throughputR * ambientLightR;
+            radianceG += throughputG * ambientLightG;
+            radianceB += throughputB * ambientLightB;
             double sheenWeight = Math.pow(1.0 - ndotv, 1.0 + tri.material.getSheenRoughness() * 5.0);
             radianceR += throughputR * ctx.surface.sheenR * sheenWeight * 0.22;
             radianceG += throughputG * ctx.surface.sheenG * sheenWeight * 0.22;
@@ -1631,6 +1638,7 @@ public class PathTracerRenderer implements Renderer {
             backgroundG = background.y;
             backgroundB = background.z;
         }
+        environmentStrength = Math.max(0.0, scene.getEnvironmentStrength());
 
         List<DirLightCache> dir = new ArrayList<>();
         List<PointLightCache> points = new ArrayList<>();
@@ -1750,6 +1758,7 @@ public class PathTracerRenderer implements Renderer {
             h = mixHash(h, Double.doubleToLongBits(background.y));
             h = mixHash(h, Double.doubleToLongBits(background.z));
         }
+        h = mixHash(h, Double.doubleToLongBits(scene.getEnvironmentStrength()));
         for (Light light : scene.getLights()) {
             if (light == null) {
                 continue;
@@ -1837,6 +1846,7 @@ public class PathTracerRenderer implements Renderer {
             ctx.envB = 0.0;
             return;
         }
+        double envScale = Math.max(0.0, environmentStrength);
         double up = clamp01(dy * 0.5 + 0.5);
         double horizon = 1.0 - Math.abs(dy);
         double zenithR = clamp01(backgroundR * 1.35 + 0.05);
@@ -1862,6 +1872,9 @@ public class PathTracerRenderer implements Renderer {
         ctx.envR = mix(ctx.envR, horizonR, haze);
         ctx.envG = mix(ctx.envG, horizonG, haze);
         ctx.envB = mix(ctx.envB, horizonB, haze);
+        ctx.envR *= envScale;
+        ctx.envG *= envScale;
+        ctx.envB *= envScale;
 
         for (DirLightCache light : dirLights) {
             double sun = Math.max(0.0, dx * light.lx + dy * light.ly + dz * light.lz);
@@ -1881,7 +1894,11 @@ public class PathTracerRenderer implements Renderer {
 
     private void fillBackground(FrameBuffer fb) {
         if (hasVisibleEnvironment()) {
-            Arrays.fill(fb.getColorBuffer(), packColor(backgroundR, backgroundG, backgroundB));
+            Arrays.fill(fb.getColorBuffer(), packColor(
+                    toneMap(backgroundR * environmentStrength),
+                    toneMap(backgroundG * environmentStrength),
+                    toneMap(backgroundB * environmentStrength)
+            ));
         } else {
             Arrays.fill(fb.getColorBuffer(), packColor(0.0, 0.0, 0.0));
         }
@@ -1890,6 +1907,7 @@ public class PathTracerRenderer implements Renderer {
 
     private boolean hasVisibleEnvironment() {
         return skyEnabled
+                && environmentStrength > 1e-6
                 && (backgroundR > 1e-6 || backgroundG > 1e-6 || backgroundB > 1e-6);
     }
 
