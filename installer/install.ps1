@@ -114,8 +114,12 @@ function Write-UninstallRegistry {
     )
 
     $uninstallLauncher = Join-Path $InstallRoot "Uninstall 3D-Render-Physics.bat"
+    $cmdExePath = Join-Path $env:SystemRoot "System32\cmd.exe"
     $iconPath = Join-Path $InstallRoot "assets\icons\IcoUni.ico"
     $installSizeKb = [Math]::Ceiling(((Get-ChildItem -Path $InstallRoot -Recurse -File | Measure-Object -Property Length -Sum).Sum) / 1KB)
+    $quotedUninstallLauncher = '"' + $uninstallLauncher + '"'
+    $uninstallCommand = '"' + $cmdExePath + '" /c ' + $quotedUninstallLauncher
+    $quietUninstallCommand = $uninstallCommand + " -Silent"
 
     New-Item -Path $uninstallRegistryKey -Force | Out-Null
     Set-ItemProperty -Path $uninstallRegistryKey -Name "DisplayName" -Value $appName
@@ -123,8 +127,8 @@ function Write-UninstallRegistry {
     Set-ItemProperty -Path $uninstallRegistryKey -Name "Publisher" -Value $appPublisher
     Set-ItemProperty -Path $uninstallRegistryKey -Name "InstallLocation" -Value $InstallRoot
     Set-ItemProperty -Path $uninstallRegistryKey -Name "DisplayIcon" -Value $iconPath
-    Set-ItemProperty -Path $uninstallRegistryKey -Name "UninstallString" -Value $uninstallLauncher
-    Set-ItemProperty -Path $uninstallRegistryKey -Name "QuietUninstallString" -Value ($uninstallLauncher + " -Silent")
+    Set-ItemProperty -Path $uninstallRegistryKey -Name "UninstallString" -Value $uninstallCommand
+    Set-ItemProperty -Path $uninstallRegistryKey -Name "QuietUninstallString" -Value $quietUninstallCommand
     Set-ItemProperty -Path $uninstallRegistryKey -Name "EstimatedSize" -Value ([int] $installSizeKb) -Type DWord
     Set-ItemProperty -Path $uninstallRegistryKey -Name "NoModify" -Value 1 -Type DWord
     Set-ItemProperty -Path $uninstallRegistryKey -Name "NoRepair" -Value 1 -Type DWord

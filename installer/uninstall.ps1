@@ -67,12 +67,16 @@ try {
     $cleanupLines = @(
         "@echo off",
         "setlocal",
+        "set tries=0",
         ":retry",
         "rmdir /s /q ""$installRoot"" >nul 2>nul",
         "if exist ""$installRoot"" (",
+        "  set /a tries+=1 >nul",
+        "  if %tries% GEQ 90 goto end",
         "  ping 127.0.0.1 -n 2 >nul",
         "  goto retry",
         ")",
+        ":end",
         "del /f /q ""%~f0"" >nul 2>nul"
     )
     Set-Content -Path $cleanupScriptPath -Value $cleanupLines -Encoding ASCII

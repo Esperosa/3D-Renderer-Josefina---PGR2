@@ -252,6 +252,7 @@ function Invoke-InstallerSmokeTest {
     $startMenuDir = Join-Path $smokeRoot "Programs"
     $uninstallKeyName = "3D-Render-Physics-Smoke"
     $registryPath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\$uninstallKeyName"
+    $cmdExePath = Join-Path $env:SystemRoot "System32\cmd.exe"
     $envNames = @(
         "3D_RENDER_PHYSICS_INSTALL_DIR",
         "3D_RENDER_PHYSICS_DESKTOP_DIR",
@@ -293,6 +294,16 @@ function Invoke-InstallerSmokeTest {
         Assert-Exists (Join-Path $startMenuDir "3D-Render-Physics\3D-Render-Physics.lnk")
         Assert-Exists (Join-Path $startMenuDir "3D-Render-Physics\Odinstalovat 3D-Render-Physics.lnk")
         Assert-Exists $registryPath
+        $registryEntry = Get-ItemProperty -Path $registryPath
+        $expectedUninstallLauncher = Join-Path $installDir "Uninstall 3D-Render-Physics.bat"
+        $expectedUninstallString = '"' + $cmdExePath + '" /c "' + $expectedUninstallLauncher + '"'
+        $expectedQuietUninstallString = $expectedUninstallString + " -Silent"
+        if ($registryEntry.UninstallString -ne $expectedUninstallString) {
+            throw "Installer zapsal špatný UninstallString do registru."
+        }
+        if ($registryEntry.QuietUninstallString -ne $expectedQuietUninstallString) {
+            throw "Installer zapsal špatný QuietUninstallString do registru."
+        }
 
         Write-Host "Spouštím installed asset smoke test..."
         & (Join-Path $installDir "3D-Render-Physics-console.bat") "--package-smoke"

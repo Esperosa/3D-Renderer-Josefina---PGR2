@@ -1106,7 +1106,7 @@ Primární build a test workflow nepoužívá Maven ani Gradle. Repo ale obsahuj
 ### Windows release bundle
 
 ```powershell
-.\package.ps1 -Version v0.1.2
+.\package.ps1 -Version v0.1.3
 ```
 
 Script vytvoří portable appku s vlastním runtime přes `jlink`, přibalí potřebné `assets`, složí jednosouborový Windows installer přes `IExpress` a obě varianty uloží do `build/package/`.
