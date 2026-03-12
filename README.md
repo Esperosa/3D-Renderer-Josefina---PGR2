@@ -43,8 +43,6 @@
 
 ![Renderer overview](docs/readme-assets/renderer-overview.svg)
 
-> Program je poctivě rozdělený na stabilní vrstvy, použitelné pokročilé části a experimentální subsystémy. README záměrně nepřipisuje programu chování, které kód ve skutečnosti neumí.
-
 ## Tvrdá data a ověřené statistiky
 
 Tato sekce shrnuje čísla ověřená přímo nad aktuální codebase a referenční headless benchmarky vygenerované runnerem `tests/run-project-metrics.ps1` nebo `tests/run-project-metrics.sh`.
