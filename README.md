@@ -1103,13 +1103,21 @@ Primární build a test workflow nepoužívá Maven ani Gradle. Repo ale obsahuj
 .\build.ps1 -Run
 ```
 
-### Windows portable bundle
+### Windows release bundle
 
 ```powershell
-.\package.ps1 -Version v0.1.1
+.\package.ps1 -Version v0.1.2
 ```
 
-Script vytvoří portable appku s vlastním runtime přes `jlink`, zkopíruje potřebné `assets`, ověří launcher přes `--help` a `--package-smoke` a výsledek uloží do `build/package/`.
+Script vytvoří portable appku s vlastním runtime přes `jlink`, přibalí potřebné `assets`, složí jednosouborový Windows installer přes `IExpress` a obě varianty uloží do `build/package/`.
+
+Během buildu se zároveň ověří:
+- portable launcher přes `--help`
+- portable asset smoke přes `--package-smoke`
+- tichá instalace installeru do izolované testovací cesty
+- vytvoření zástupců a uninstall záznamu
+- spuštění instalované appky přes asset smoke
+- tichá odinstalace a úklid po ní
 
 ### Linux / macOS / Git Bash
 
