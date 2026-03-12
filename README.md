@@ -1208,4 +1208,3 @@ build/           lokální build artefakty
 
 ---
 
-Program je dokumentovaný jako technický studentský projekt z počítačové grafiky. Cílem README není marketingové shrnutí, ale přesný a přehledný popis toho, co program skutečně dělá, jaké výpočty používá, kde jsou silné stránky a kde jsou záměrná nebo praktická omezení.
