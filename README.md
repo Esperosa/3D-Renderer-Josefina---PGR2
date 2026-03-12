@@ -1103,17 +1103,17 @@ Primární build a test workflow nepoužívá Maven ani Gradle. Repo ale obsahuj
 .\build.ps1 -Run
 ```
 
-### Windows release bundle
+### Windows offline installer
 
 ```powershell
-.\package.ps1 -Version v0.1.3
+.\package.ps1 -Version vX.Y.Z
 ```
 
-Script vytvoří portable appku s vlastním runtime přes `jlink`, přibalí potřebné `assets`, složí jednosouborový Windows installer přes `IExpress` a obě varianty uloží do `build/package/`.
+Script vytvoří jednosouborový offline Windows installer `.exe`, který v sobě nese vlastní Java runtime, potřebné `assets` a po instalaci se chová jako běžný desktop program se zástupci a odinstalací. Do `build/package/` ukládá jen finální instalačku.
 
 Během buildu se zároveň ověří:
-- portable launcher přes `--help`
-- portable asset smoke přes `--package-smoke`
+- zabalená aplikace přes `--help`
+- zabalená aplikace přes `--package-smoke`
 - tichá instalace installeru do izolované testovací cesty
 - vytvoření zástupců a uninstall záznamu
 - spuštění instalované appky přes asset smoke

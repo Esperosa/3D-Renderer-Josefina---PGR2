@@ -80,10 +80,10 @@ function Resolve-VersionTag {
     return $latestTag.Trim()
 }
 
-function Write-PortableLaunchers {
+function Write-AppLaunchers {
     param(
         [Parameter(Mandatory = $true)]
-        [string] $DistRoot
+        [string] $AppRoot
     )
 
     $guiLauncher = @'
@@ -108,8 +108,8 @@ popd >nul
 exit /b %EXIT_CODE%
 '@
 
-    Set-Content -Path (Join-Path $DistRoot "3D-Render-Physics.bat") -Value $guiLauncher -Encoding ASCII
-    Set-Content -Path (Join-Path $DistRoot "3D-Render-Physics-console.bat") -Value $consoleLauncher -Encoding ASCII
+    Set-Content -Path (Join-Path $AppRoot "3D-Render-Physics.bat") -Value $guiLauncher -Encoding ASCII
+    Set-Content -Path (Join-Path $AppRoot "3D-Render-Physics-console.bat") -Value $consoleLauncher -Encoding ASCII
 }
 
 function Write-InstallerLauncher {
@@ -201,22 +201,43 @@ function Remove-IExpressScratchFiles {
             ForEach-Object { Remove-Item -Recurse -Force $_.FullName }
 }
 
-function Invoke-PortableSmokeTests {
+function New-AppPayload {
     param(
         [Parameter(Mandatory = $true)]
-        [string] $DistRoot
+        [string] $PayloadRoot,
+        [Parameter(Mandatory = $true)]
+        [string] $JarPath,
+        [Parameter(Mandatory = $true)]
+        [string] $RuntimeRoot,
+        [Parameter(Mandatory = $true)]
+        [string] $RepoRoot
     )
 
-    Write-Host "Spouštím packaged help smoke test..."
-    & (Join-Path $DistRoot "3D-Render-Physics-console.bat") "--help"
+    New-Item -ItemType Directory -Path $PayloadRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $PayloadRoot "app") -Force | Out-Null
+    Copy-Item $JarPath (Join-Path $PayloadRoot "app") -Force
+    Copy-Item $RuntimeRoot (Join-Path $PayloadRoot "runtime") -Recurse -Force
+    Copy-Item (Join-Path $RepoRoot "assets") (Join-Path $PayloadRoot "assets") -Recurse -Force
+    Copy-Item (Join-Path $RepoRoot "README.md") (Join-Path $PayloadRoot "README.md") -Force
+    Write-AppLaunchers -AppRoot $PayloadRoot
+}
+
+function Invoke-PayloadSmokeTests {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $PayloadRoot
+    )
+
+    Write-Host "Spouštím payload help smoke test..."
+    & (Join-Path $PayloadRoot "3D-Render-Physics-console.bat") "--help"
     if ($LASTEXITCODE -ne 0) {
-        throw "Packaged help smoke test selhal."
+        throw "Payload help smoke test selhal."
     }
 
-    Write-Host "Spouštím packaged asset smoke test..."
-    & (Join-Path $DistRoot "3D-Render-Physics-console.bat") "--package-smoke"
+    Write-Host "Spouštím payload asset smoke test..."
+    & (Join-Path $PayloadRoot "3D-Render-Physics-console.bat") "--package-smoke"
     if ($LASTEXITCODE -ne 0) {
-        throw "Packaged asset smoke test selhal."
+        throw "Payload asset smoke test selhal."
     }
 }
 
@@ -246,10 +267,10 @@ function Invoke-InstallerSmokeTest {
         [string] $PackageRoot
     )
 
-    $smokeRoot = Join-Path $PackageRoot "installer-smoke"
-    $installDir = Join-Path $smokeRoot "Install"
-    $desktopDir = Join-Path $smokeRoot "Desktop"
-    $startMenuDir = Join-Path $smokeRoot "Programs"
+    $smokeRoot = Join-Path $PackageRoot "installer smoke"
+    $installDir = Join-Path $smokeRoot "Classic Program"
+    $desktopDir = Join-Path $smokeRoot "Desktop Shortcuts"
+    $startMenuDir = Join-Path $smokeRoot "Start Menu"
     $uninstallKeyName = "3D-Render-Physics-Smoke"
     $registryPath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\$uninstallKeyName"
     $cmdExePath = Join-Path $env:SystemRoot "System32\cmd.exe"
@@ -336,18 +357,16 @@ function Invoke-InstallerSmokeTest {
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $versionTag = Resolve-VersionTag -RepoRoot $repoRoot -RequestedVersion $Version
 $safeVersion = $versionTag.Trim()
-$packageBaseName = "3D-Render-Physics-$safeVersion-windows-portable"
 $installerBaseName = "3D-Render-Physics-$safeVersion-windows-installer.exe"
 
 $buildRoot = Join-Path $repoRoot "build"
 $classesRoot = Join-Path $buildRoot "classes"
 $packageRoot = Join-Path $buildRoot "package"
-$stagingRoot = Join-Path $packageRoot "staging"
-$stagingAppRoot = Join-Path $stagingRoot "app"
-$stagingRuntimeRoot = Join-Path $stagingRoot "runtime"
-$distRoot = Join-Path $packageRoot $packageBaseName
-$zipPath = Join-Path $packageRoot ($packageBaseName + ".zip")
-$jarPath = Join-Path $stagingAppRoot "3D-Render-Physics.jar"
+$packageStagingRoot = Join-Path $packageRoot "staging"
+$runtimeRoot = Join-Path $packageStagingRoot "runtime"
+$payloadRoot = Join-Path $packageStagingRoot "app-payload"
+$appRoot = Join-Path $payloadRoot "3D-Render-Physics"
+$jarPath = Join-Path $packageStagingRoot "3D-Render-Physics.jar"
 $installerStagingRoot = Join-Path $packageRoot "installer-staging"
 $installerPayloadZipPath = Join-Path $installerStagingRoot "3D-Render-Physics-payload.zip"
 $installerScriptPath = Join-Path $installerStagingRoot "install.ps1"
@@ -362,22 +381,18 @@ $jdeps = Get-JavaTool "jdeps"
 $jlink = Get-JavaTool "jlink"
 $iExpress = Get-IExpressTool
 
-Remove-PathIfExists $stagingRoot
-Remove-PathIfExists $distRoot
-Remove-PathIfExists $zipPath
-Remove-PathIfExists $installerStagingRoot
-Remove-PathIfExists $installerExePath
-Remove-IExpressScratchFiles -PackageRoot $packageRoot -InstallerExePath $installerExePath
-New-Item -ItemType Directory -Path $classesRoot -Force | Out-Null
-New-Item -ItemType Directory -Path $stagingAppRoot -Force | Out-Null
+Remove-PathIfExists $packageRoot
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $packageStagingRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $installerStagingRoot -Force | Out-Null
+Remove-IExpressScratchFiles -PackageRoot $packageRoot -InstallerExePath $installerExePath
 
 $srcFiles = Get-ChildItem -Path (Join-Path $repoRoot "src") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 if ($srcFiles.Count -eq 0) {
     throw "Ve složce src nebyly nalezeny žádné Java zdrojáky."
 }
 
-Write-Host "Kompiluji hlavní zdrojáky pro release balík..."
+Write-Host "Kompiluji hlavní zdrojáky pro offline installer..."
 Remove-PathIfExists $classesRoot
 New-Item -ItemType Directory -Path $classesRoot -Force | Out-Null
 & $javac "-encoding" "UTF-8" "-d" $classesRoot @srcFiles
@@ -398,44 +413,35 @@ if ([string]::IsNullOrWhiteSpace($moduleDeps)) {
 }
 
 Write-Host "Skládám vlastní runtime přes jlink..."
-& $jlink "--add-modules" $moduleDeps "--strip-debug" "--no-header-files" "--no-man-pages" "--compress=2" "--output" $stagingRuntimeRoot
+& $jlink "--add-modules" $moduleDeps "--strip-debug" "--no-header-files" "--no-man-pages" "--compress=2" "--output" $runtimeRoot
 if ($LASTEXITCODE -ne 0) {
     throw "Vytvoření runtime image přes jlink selhalo."
 }
 
-Write-Host "Připravuji portable adresář..."
-New-Item -ItemType Directory -Path $distRoot -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $distRoot "app") -Force | Out-Null
-Copy-Item $jarPath (Join-Path $distRoot "app") -Force
-Copy-Item $stagingRuntimeRoot (Join-Path $distRoot "runtime") -Recurse -Force
-Copy-Item (Join-Path $repoRoot "assets") (Join-Path $distRoot "assets") -Recurse -Force
-Copy-Item (Join-Path $repoRoot "README.md") (Join-Path $distRoot "README.md") -Force
-Write-PortableLaunchers -DistRoot $distRoot
+Write-Host "Připravuji interní payload pro instalačku..."
+New-AppPayload -PayloadRoot $appRoot -JarPath $jarPath -RuntimeRoot $runtimeRoot -RepoRoot $repoRoot
 
-Write-Host "Ověřuji obsah portable bundle..."
-Assert-Exists (Join-Path $distRoot "app\3D-Render-Physics.jar")
-Assert-Exists (Join-Path $distRoot "runtime\bin\java.exe")
-Assert-Exists (Join-Path $distRoot "runtime\bin\javaw.exe")
-Assert-Exists (Join-Path $distRoot "assets\icons\IcoUni.png")
-Assert-Exists (Join-Path $distRoot "assets\icons\IcoUni.ico")
-Assert-Exists (Join-Path $distRoot "assets\models\cube.obj")
-Assert-Exists (Join-Path $distRoot "assets\models\StartModel.glb")
+Write-Host "Ověřuji interní payload..."
+Assert-Exists (Join-Path $appRoot "app\3D-Render-Physics.jar")
+Assert-Exists (Join-Path $appRoot "runtime\bin\java.exe")
+Assert-Exists (Join-Path $appRoot "runtime\bin\javaw.exe")
+Assert-Exists (Join-Path $appRoot "assets\icons\IcoUni.png")
+Assert-Exists (Join-Path $appRoot "assets\icons\IcoUni.ico")
+Assert-Exists (Join-Path $appRoot "assets\models\cube.obj")
+Assert-Exists (Join-Path $appRoot "assets\models\StartModel.glb")
 
 try {
-    Invoke-PortableSmokeTests -DistRoot $distRoot
+    Invoke-PayloadSmokeTests -PayloadRoot $appRoot
 
-    Write-Host "Vytvářím ZIP archive portable bundle..."
-    Compress-Archive -Path $distRoot -DestinationPath $zipPath -Force
+    Write-Host "Baluji payload pro one-file installer..."
+    Compress-Archive -Path $appRoot -DestinationPath $installerPayloadZipPath -Force
 
-    Write-Host "Připravuji installer payload..."
-    New-Item -ItemType Directory -Path $installerStagingRoot -Force | Out-Null
-    Copy-Item $zipPath $installerPayloadZipPath -Force
     Copy-Item (Join-Path $repoRoot "installer\install.ps1") $installerScriptPath -Force
     Copy-Item (Join-Path $repoRoot "installer\uninstall.ps1") $uninstallerScriptPath -Force
     Write-InstallerLauncher -PathValue $installerCmdPath -VersionValue $safeVersion
     Write-IExpressSed -PathValue $installerSedPath -InstallerExePath $installerExePath -InstallerStagingRoot $installerStagingRoot
 
-    Write-Host "Vytvářím Windows installer..."
+    Write-Host "Vytvářím one-file Windows installer..."
     $iExpressProcess = Start-Process -FilePath $iExpress -ArgumentList @("/N", "/Q", "/M", $installerSedPath) -Wait -PassThru
     if ($iExpressProcess.ExitCode -ne 0) {
         throw "IExpress selhal při tvorbě installeru."
@@ -444,19 +450,15 @@ try {
 
     Invoke-InstallerSmokeTest -InstallerExePath $installerExePath -PackageRoot $packageRoot
     Remove-IExpressScratchFiles -PackageRoot $packageRoot -InstallerExePath $installerExePath
-    Remove-PathIfExists $stagingRoot
+    Remove-PathIfExists $packageStagingRoot
     Remove-PathIfExists $installerStagingRoot
 } catch {
-    Remove-PathIfExists $distRoot
-    Remove-PathIfExists $zipPath
     Remove-PathIfExists $installerExePath
-    Remove-PathIfExists $stagingRoot
+    Remove-PathIfExists $packageStagingRoot
     Remove-PathIfExists $installerStagingRoot
     Remove-IExpressScratchFiles -PackageRoot $packageRoot -InstallerExePath $installerExePath
     throw
 }
 
-Write-Host "Release balíky jsou hotové:"
-Write-Host "  Portable folder: $distRoot"
-Write-Host "  Portable zip:    $zipPath"
-Write-Host "  Installer exe:   $installerExePath"
+Write-Host "One-file offline installer je hotový:"
+Write-Host "  Installer exe: $installerExePath"
