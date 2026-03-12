@@ -38,7 +38,7 @@ public class CameraController {
         this.camera = camera;
         this.mode = mode;
         this.moveSpeed = 2.2;
-        this.rotateSpeed = 0.0012;
+        this.rotateSpeed = 0.00138;
         this.orbitTarget = new Vec3(0.0, 0.8, 0.0);
         this.yaw = 0.0;
         this.pitch = 0.0;

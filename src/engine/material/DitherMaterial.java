@@ -1,5 +1,7 @@
 package engine.material;
 
+import engine.util.BitFont;
+
 /**
  * Tady držím parametry materiálu pro dithering a ASCII režimy vykreslení.
  */
@@ -16,7 +18,7 @@ public class DitherMaterial extends Material {
         this.contrast = 1.0;
         this.invert = false;
         this.cellSize = 6;
-        this.asciiCharset = " .:-=+*#%@";
+        this.asciiCharset = BitFont.DEFAULT_ASCII_CHARSET;
     }
 
     public int getToneCount() {
@@ -56,9 +58,9 @@ public class DitherMaterial extends Material {
     }
 
     public void setAsciiCharset(String charset) {
-        if (charset == null || charset.isBlank()) {
+        if (charset == null) {
             return;
         }
-        this.asciiCharset = charset;
+        this.asciiCharset = BitFont.sanitizeCharset(charset);
     }
 }

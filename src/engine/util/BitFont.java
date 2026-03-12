@@ -15,6 +15,8 @@ public class BitFont {
     private static final int ASCII_START = 32;
     private static final int ASCII_END = 126;
     private static final int GLYPH_COUNT = ASCII_END - ASCII_START + 1;
+    public static final String DEFAULT_ASCII_CHARSET =
+            " .'`^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 
     private final int charWidth;
     private final int charHeight;
@@ -29,6 +31,31 @@ public class BitFont {
         this.charHeight = Math.max(2, charHeight);
         this.glyphs = new boolean[GLYPH_COUNT][this.charHeight][this.charWidth];
         initDefaultGlyphs();
+    }
+
+    public static String sanitizeCharset(String charset) {
+        if (charset == null) {
+            return DEFAULT_ASCII_CHARSET;
+        }
+
+        boolean[] seen = new boolean[GLYPH_COUNT];
+        StringBuilder normalized = new StringBuilder(charset.length());
+        for (int i = 0; i < charset.length(); i++) {
+            char ch = charset.charAt(i);
+            if (ch < ASCII_START || ch > ASCII_END) {
+                continue;
+            }
+            int glyphIndex = ch - ASCII_START;
+            if (seen[glyphIndex]) {
+                continue;
+            }
+            seen[glyphIndex] = true;
+            normalized.append(ch);
+        }
+        if (normalized.length() == 0) {
+            return DEFAULT_ASCII_CHARSET;
+        }
+        return normalized.toString();
     }
 
     /**

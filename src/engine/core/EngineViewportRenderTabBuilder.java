@@ -141,10 +141,15 @@ final class EngineViewportRenderTabBuilder {
                 engine.wireframeRenderer.setParameter("dashedMode", value));
 
         JPanel ditherSection = engine.addCollapsibleSection(renderTab, "Dither / ASCII", false);
+        DitherRenderer.DitherStyle ditherStyle = engine.ditherRenderer.getStyle();
         engine.addComboRow(ditherSection, "Styl",
                 new String[]{"BLUE_NOISE", "PATTERN", "ASCII"},
-                engine.ditherRenderer.getStyle().toString(),
-                value -> engine.setDitherStyle(DitherRenderer.DitherStyle.valueOf(value)));
+                ditherStyle.toString(),
+                value -> {
+                    engine.setDitherStyle(DitherRenderer.DitherStyle.valueOf(value));
+                    build(engine);
+                    engine.window.selectRightTab("Render");
+                });
         engine.addNumericRow(ditherSection, "Počet tónů", Integer.toString(engine.ditherToneCount), text -> {
             engine.ditherToneCount = Math.max(2, (int) Math.round(engine.parseOrFallback(text, engine.ditherToneCount)));
             engine.ditherRenderer.setParameter("toneCount", engine.ditherToneCount);
@@ -153,20 +158,26 @@ final class EngineViewportRenderTabBuilder {
             engine.ditherContrast = Math.max(0.1, Math.min(4.0, engine.parseOrFallback(text, engine.ditherContrast)));
             engine.ditherRenderer.setParameter("contrast", engine.ditherContrast);
         });
-        engine.addNumericRow(ditherSection, "Velikost buňky", Integer.toString(engine.ditherCellSize), text -> {
-            engine.ditherCellSize = Math.max(2, (int) Math.round(engine.parseOrFallback(text, engine.ditherCellSize)));
-            engine.ditherRenderer.setParameter("cellSize", engine.ditherCellSize);
+        engine.addNumericRow(ditherSection, "Světelná pomoc", engine.formatTransformValue(engine.ditherLightAssist), text -> {
+            engine.ditherLightAssist = Math.max(0.0, Math.min(1.0, engine.parseOrFallback(text, engine.ditherLightAssist)));
+            engine.ditherRenderer.setParameter("lightAssist", engine.ditherLightAssist);
         });
         engine.addBooleanRow(ditherSection, "Invertovat", engine.ditherInvert, value -> {
             engine.ditherInvert = value;
             engine.ditherRenderer.setParameter("invert", engine.ditherInvert);
         });
-        engine.addTextRow(ditherSection, "Znaková sada", engine.ditherAsciiCharset, value -> {
-            if (!value.isBlank()) {
-                engine.ditherAsciiCharset = value;
-                engine.ditherRenderer.setParameter("asciiCharset", engine.ditherAsciiCharset);
-            }
-        });
+        if (ditherStyle == DitherRenderer.DitherStyle.ASCII) {
+            engine.addNumericRow(ditherSection, "Velikost buňky", Integer.toString(engine.ditherCellSize), text -> {
+                engine.ditherCellSize = Math.max(2, (int) Math.round(engine.parseOrFallback(text, engine.ditherCellSize)));
+                engine.ditherRenderer.setParameter("cellSize", engine.ditherCellSize);
+            });
+            engine.addTextRow(ditherSection, "Znaková sada ASCII", engine.ditherAsciiCharset, value -> {
+                if (!value.isBlank()) {
+                    engine.ditherAsciiCharset = value;
+                    engine.ditherRenderer.setParameter("asciiCharset", engine.ditherAsciiCharset);
+                }
+            });
+        }
 
         JPanel temporalSection = engine.addCollapsibleSection(renderTab, "Temporal Noise", false);
         temporalSection.add(UiBuilder.helperText("Temporal Noise používá stabilní 2D grain na pevné mřížce. Objekty běží integer kroky po X i Y přes společný regionální krokovač, pozadí zůstává statické."));

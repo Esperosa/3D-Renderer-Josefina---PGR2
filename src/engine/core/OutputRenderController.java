@@ -16,6 +16,7 @@ import engine.math.Vec3;
 import engine.scene.Scene;
 import engine.ui.UiStrings;
 import engine.util.AnimatedGifWriter;
+import engine.util.BitFont;
 import engine.util.MjpegAviWriter;
 import engine.util.ThreadPool;
 
@@ -80,9 +81,10 @@ public class OutputRenderController {
         public String ditherStyle = DitherRenderer.DitherStyle.BLUE_NOISE.name();
         public int ditherToneCount = 2;
         public double ditherContrast = 1.15;
+        public double ditherLightAssist = 0.38;
         public boolean ditherInvert = false;
         public int ditherCellSize = 6;
-        public String ditherAsciiCharset = " .:-=+*#%@";
+        public String ditherAsciiCharset = BitFont.DEFAULT_ASCII_CHARSET;
         public double temporalTickRate = 6.8;
         public double temporalNearContribution = 2.22;
         public double temporalGrazingContribution = 1.87;
@@ -188,6 +190,7 @@ public class OutputRenderController {
                 : settings.ditherStyle;
         settings.ditherToneCount = engine.ditherToneCount;
         settings.ditherContrast = engine.ditherContrast;
+        settings.ditherLightAssist = engine.ditherLightAssist;
         settings.ditherInvert = engine.ditherInvert;
         settings.ditherCellSize = engine.ditherCellSize;
         settings.ditherAsciiCharset = engine.ditherAsciiCharset;
@@ -449,6 +452,7 @@ public class OutputRenderController {
         job.ditherStyle = settings.ditherStyle;
         job.ditherToneCount = Math.max(2, settings.ditherToneCount);
         job.ditherContrast = Math.max(0.1, Math.min(4.0, settings.ditherContrast));
+        job.ditherLightAssist = Math.max(0.0, Math.min(1.0, settings.ditherLightAssist));
         job.ditherInvert = settings.ditherInvert;
         job.ditherCellSize = Math.max(2, settings.ditherCellSize);
         job.ditherAsciiCharset = settings.ditherAsciiCharset;
@@ -991,6 +995,7 @@ public class OutputRenderController {
                 renderer.setParameter("style", job.ditherStyle);
                 renderer.setParameter("toneCount", job.ditherToneCount);
                 renderer.setParameter("contrast", job.ditherContrast);
+                renderer.setParameter("lightAssist", job.ditherLightAssist);
                 renderer.setParameter("invert", job.ditherInvert);
                 renderer.setParameter("cellSize", job.ditherCellSize);
                 renderer.setParameter("asciiCharset", job.ditherAsciiCharset);
@@ -1232,9 +1237,12 @@ public class OutputRenderController {
             case WIREFRAME -> "Hloubkově skryté " + OutputRenderSupport.onOff(job.wireframeDepthHiddenLines)
                     + "  Silueta " + OutputRenderSupport.onOff(job.wireframeSilhouetteBoost)
                     + "  Přerušované " + OutputRenderSupport.onOff(job.wireframeDashedMode);
-            case DITHERING -> "Styl " + job.ditherStyle
+            case DITHERING -> "ASCII".equalsIgnoreCase(job.ditherStyle)
+                    ? "Styl " + job.ditherStyle
                     + "  Tóny " + job.ditherToneCount
-                    + "  Buňka " + job.ditherCellSize;
+                    + "  Buňka " + job.ditherCellSize
+                    : "Styl " + job.ditherStyle
+                    + "  Tóny " + job.ditherToneCount;
             case TEMPORAL_NOISE -> "Tempo " + OutputRenderSupport.fmt(job.temporalTickRate)
                     + "  Blízkost " + OutputRenderSupport.fmt(job.temporalNearContribution)
                     + "  Úhel " + OutputRenderSupport.fmt(job.temporalGrazingContribution)

@@ -49,6 +49,7 @@ final class OutputRenderJob {
     String ditherStyle;
     int ditherToneCount;
     double ditherContrast;
+    double ditherLightAssist;
     boolean ditherInvert;
     int ditherCellSize;
     String ditherAsciiCharset;

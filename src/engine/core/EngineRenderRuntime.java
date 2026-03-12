@@ -324,6 +324,7 @@ final class EngineRenderRuntime {
         if (engine.progressiveViewportEnabled && engine.interactiveRenderScaleActive) {
             scale *= interactiveScaleFactor(engine);
         }
+        scale *= clamp(engine.safetyViewportScaleClamp, 0.35, 1.0);
         return scale;
     }
 
@@ -348,7 +349,7 @@ final class EngineRenderRuntime {
 
         double previousAppliedScale = engine.viewportAdaptiveScaleApplied;
         boolean previousCriticalPreview = engine.viewportCriticalPreviewActive;
-        if (engine.progressiveViewportEnabled && supportsInteractiveViewportScaling(activeMode)) {
+        if (engine.progressiveViewportEnabled && supportsInteractiveViewportScaling(engine, activeMode)) {
             updateAdaptiveViewportAssist(engine, activeMode, now, interactionActive, withinInteractionTail);
         } else {
             resetAdaptiveViewportState(engine, 0.14);
@@ -366,8 +367,17 @@ final class EngineRenderRuntime {
         }
     }
 
-    private static boolean supportsInteractiveViewportScaling(RenderMode mode) {
-        return mode != null;
+    private static boolean supportsInteractiveViewportScaling(Engine engine, RenderMode mode) {
+        if (mode == null) {
+            return false;
+        }
+        if (mode == RenderMode.DITHERING
+                && engine != null
+                && engine.ditherRenderer != null
+                && engine.ditherRenderer.getStyle() == DitherRenderer.DitherStyle.ASCII) {
+            return false;
+        }
+        return true;
     }
 
     static RenderMode resolveViewportRenderMode(Engine engine, boolean interactionActive) {

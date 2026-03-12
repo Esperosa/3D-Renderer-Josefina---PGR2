@@ -102,6 +102,7 @@ final class EngineLifecycleController {
         engine.ditherRenderer.setParameter("workerCount", engine.parallelWorkerCount);
         engine.ditherRenderer.setParameter("toneCount", engine.ditherToneCount);
         engine.ditherRenderer.setParameter("contrast", engine.ditherContrast);
+        engine.ditherRenderer.setParameter("lightAssist", engine.ditherLightAssist);
         engine.ditherRenderer.setParameter("invert", engine.ditherInvert);
         engine.ditherRenderer.setParameter("cellSize", engine.ditherCellSize);
         engine.ditherRenderer.setParameter("asciiCharset", engine.ditherAsciiCharset);
@@ -207,6 +208,24 @@ final class EngineLifecycleController {
                 }
                 try {
                     Thread.sleep(33);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                continue;
+            }
+            if (EngineSafetyController.shouldHoldFrame(engine, now)) {
+                String[] holdOverlay = EngineSafetyController.augmentOverlay(
+                        engine,
+                        engine.debugOverlayEnabled ? EngineViewportOverlay.buildDebugHudLines(engine, elapsed) : null
+                );
+                engine.window.setOverlayText(holdOverlay);
+                engine.window.blit(
+                        engine.frameBuffer.getColorBuffer(),
+                        engine.frameBuffer.getWidth(),
+                        engine.frameBuffer.getHeight());
+                try {
+                    Thread.sleep(EngineSafetyController.recoverySleepMillis());
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -326,9 +345,12 @@ final class EngineLifecycleController {
                 if (engine.frameBuffer != null) {
                     engine.frameBuffer.clear(0xFF050608, 1.0f);
                 }
+                EngineSafetyController.recordRenderFailure(engine, System.nanoTime());
             }
-            engine.window.setOverlayText(
-                    engine.debugOverlayEnabled ? EngineViewportOverlay.buildDebugHudLines(engine, elapsed) : null);
+            engine.window.setOverlayText(EngineSafetyController.augmentOverlay(
+                    engine,
+                    engine.debugOverlayEnabled ? EngineViewportOverlay.buildDebugHudLines(engine, elapsed) : null
+            ));
             engine.window.blit(
                     engine.frameBuffer.getColorBuffer(),
                     engine.frameBuffer.getWidth(),
@@ -336,6 +358,7 @@ final class EngineLifecycleController {
 
             long frameEnd = System.nanoTime();
             EngineRenderRuntime.recordViewportFrameTime(engine, (frameEnd - frameStart) / 1_000_000.0);
+            EngineSafetyController.recordFrame(engine, (frameEnd - frameStart) / 1_000_000.0, frameEnd);
             frameCounter++;
             fpsAccumulator += dt;
             frameTimeAccumulatorMs += (frameEnd - frameStart) / 1_000_000.0;

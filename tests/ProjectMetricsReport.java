@@ -209,19 +209,21 @@ public final class ProjectMetricsReport {
 
     private static TestBucket bucketForSuite(String suite) {
         String lower = suite.toLowerCase(Locale.ROOT);
-        if (lower.contains("obj") || lower.contains("gltf") || lower.contains("import")) {
+        if (lower.contains("obj") || lower.contains("gltf") || lower.contains("importedtexture") || lower.contains("import")) {
             return TestBucket.IMPORT_IO;
         }
-        if (lower.contains("temporal") || lower.contains("ray") || lower.contains("raster")
-                || lower.contains("shadow") || lower.contains("smoothshading")) {
-            return TestBucket.RENDERING;
+        if (lower.contains("safety") || lower.contains("undo") || lower.contains("shortcut")
+                || lower.contains("timeline") || lower.contains("viewportstability")
+                || lower.contains("camera")) {
+            return TestBucket.EDITOR_CORE;
         }
-        if (lower.contains("material") || lower.contains("texture")) {
+        if (lower.contains("material")) {
             return TestBucket.MATERIALS;
         }
-        if (lower.contains("undo") || lower.contains("shortcut") || lower.contains("timeline")
-                || lower.contains("dock") || lower.contains("camera") || lower.contains("scene")) {
-            return TestBucket.EDITOR_CORE;
+        if (lower.contains("dither") || lower.contains("temporal") || lower.contains("ray")
+                || lower.contains("raster") || lower.contains("shadow") || lower.contains("smoothshading")
+                || lower.contains("hex") || lower.contains("wireframe") || lower.contains("ascii")) {
+            return TestBucket.RENDERING;
         }
         if (lower.contains("simulation") || lower.contains("presentation")) {
             return TestBucket.QUALITY_PRESENTATION;

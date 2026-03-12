@@ -153,9 +153,12 @@ final class OutputRenderArtifacts {
                 settingsMap.put("style", job.ditherStyle);
                 settingsMap.put("toneCount", job.ditherToneCount);
                 settingsMap.put("contrast", job.ditherContrast);
+                settingsMap.put("lightAssist", job.ditherLightAssist);
                 settingsMap.put("invert", job.ditherInvert);
-                settingsMap.put("cellSize", job.ditherCellSize);
-                settingsMap.put("asciiCharset", job.ditherAsciiCharset);
+                if ("ASCII".equalsIgnoreCase(job.ditherStyle)) {
+                    settingsMap.put("cellSize", job.ditherCellSize);
+                    settingsMap.put("asciiCharset", job.ditherAsciiCharset);
+                }
             }
             case TEMPORAL_NOISE -> {
                 settingsMap.put("temporalTickRate", job.temporalTickRate);

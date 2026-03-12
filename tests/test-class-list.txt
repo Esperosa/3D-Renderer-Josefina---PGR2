@@ -11,6 +11,9 @@ engine.core.EngineSceneImportFocusTests
 engine.core.UndoRedoHistoryTests
 engine.core.EditorShortcutRouterTests
 engine.core.MaterialDockRefactorTests
+engine.core.AsciiViewportStabilityTests
+engine.core.EngineSafetyControllerTests
+engine.core.EngineSafetyRendererCoverageTests
 ObjMaterialImportTests
 ObjMultiMaterialImportTests
 GltfMaterialExtensionImportTests
@@ -23,3 +26,6 @@ RasterTiledParallelTests
 PrimitiveLibraryTests
 ImportedTextureRenderSmokeTests
 TemporalNoiseRendererTests
+AsciiDitherGlyphMatchingTests
+DitherLightingAssistTests
+DitherSmartContrastTests

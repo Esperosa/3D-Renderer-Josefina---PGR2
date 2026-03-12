@@ -32,6 +32,7 @@ import engine.scene.Entity;
 import engine.scene.Light;
 import engine.scene.PointLight;
 import engine.scene.Scene;
+import engine.util.BitFont;
 import engine.util.RayIntersectionUtil;
 import engine.util.ThreadPool;
 import engine.util.UiBuilder;
@@ -200,6 +201,14 @@ public class Engine {
     boolean progressiveViewportEnabled;
     double interactiveRenderScale;
     boolean interactiveRenderScaleActive;
+    boolean safetyMonitorEnabled;
+    boolean safetyRecoveryActive;
+    String safetyRecoveryReason;
+    long safetyRecoveryUntilNanos;
+    long safetyLastRecoveryNanos;
+    int safetyRecoveryCount;
+    int safetySevereFrameStreak;
+    double safetyViewportScaleClamp;
     long lastViewportInteractionNanos;
     double viewportTargetFps;
     double viewportSmoothedFrameMs;
@@ -260,6 +269,7 @@ public class Engine {
 
     int ditherToneCount;
     double ditherContrast;
+    double ditherLightAssist;
     boolean ditherInvert;
     int ditherCellSize;
     String ditherAsciiCharset;
@@ -394,6 +404,14 @@ public class Engine {
         this.progressiveViewportEnabled = true;
         this.interactiveRenderScale = 0.75;
         this.interactiveRenderScaleActive = false;
+        this.safetyMonitorEnabled = true;
+        this.safetyRecoveryActive = false;
+        this.safetyRecoveryReason = "";
+        this.safetyRecoveryUntilNanos = 0L;
+        this.safetyLastRecoveryNanos = 0L;
+        this.safetyRecoveryCount = 0;
+        this.safetySevereFrameStreak = 0;
+        this.safetyViewportScaleClamp = 1.0;
         this.lastViewportInteractionNanos = 0L;
         this.viewportTargetFps = 25.0;
         this.viewportSmoothedFrameMs = 1000.0 / this.viewportTargetFps;
@@ -466,9 +484,10 @@ public class Engine {
 
         this.ditherToneCount = 2;
         this.ditherContrast = 1.15;
+        this.ditherLightAssist = 0.38;
         this.ditherInvert = false;
         this.ditherCellSize = 6;
-        this.ditherAsciiCharset = " .:-=+*#%@";
+        this.ditherAsciiCharset = BitFont.DEFAULT_ASCII_CHARSET;
 
         this.temporalTickRate = 6.8;
         this.temporalNearContribution = 2.22;

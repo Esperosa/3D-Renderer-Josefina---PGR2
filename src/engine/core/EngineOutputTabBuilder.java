@@ -694,10 +694,10 @@ final class EngineOutputTabBuilder {
     private static void buildOutputDitherSettings(Engine engine,
                                                   JPanel section,
                                                   OutputRenderController.Settings outputSettings) {
-        section.add(UiBuilder.helperText("Dither je single-pass. Tady nastavíte přesný pattern pro finální výstup."));
+        String currentStyle = outputSettings.ditherStyle == null ? "BLUE_NOISE" : outputSettings.ditherStyle;
         engine.addComboRow(section, "Styl",
                 new String[]{"BLUE_NOISE", "PATTERN", "ASCII"},
-                outputSettings.ditherStyle == null ? "BLUE_NOISE" : outputSettings.ditherStyle,
+                currentStyle,
                 value -> {
                     outputSettings.ditherStyle = value;
                     refreshOutputTab(engine);
@@ -712,9 +712,9 @@ final class EngineOutputTabBuilder {
                     engine.parseOrFallback(text, outputSettings.ditherContrast)));
             refreshOutputTab(engine);
         });
-        engine.addNumericRow(section, "Velikost buňky", Integer.toString(outputSettings.ditherCellSize), text -> {
-            outputSettings.ditherCellSize = Math.max(2, Math.min(128,
-                    (int) Math.round(engine.parseOrFallback(text, outputSettings.ditherCellSize))));
+        engine.addNumericRow(section, "Světelná pomoc", engine.formatTransformValue(outputSettings.ditherLightAssist), text -> {
+            outputSettings.ditherLightAssist = Math.max(0.0, Math.min(1.0,
+                    engine.parseOrFallback(text, outputSettings.ditherLightAssist)));
             refreshOutputTab(engine);
         });
         engine.addBooleanRow(section, "Invertovat", outputSettings.ditherInvert,
@@ -722,12 +722,19 @@ final class EngineOutputTabBuilder {
                     outputSettings.ditherInvert = value;
                     refreshOutputTab(engine);
                 });
-        engine.addTextRow(section, "Znaková sada", outputSettings.ditherAsciiCharset, value -> {
-            if (!value.isBlank()) {
-                outputSettings.ditherAsciiCharset = value;
-            }
-            refreshOutputTab(engine);
-        });
+        if ("ASCII".equalsIgnoreCase(currentStyle)) {
+            engine.addNumericRow(section, "Velikost buňky", Integer.toString(outputSettings.ditherCellSize), text -> {
+                outputSettings.ditherCellSize = Math.max(2, Math.min(128,
+                        (int) Math.round(engine.parseOrFallback(text, outputSettings.ditherCellSize))));
+                refreshOutputTab(engine);
+            });
+            engine.addTextRow(section, "Znaková sada ASCII", outputSettings.ditherAsciiCharset, value -> {
+                if (!value.isBlank()) {
+                    outputSettings.ditherAsciiCharset = value;
+                }
+                refreshOutputTab(engine);
+            });
+        }
     }
 
     private static void buildOutputTemporalSettings(Engine engine,
