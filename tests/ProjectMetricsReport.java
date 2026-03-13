@@ -839,11 +839,27 @@ public final class ProjectMetricsReport {
             out.append("| Viewport rozliseni | ").append(benchmarkMatrix.viewportResolutionLabels()).append(" |\n");
             out.append("| Offline rozliseni | ").append(benchmarkMatrix.offlineResolutionLabels()).append(" |\n");
             out.append("| Workload faze | first-frame = init + prvni render na cerstve instanci po case primingu, steady-frame = render po warm-upu |\n");
+            out.append("| Workload profily | `static-steady` = staticka scena + staticka kamera, `dynamic-sequence` = viewport sekvence s orbit kamerou a `scene.update(time)` |\n");
             out.append("| Statistika | min, median, mean, p90, max, stddev z realnych sample, zadny median-z-mediannu |\n");
             out.append("| CSV dataset | `build/tests/renderer-benchmark-matrix.csv` |\n");
             out.append("| Kamera | perspective, FOV 60 deg, aspect podle rozliseni, pozice `(0.0, 1.3, 7.4 +/- bias)` |\n");
             out.append("| Poznamka | viewport a offline renderery maji oddelene resolution matice, aby benchmark zustal pouzitelny i pro CPU ray/path |\n");
-            out.append("| Interpretace Temporal Noise | steady-frame ve staticke scene typicky reuseuje analyzu; pro dynamicke sekvence sleduj first-frame i stress rows |\n");
+            out.append("| Benchmark host JVM | ")
+                    .append(benchmarkMatrix.hostMetadata.javaVersion)
+                    .append(" / ")
+                    .append(benchmarkMatrix.hostMetadata.javaVmName)
+                    .append(", ")
+                    .append(benchmarkMatrix.hostMetadata.osName)
+                    .append(" ")
+                    .append(benchmarkMatrix.hostMetadata.osVersion)
+                    .append(", runtime processors ")
+                    .append(benchmarkMatrix.hostMetadata.runtimeProcessors)
+                    .append(", max memory ")
+                    .append(benchmarkMatrix.hostMetadata.maxMemoryMb)
+                    .append(" MB |\n");
+            out.append("| Benchmark CPU descriptor | ").append(benchmarkMatrix.hostMetadata.cpuDescriptor).append(" |\n");
+            out.append("| Per-case child metadata | `runtime_processors`, `max_memory_mb`, `java_*`, `os_*`, `cpu_descriptor` jsou v CSV po kazdem case; `Half CPU` child typicky vidi `13` processoru kvuli `ActiveProcessorCount` |\n");
+            out.append("| Interpretace Temporal Noise | steady-frame ve staticke scene typicky reuseuje analyzu; pro realny zaver cti i `dynamic-sequence` audit |\n");
             out.append('\n');
 
             out.append("## Benchmark scenare\n\n");
@@ -858,10 +874,10 @@ public final class ProjectMetricsReport {
             }
             out.append('\n');
 
-            out.append("## Agregovane renderer benchmarky\n\n");
+            out.append("## Agregovane renderer benchmarky: static steady\n\n");
             out.append("| Renderer | Core profil | Pocet case | First-frame geo median [ms] | Steady-frame geo median [ms] | Worst steady median [ms] |\n");
             out.append("| --- | --- | ---: | ---: | ---: | ---: |\n");
-            for (RendererBenchmarkSuite.RendererAggregate aggregate : benchmarkMatrix.aggregates) {
+            for (RendererBenchmarkSuite.RendererAggregate aggregate : benchmarkMatrix.aggregatesForWorkload("static-steady")) {
                 out.append("| ").append(aggregate.rendererLabel)
                         .append(" | ").append(aggregate.coreProfileLabel)
                         .append(" | ").append(aggregate.caseCount)
@@ -872,10 +888,30 @@ public final class ProjectMetricsReport {
             }
             out.append('\n');
 
-            out.append("## Stress case vysledky\n\n");
+            List<RendererBenchmarkSuite.DynamicViewportAuditRow> dynamicAuditRows = benchmarkMatrix.dynamicViewportAuditRows();
+            if (!dynamicAuditRows.isEmpty()) {
+                out.append("## Dynamic viewport audit\n\n");
+                out.append("| Renderer | Core profil | Scena | Rozliseni | Static steady [ms] | Dynamic steady [ms] | Slowdown | Static first [ms] | Dynamic first [ms] |\n");
+                out.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+                for (RendererBenchmarkSuite.DynamicViewportAuditRow row : dynamicAuditRows) {
+                    out.append("| ").append(row.rendererLabel())
+                            .append(" | ").append(row.coreProfileLabel())
+                            .append(" | ").append(row.sceneLabel())
+                            .append(" | ").append(row.resolutionLabel())
+                            .append(" | ").append(formatMs(row.staticSteadyMedianMs()))
+                            .append(" | ").append(formatMs(row.dynamicSteadyMedianMs()))
+                            .append(" | ").append(formatRatio(row.dynamicSteadySlowdown()))
+                            .append(" | ").append(formatMs(row.staticFirstMedianMs()))
+                            .append(" | ").append(formatMs(row.dynamicFirstMedianMs()))
+                            .append(" |\n");
+                }
+                out.append('\n');
+            }
+
+            out.append("## Stress case vysledky: static steady\n\n");
             out.append("| Renderer | Core profil | Scena | Rozliseni | First median [ms] | Steady median [ms] | Steady p90 [ms] |\n");
             out.append("| --- | --- | --- | ---: | ---: | ---: | ---: |\n");
-            for (RendererBenchmarkSuite.BenchmarkCaseResult row : benchmarkMatrix.stressCaseRows()) {
+            for (RendererBenchmarkSuite.BenchmarkCaseResult row : benchmarkMatrix.stressCaseRows("static-steady")) {
                 out.append("| ").append(row.rendererLabel)
                         .append(" | ").append(row.coreProfileLabel)
                         .append(" | ").append(row.sceneLabel)
@@ -921,6 +957,10 @@ public final class ProjectMetricsReport {
 
         private static String formatMs(double value) {
             return String.format(Locale.US, "%.2f", value);
+        }
+
+        private static String formatRatio(double value) {
+            return String.format(Locale.US, "%.2fx", value);
         }
 
         private static String formatSize(long bytes) {
