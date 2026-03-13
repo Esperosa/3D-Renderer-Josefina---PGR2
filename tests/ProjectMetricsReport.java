@@ -69,8 +69,10 @@ public final class ProjectMetricsReport {
         MetricsReport report = collectReport();
         String markdown = report.toMarkdown();
         Path out = Path.of("build", "tests", "project-metrics-report.md");
+        Path csvOut = Path.of("build", "tests", "renderer-benchmark-matrix.csv");
         Files.createDirectories(out.getParent());
         Files.writeString(out, markdown, StandardCharsets.UTF_8);
+        Files.writeString(csvOut, report.benchmarkMatrix().toCsv(), StandardCharsets.UTF_8);
         System.out.println(markdown);
     }
 
@@ -103,11 +105,10 @@ public final class ProjectMetricsReport {
         ImportStats importStats = collectImportStats(repoRoot);
         EnumMap<TestBucket, Integer> testBuckets = classifyTestSuites(suiteEntries);
         BenchmarkEnvironment environment = BenchmarkEnvironment.capture();
+        RendererBenchmarkSuite.BenchmarkMatrixReport benchmarkMatrix = RendererBenchmarkSuite.runMatrixBenchmarks();
         Scene scene = buildBenchmarkScene();
         PerspectiveCamera camera = buildBenchmarkCamera();
         SceneComplexityStats sceneComplexity = measureSceneComplexity(scene);
-        List<BenchmarkResult> benchmarks = runBenchmarks();
-        List<ResolutionScalingResult> scalingResults = runResolutionScalingBenchmarks(scene, camera);
         List<ExportBenchmarkResult> exportBenchmarks = runExportBenchmarks(scene, camera);
 
         return new MetricsReport(
@@ -116,9 +117,8 @@ public final class ProjectMetricsReport {
                 projectCounts,
                 importStats,
                 testBuckets,
+                benchmarkMatrix,
                 sceneComplexity,
-                benchmarks,
-                scalingResults,
                 exportBenchmarks
         );
     }
@@ -368,13 +368,13 @@ public final class ProjectMetricsReport {
             Arrays.sort(sorted);
             min = Math.min(min, sorted[0]);
             max = Math.max(max, sorted[sorted.length - 1]);
-            medians[pass] = sorted[sorted.length / 2];
+            medians[pass] = medianOfSorted(sorted);
             means[pass] = Arrays.stream(passSamples).average().orElse(0.0);
         }
 
         double[] sortedMedians = medians.clone();
         Arrays.sort(sortedMedians);
-        double median = sortedMedians[sortedMedians.length / 2];
+        double median = medianOfSorted(sortedMedians);
         double mean = Arrays.stream(means).average().orElse(0.0);
         return new ResolutionBenchmarkSample(label, resolution, passes, runs, min, median, mean, max);
     }
@@ -430,16 +430,16 @@ public final class ProjectMetricsReport {
             Arrays.sort(sorted);
             min = Math.min(min, sorted[0]);
             max = Math.max(max, sorted[sorted.length - 1]);
-            medians[pass] = sorted[sorted.length / 2];
+            medians[pass] = medianOfSorted(sorted);
             means[pass] = Arrays.stream(passSamples).average().orElse(0.0);
             sizes[pass] = passSize;
         }
 
         double[] sortedMedians = medians.clone();
         Arrays.sort(sortedMedians);
-        double median = sortedMedians[sortedMedians.length / 2];
+        double median = medianOfSorted(sortedMedians);
         double mean = Arrays.stream(means).average().orElse(0.0);
-        long medianSize = sizes[sizes.length / 2];
+        long medianSize = medianOfSorted(sizes);
         return new ExportResolutionSample(label, resolution, passes, runs, min, median, mean, max, medianSize);
     }
 
@@ -482,13 +482,13 @@ public final class ProjectMetricsReport {
             Arrays.sort(sorted);
             min = Math.min(min, sorted[0]);
             max = Math.max(max, sorted[sorted.length - 1]);
-            medians[pass] = sorted[sorted.length / 2];
+            medians[pass] = medianOfSorted(sorted);
             means[pass] = Arrays.stream(samples).average().orElse(0.0);
         }
 
         double[] sortedMedians = medians.clone();
         Arrays.sort(sortedMedians);
-        double median = sortedMedians[sortedMedians.length / 2];
+        double median = medianOfSorted(sortedMedians);
         double mean = Arrays.stream(means).average().orElse(0.0);
         return new BenchmarkResult(label, width, height, passes, runs, min, median, mean, max);
     }
@@ -618,6 +618,32 @@ public final class ProjectMetricsReport {
             }
         }
         return Files.size(temp);
+    }
+
+    private static double medianOfSorted(double[] sorted) {
+        if (sorted == null || sorted.length == 0) {
+            return 0.0;
+        }
+        int length = sorted.length;
+        if ((length & 1) == 1) {
+            return sorted[length / 2];
+        }
+        return (sorted[length / 2 - 1] + sorted[length / 2]) * 0.5;
+    }
+
+    private static long medianOfSorted(long[] sorted) {
+        if (sorted == null || sorted.length == 0) {
+            return 0L;
+        }
+        long[] copy = sorted.clone();
+        Arrays.sort(copy);
+        int length = copy.length;
+        if ((length & 1) == 1) {
+            return copy[length / 2];
+        }
+        long a = copy[length / 2 - 1];
+        long b = copy[length / 2];
+        return Math.round((a + b) * 0.5);
     }
 
     private static void writeJpeg(BufferedImage image, Path out, float quality) throws Exception {
@@ -760,9 +786,8 @@ public final class ProjectMetricsReport {
                                  LinkedHashMap<String, Integer> projectCounts,
                                  ImportStats importStats,
                                  EnumMap<TestBucket, Integer> testBuckets,
+                                 RendererBenchmarkSuite.BenchmarkMatrixReport benchmarkMatrix,
                                  SceneComplexityStats sceneComplexity,
-                                 List<BenchmarkResult> benchmarks,
-                                 List<ResolutionScalingResult> scalingResults,
                                  List<ExportBenchmarkResult> exportBenchmarks) {
 
         String toMarkdown() {
@@ -797,56 +822,82 @@ public final class ProjectMetricsReport {
             }
             out.append('\n');
 
-            out.append("## Benchmark scéna a transparentní parametry\n\n");
+            out.append("## Renderer benchmark matrix\n\n");
             out.append("| Parametr | Hodnota |\n");
             out.append("| --- | --- |\n");
-            out.append("| Mesh entity | ").append(sceneComplexity.meshEntities()).append(" |\n");
-            out.append("| Světla | ").append(sceneComplexity.lights()).append(" směrová světla |\n");
-            out.append("| Celkový počet trojúhelníků | ").append(sceneComplexity.totalTriangles()).append(" |\n");
-            out.append("| Kamera | perspective, FOV 60°, pozice `(0.0, 0.5, 4.4)`, lookAt `(0.0, -0.15, 0.0)` |\n");
-            out.append("| Rozlišení renderer scaling testu | 640x360, 1280x720, 1920x1080 |\n");
-            out.append("| Render benchmark režim | single-worker, headless |\n");
-            out.append("| Render benchmark passy | 2 nezávislé passy × 3 měřené běhy |\n");
+            out.append("| Benchmark mode | ").append(benchmarkMatrix.mode.name().toLowerCase(Locale.ROOT)).append(" |\n");
+            out.append("| Izolace případů | ").append(benchmarkMatrix.isolated ? "samostatny child JVM proces pro kazdy case" : "spolecny JVM proces").append(" |\n");
+            out.append("| Core profily | ");
+            for (int i = 0; i < benchmarkMatrix.coreProfiles.size(); i++) {
+                RendererBenchmarkSuite.CoreProfile profile = benchmarkMatrix.coreProfiles.get(i);
+                if (i > 0) {
+                    out.append(", ");
+                }
+                out.append(profile.label()).append(" = ").append(profile.workerCount()).append(" worker");
+            }
+            out.append(" |\n");
+            out.append("| Viewport rozliseni | ").append(benchmarkMatrix.viewportResolutionLabels()).append(" |\n");
+            out.append("| Offline rozliseni | ").append(benchmarkMatrix.offlineResolutionLabels()).append(" |\n");
+            out.append("| Workload faze | first-frame = init + prvni render na cerstve instanci po case primingu, steady-frame = render po warm-upu |\n");
+            out.append("| Statistika | min, median, mean, p90, max, stddev z realnych sample, zadny median-z-mediannu |\n");
+            out.append("| CSV dataset | `build/tests/renderer-benchmark-matrix.csv` |\n");
+            out.append("| Kamera | perspective, FOV 60 deg, aspect podle rozliseni, pozice `(0.0, 1.3, 7.4 +/- bias)` |\n");
+            out.append("| Poznamka | viewport a offline renderery maji oddelene resolution matice, aby benchmark zustal pouzitelny i pro CPU ray/path |\n");
+            out.append("| Interpretace Temporal Noise | steady-frame ve staticke scene typicky reuseuje analyzu; pro dynamicke sekvence sleduj first-frame i stress rows |\n");
+            out.append('\n');
+
+            out.append("## Benchmark scenare\n\n");
+            out.append("| Scena | Mesh entity | Svetla | Trojuhelniky |\n");
+            out.append("| --- | ---: | ---: | ---: |\n");
+            for (RendererBenchmarkSuite.SceneProfileSummary sceneSummary : benchmarkMatrix.scenes) {
+                out.append("| ").append(sceneSummary.label())
+                        .append(" | ").append(sceneSummary.meshEntities())
+                        .append(" | ").append(sceneSummary.lights())
+                        .append(" | ").append(sceneSummary.totalTriangles())
+                        .append(" |\n");
+            }
+            out.append('\n');
+
+            out.append("## Agregovane renderer benchmarky\n\n");
+            out.append("| Renderer | Core profil | Pocet case | First-frame geo median [ms] | Steady-frame geo median [ms] | Worst steady median [ms] |\n");
+            out.append("| --- | --- | ---: | ---: | ---: | ---: |\n");
+            for (RendererBenchmarkSuite.RendererAggregate aggregate : benchmarkMatrix.aggregates) {
+                out.append("| ").append(aggregate.rendererLabel)
+                        .append(" | ").append(aggregate.coreProfileLabel)
+                        .append(" | ").append(aggregate.caseCount)
+                        .append(" | ").append(formatMs(aggregate.firstGeoMeanMedianMs))
+                        .append(" | ").append(formatMs(aggregate.steadyGeoMeanMedianMs))
+                        .append(" | ").append(formatMs(aggregate.worstSteadyMedianMs))
+                        .append(" |\n");
+            }
+            out.append('\n');
+
+            out.append("## Stress case vysledky\n\n");
+            out.append("| Renderer | Core profil | Scena | Rozliseni | First median [ms] | Steady median [ms] | Steady p90 [ms] |\n");
+            out.append("| --- | --- | --- | ---: | ---: | ---: | ---: |\n");
+            for (RendererBenchmarkSuite.BenchmarkCaseResult row : benchmarkMatrix.stressCaseRows()) {
+                out.append("| ").append(row.rendererLabel)
+                        .append(" | ").append(row.coreProfileLabel)
+                        .append(" | ").append(row.sceneLabel)
+                        .append(" | ").append(row.resolutionLabel)
+                        .append(" | ").append(formatMs(row.firstFrame.medianMs))
+                        .append(" | ").append(formatMs(row.steadyFrame.medianMs))
+                        .append(" | ").append(formatMs(row.steadyFrame.p90Ms))
+                        .append(" |\n");
+            }
+            out.append('\n');
+
+            out.append("## Export benchmark parametry\n\n");
+            out.append("| Parametr | Hodnota |\n");
+            out.append("| --- | --- |\n");
+            out.append("| Export benchmark scena | ").append(sceneComplexity.meshEntities()).append(" mesh entity, ")
+                    .append(sceneComplexity.lights()).append(" svetla, ")
+                    .append(sceneComplexity.totalTriangles()).append(" trojuhelniku |\n");
             out.append("| Export benchmark zdroj | 8 předpřipravených PHONG frameů na rozlišení |\n");
             out.append("| Export benchmark formáty | PNG still, JPG still, PNG sequence, GIF, AVI MJPEG |\n");
             out.append("| JPG kvalita | 0.92 |\n");
             out.append("| GIF | 8 snímků, 24 FPS, loop forever |\n");
             out.append("| AVI | 8 snímků, 24 FPS, MJPEG quality 0.90 |\n\n");
-
-            out.append("## Referenční headless benchmark rendererů\n\n");
-            out.append("> Měřím čas samotného `render(...)` nad stejnou malou scénou. ");
-            out.append("Každý renderer dostane `3` nezávislé passy, v každém passu warm-up a potom `5` měřených běhů. ");
-            out.append("Tabulka uvádí nejlepší minimum, medián z mediánů, průměr z průměrů a nejhorší maximum v milisekundách.\n\n");
-            out.append("| Renderer | Rozlišení | Passy × běhy | Min [ms] | Median [ms] | Mean [ms] | Max [ms] |\n");
-            out.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n");
-            for (BenchmarkResult benchmark : benchmarks) {
-                out.append("| ").append(benchmark.label())
-                        .append(" | ").append(benchmark.width()).append("x").append(benchmark.height())
-                        .append(" | ").append(benchmark.passes()).append(" × ").append(benchmark.runsPerPass())
-                        .append(" | ").append(formatMs(benchmark.minMs()))
-                        .append(" | ").append(formatMs(benchmark.medianMs()))
-                        .append(" | ").append(formatMs(benchmark.meanMs()))
-                        .append(" | ").append(formatMs(benchmark.maxMs()))
-                        .append(" |\n");
-            }
-            out.append('\n');
-
-            out.append("## Škálování výkonu podle rozlišení\n\n");
-            out.append("| Renderer | 640x360 median [ms] | 1280x720 median [ms] | 1920x1080 median [ms] | Poměr 1080p / 360p |\n");
-            out.append("| --- | ---: | ---: | ---: | ---: |\n");
-            for (ResolutionScalingResult scaling : scalingResults) {
-                ResolutionBenchmarkSample low = scaling.samples().get(0);
-                ResolutionBenchmarkSample mid = scaling.samples().get(1);
-                ResolutionBenchmarkSample high = scaling.samples().get(2);
-                double ratio = high.medianMs() / Math.max(0.001, low.medianMs());
-                out.append("| ").append(scaling.label())
-                        .append(" | ").append(formatMs(low.medianMs()))
-                        .append(" | ").append(formatMs(mid.medianMs()))
-                        .append(" | ").append(formatMs(high.medianMs()))
-                        .append(" | ").append(String.format(Locale.US, "%.2f×", ratio))
-                        .append(" |\n");
-            }
-            out.append('\n');
 
             out.append("## Export benchmark podle formátu a rozlišení\n\n");
             out.append("| Formát | 640x360 median [ms] | 640x360 velikost | 1280x720 median [ms] | 1280x720 velikost | 1920x1080 median [ms] | 1920x1080 velikost |\n");

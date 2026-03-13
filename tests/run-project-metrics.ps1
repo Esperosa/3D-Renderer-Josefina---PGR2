@@ -1,3 +1,8 @@
+param(
+    [ValidateSet("quick", "standard", "full")]
+    [string] $BenchmarkMode = "standard"
+)
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -20,7 +25,26 @@ function Get-JavaTool {
         return $command.Source
     }
 
-    throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME. Nainstalujte JDK 17+ a nastavte PATH nebo JAVA_HOME."
+    $programRoots = @(
+        $env:ProgramFiles,
+        ${env:ProgramFiles(x86)}
+    ) | Where-Object { $_ }
+    foreach ($programRoot in $programRoots) {
+        $javaRoot = Join-Path $programRoot "Java"
+        if (-not (Test-Path $javaRoot)) {
+            continue
+        }
+        $candidate = Get-ChildItem -Path $javaRoot -Directory -Filter "jdk*" -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+        if ($candidate) {
+            return $candidate
+        }
+    }
+
+    throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME, ani mezi běžnými instalacemi JDK v Program Files. Nainstalujte JDK 17+ a nastavte PATH nebo JAVA_HOME."
 }
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -55,5 +79,5 @@ $pathSeparator = [System.IO.Path]::PathSeparator
 $classPath = "$mainOut$pathSeparator$testOut"
 
 Write-Host "Generuji report projektu..."
-& $java "-cp" $classPath "ProjectMetricsReport"
+& $java "-Dmetrics.benchmark.mode=$BenchmarkMode" "-cp" $classPath "ProjectMetricsReport"
 exit $LASTEXITCODE

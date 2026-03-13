@@ -24,7 +24,26 @@ function Get-JavaTool {
         return $command.Source
     }
 
-    throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME. Pro packaging potřebuji plný JDK 17+."
+    $programRoots = @(
+        $env:ProgramFiles,
+        ${env:ProgramFiles(x86)}
+    ) | Where-Object { $_ }
+    foreach ($programRoot in $programRoots) {
+        $javaRoot = Join-Path $programRoot "Java"
+        if (-not (Test-Path $javaRoot)) {
+            continue
+        }
+        $candidate = Get-ChildItem -Path $javaRoot -Directory -Filter "jdk*" -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+        if ($candidate) {
+            return $candidate
+        }
+    }
+
+    throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME, ani mezi běžnými instalacemi JDK v Program Files. Pro packaging potřebuji plný JDK 17+."
 }
 
 function Get-IExpressTool {

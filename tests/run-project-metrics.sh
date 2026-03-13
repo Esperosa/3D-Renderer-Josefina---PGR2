@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+benchmark_mode="${1:-standard}"
+case "$benchmark_mode" in
+  quick|standard|full) ;;
+  *)
+    echo "Neplatny benchmark mode '$benchmark_mode'. Pouzij quick, standard nebo full." >&2
+    exit 1
+    ;;
+esac
+
 get_java_tool() {
   local name="$1"
   if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/$name" ]]; then
@@ -38,4 +47,4 @@ echo "Kompiluji testy a report..."
 
 classpath="$main_out:$test_out"
 echo "Generuji report projektu..."
-"$java_bin" -cp "$classpath" ProjectMetricsReport
+"$java_bin" -Dmetrics.benchmark.mode="$benchmark_mode" -cp "$classpath" ProjectMetricsReport
