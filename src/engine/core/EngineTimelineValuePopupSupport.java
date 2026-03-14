@@ -1,6 +1,7 @@
 package engine.core;
 
 import engine.ui.UiStrings;
+import engine.ui.UiTheme;
 
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
@@ -72,6 +73,7 @@ final class EngineTimelineValuePopupSupport {
             hint.setEnabled(false);
             popup.add(hint);
         }
+        UiTheme.stylePopupMenu(popup);
         popup.show(target, x, y);
     }
 

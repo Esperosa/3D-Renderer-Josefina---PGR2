@@ -11,6 +11,9 @@ public final class JointBilateralDenoiserTests {
 
     public static void main(String[] args) {
         testGuideBuffersPreserveEdges();
+        testAlbedoGuidePreservesMaterialBoundaries();
+        testVarianceGuidedPixelsSmoothMoreWhenTheyAreNoisy();
+        testStableFramesUseFewerPasses();
         testParallelMatchesSequential();
         System.out.println("JointBilateralDenoiserTests: ALL TESTS PASSED");
     }
@@ -103,11 +106,120 @@ public final class JointBilateralDenoiserTests {
         assertDoubleArrayEquals("denoiseB", seqB, parB);
     }
 
+    private static void testAlbedoGuidePreservesMaterialBoundaries() {
+        int width = 5;
+        int height = 1;
+        double[] accumR = new double[]{0.45, 0.45, 0.35, 0.45, 0.45};
+        double[] accumG = new double[5];
+        double[] accumB = new double[5];
+        float[] depth = new float[]{1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+        float[] normal = new float[15];
+        for (int i = 0; i < 5; i++) {
+            setNormal(normal, i, 0.0f, 0.0f, 1.0f);
+        }
+
+        float[] flatAlbedo = new float[15];
+        float[] separatedAlbedo = new float[15];
+        for (int i = 0; i < 5; i++) {
+            setColor(flatAlbedo, i, 0.6f, 0.6f, 0.6f);
+            if (i == 2) {
+                setColor(separatedAlbedo, i, 0.1f, 0.8f, 0.1f);
+            } else {
+                setColor(separatedAlbedo, i, 0.6f, 0.6f, 0.6f);
+            }
+        }
+
+        double[] flatR = new double[5];
+        double[] flatG = new double[5];
+        double[] flatB = new double[5];
+        int[] flatOut = new int[5];
+        double[] separatedR = new double[5];
+        double[] separatedG = new double[5];
+        double[] separatedB = new double[5];
+        int[] separatedOut = new int[5];
+
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.7, 1.0, 1.0,
+                accumR, accumG, accumB, depth, normal, flatAlbedo, flatR, flatG, flatB, flatOut);
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.7, 1.0, 1.0,
+                accumR, accumG, accumB, depth, normal, separatedAlbedo, separatedR, separatedG, separatedB, separatedOut);
+
+        if (separatedR[2] >= flatR[2] - 0.004) {
+            throw new AssertionError("Albedo guide should keep material boundaries sharper. flat="
+                    + flatR[2] + " separated=" + separatedR[2]);
+        }
+    }
+
+    private static void testVarianceGuidedPixelsSmoothMoreWhenTheyAreNoisy() {
+        int width = 3;
+        int height = 1;
+        long sampleCount = 32L;
+        double[] accumR = new double[]{12.8, 9.6, 12.8};
+        double[] accumG = new double[3];
+        double[] accumB = new double[3];
+        float[] depth = new float[]{1.0f, 1.0f, 1.0f};
+        float[] normal = new float[9];
+        for (int i = 0; i < 3; i++) {
+            setNormal(normal, i, 0.0f, 0.0f, 1.0f);
+        }
+
+        double[] lowNoiseLuma = new double[]{12.8, 9.6, 12.8};
+        double[] lowNoiseLumaSq = new double[]{5.12, 2.88, 5.12};
+        double[] highNoiseLuma = new double[]{12.8, 9.6, 12.8};
+        double[] highNoiseLumaSq = new double[]{5.12, 5.76, 5.12};
+
+        double[] lowR = new double[3];
+        double[] lowG = new double[3];
+        double[] lowB = new double[3];
+        double[] lowScratchR = new double[3];
+        double[] lowScratchG = new double[3];
+        double[] lowScratchB = new double[3];
+        int[] lowOut = new int[3];
+
+        double[] highR = new double[3];
+        double[] highG = new double[3];
+        double[] highB = new double[3];
+        double[] highScratchR = new double[3];
+        double[] highScratchG = new double[3];
+        double[] highScratchB = new double[3];
+        int[] highOut = new int[3];
+
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.62, 1.0, 1.0 / sampleCount,
+                accumR, accumG, accumB, lowNoiseLuma, lowNoiseLumaSq, sampleCount,
+                depth, normal, null, lowR, lowG, lowB, lowScratchR, lowScratchG, lowScratchB, lowOut);
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.62, 1.0, 1.0 / sampleCount,
+                accumR, accumG, accumB, highNoiseLuma, highNoiseLumaSq, sampleCount,
+                depth, normal, null, highR, highG, highB, highScratchR, highScratchG, highScratchB, highOut);
+
+        if (highR[1] <= lowR[1] + 0.01) {
+            throw new AssertionError("Higher-variance pixels should be smoothed more aggressively. low="
+                    + lowR[1] + " high=" + highR[1]);
+        }
+    }
+
+    private static void testStableFramesUseFewerPasses() {
+        if (JointBilateralDenoiser.resolvePassCount(2, 1.0) != 3) {
+            throw new AssertionError("Radius 2 should keep the full pass budget while the frame is noisy.");
+        }
+        if (JointBilateralDenoiser.resolvePassCount(2, 0.04) != 2) {
+            throw new AssertionError("Very stable frames should skip the widest cleanup pass.");
+        }
+        if (JointBilateralDenoiser.resolvePassCount(1, 0.02) != 2) {
+            throw new AssertionError("Low-radius denoise should keep its minimum two-pass footprint.");
+        }
+    }
+
     private static void setNormal(float[] normal, int index, float nx, float ny, float nz) {
         int base = index * 3;
         normal[base] = nx;
         normal[base + 1] = ny;
         normal[base + 2] = nz;
+    }
+
+    private static void setColor(float[] color, int index, float r, float g, float b) {
+        int base = index * 3;
+        color[base] = r;
+        color[base + 1] = g;
+        color[base + 2] = b;
     }
 
     private static void assertDoubleArrayEquals(String label, double[] expected, double[] actual) {

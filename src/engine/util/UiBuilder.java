@@ -665,6 +665,7 @@ public final class UiBuilder {
                 remove.setEnabled(removeAction != null);
                 remove.addActionListener(evt -> runSafe(removeAction));
                 popup.add(remove);
+                UiTheme.stylePopupMenu(popup);
                 popup.show(e.getComponent(), e.getX(), e.getY());
                 e.consume();
             }

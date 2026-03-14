@@ -25,7 +25,6 @@ final class RenderSettingsSync {
             boolean rayShadows,
             boolean rayReflections,
             boolean rayDenoise,
-            int rayDenoiseStartSamples,
             int rayDenoiseRadius,
             double rayDenoiseStrength) {
         if (rayTracerRenderer == null) {
@@ -45,7 +44,6 @@ final class RenderSettingsSync {
         rayTracerRenderer.setParameter("shadows", rayShadows);
         rayTracerRenderer.setParameter("reflections", rayReflections);
         rayTracerRenderer.setParameter("denoise", rayDenoise);
-        rayTracerRenderer.setParameter("denoiseStartSamples", rayDenoiseStartSamples);
         rayTracerRenderer.setParameter("denoiseRadius", rayDenoiseRadius);
         rayTracerRenderer.setParameter("denoiseStrength", rayDenoiseStrength);
         return rayMaxDepth;
@@ -63,7 +61,6 @@ final class RenderSettingsSync {
             boolean pathDirectLighting,
             boolean pathSkyEnvironment,
             boolean pathDenoise,
-            int pathDenoiseStartSamples,
             int pathDenoiseRadius,
             double pathDenoiseStrength) {
         if (pathTracerRenderer == null) {
@@ -82,7 +79,6 @@ final class RenderSettingsSync {
         pathTracerRenderer.setParameter("directLighting", pathDirectLighting);
         pathTracerRenderer.setParameter("sky", pathSkyEnvironment);
         pathTracerRenderer.setParameter("denoise", pathDenoise);
-        pathTracerRenderer.setParameter("denoiseStartSamples", pathDenoiseStartSamples);
         pathTracerRenderer.setParameter("denoiseRadius", pathDenoiseRadius);
         pathTracerRenderer.setParameter("denoiseStrength", pathDenoiseStrength);
         return pathMaxDepth;

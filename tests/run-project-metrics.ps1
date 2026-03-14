@@ -30,21 +30,27 @@ function Get-JavaTool {
         ${env:ProgramFiles(x86)}
     ) | Where-Object { $_ }
     foreach ($programRoot in $programRoots) {
-        $javaRoot = Join-Path $programRoot "Java"
-        if (-not (Test-Path $javaRoot)) {
-            continue
-        }
-        $candidate = Get-ChildItem -Path $javaRoot -Directory -Filter "jdk*" -ErrorAction SilentlyContinue |
-            Sort-Object Name -Descending |
-            ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
-            Where-Object { Test-Path $_ } |
-            Select-Object -First 1
-        if ($candidate) {
-            return $candidate
+        $javaHomes = @(
+            (Join-Path $programRoot "Java"),
+            (Join-Path $programRoot "Eclipse Adoptium"),
+            (Join-Path $programRoot "Microsoft")
+        )
+        foreach ($javaHome in $javaHomes) {
+            if (-not (Test-Path $javaHome)) {
+                continue
+            }
+            $candidate = Get-ChildItem -Path $javaHome -Directory -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
+                Where-Object { Test-Path $_ } |
+                Select-Object -First 1
+            if ($candidate) {
+                return $candidate
+            }
         }
     }
 
-    throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME, ani mezi běžnými instalacemi JDK v Program Files. Nainstalujte JDK 17+ a nastavte PATH nebo JAVA_HOME."
+    throw "Tool '$Name' was not found in PATH, JAVA_HOME, or common JDK install folders under Program Files. Install JDK 17+ and set PATH or JAVA_HOME."
 }
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -57,19 +63,19 @@ $testOut = Join-Path $reportRoot "test-classes"
 $javac = Get-JavaTool "javac"
 $java = Get-JavaTool "java"
 
-New-Item -ItemType Directory -Path $mainOut | Out-Null
-New-Item -ItemType Directory -Path $testOut | Out-Null
+New-Item -ItemType Directory -Path $mainOut -Force | Out-Null
+New-Item -ItemType Directory -Path $testOut -Force | Out-Null
 
 $srcFiles = Get-ChildItem -Path (Join-Path $repoRoot "src") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 $testFiles = Get-ChildItem -Path (Join-Path $repoRoot "tests") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 
-Write-Host "Kompiluji hlavní zdrojáky..."
+Write-Host "Compiling main sources..."
 & $javac "-encoding" "UTF-8" "-d" $mainOut @srcFiles
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Host "Kompiluji testy a report..."
+Write-Host "Compiling tests and report..."
 & $javac "-encoding" "UTF-8" "-cp" $mainOut "-d" $testOut @testFiles
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
@@ -78,6 +84,6 @@ if ($LASTEXITCODE -ne 0) {
 $pathSeparator = [System.IO.Path]::PathSeparator
 $classPath = "$mainOut$pathSeparator$testOut"
 
-Write-Host "Generuji report projektu..."
+Write-Host "Generating project report..."
 & $java "-Dmetrics.benchmark.mode=$BenchmarkMode" "-cp" $classPath "ProjectMetricsReport"
 exit $LASTEXITCODE

@@ -40,7 +40,6 @@ final class OutputRenderJob {
     boolean reflections;
     boolean sky;
     boolean denoise;
-    int denoiseStartSamples;
     int denoiseRadius;
     double denoiseStrength;
     boolean wireframeDepthHiddenLines;

@@ -18,9 +18,7 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.IllegalComponentStateException;
 import java.awt.Insets;
-import java.awt.MenuItem;
 import java.awt.Point;
-import java.awt.PopupMenu;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Stroke;
@@ -47,11 +45,15 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.Icon;
 import javax.swing.JFrame;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.Scrollable;
 import javax.swing.JTabbedPane;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 
 /**
  * Tady držím hlavní AWT okno s canvasem, toolbarem a postranními panely.
@@ -72,9 +74,12 @@ public class Window {
     private final JPanel toolbar;
     private final JPanel timelineDock;
     private final JTabbedPane rightTabs;
-    private final PopupMenu contextMenu;
+    private final JPopupMenu contextMenu;
     private final Map<String, JPanel> rightTabContents;
     private final Map<String, Integer> rightTabIndices;
+    private Runnable contextMenuBeforeShowAction;
+    private Runnable contextMenuAfterAction;
+    private Runnable contextMenuAfterCancelAction;
 
     private int width;
     private int height;
@@ -94,6 +99,7 @@ public class Window {
     private volatile double worldAxisUpY;
     private volatile double worldAxisUpZ;
     private int timelineDockHeight;
+    private boolean timelineDockManuallyResized;
     private boolean timelineResizeDragging;
     private int timelineResizeStartScreenY;
     private int timelineResizeStartHeight;
@@ -133,7 +139,7 @@ public class Window {
         timelineDock = new JPanel(new BorderLayout(8, 0));
         timelineDock.setBackground(UiTheme.PANEL_BG);
         timelineDock.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.BORDER_SUBTLE));
-        timelineDockHeight = UiTheme.BOTTOM_DOCK_DEFAULT_HEIGHT;
+        timelineDockHeight = computeDefaultTimelineDockHeight(height);
         timelineDock.setPreferredSize(new Dimension(width, timelineDockHeight));
         root.add(timelineDock, BorderLayout.SOUTH);
 
@@ -148,22 +154,39 @@ public class Window {
                 BorderFactory.createMatteBorder(0, 1, 0, 0, TAB_BORDER),
                 new EmptyBorder(0, 4, 0, 0)
         ));
-        rightTabs.setPreferredSize(new Dimension(420, height));
+        rightTabs.setPreferredSize(new Dimension(computeRightPanelWidth(width, height), height));
         rightTabs.setMinimumSize(new Dimension(UiTheme.RIGHT_PANEL_MIN, 0));
         UiTheme.installTabbedPaneTheme(rightTabs);
         root.add(rightTabs, BorderLayout.EAST);
         frame.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                updateRightTabsPreferredWidth();
-                toolbar.revalidate();
-                timelineDock.revalidate();
-                frame.getContentPane().revalidate();
+                syncResponsiveLayout();
             }
         });
 
-        contextMenu = new PopupMenu();
-        canvas.add(contextMenu);
+        contextMenu = new JPopupMenu();
+        UiTheme.stylePopupMenu(contextMenu);
+        contextMenuBeforeShowAction = null;
+        contextMenuAfterAction = null;
+        contextMenuAfterCancelAction = null;
+        contextMenu.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                // Tady nic navÃ­c nepotÅ™ebuju, callback volÃ¡m tÄ›snÄ› pÅ™ed show().
+            }
+
+            @Override
+            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                // Tady schvÃ¡lnÄ› nic nedÄ›lÃ¡m, potvrzenÃ© akce Å™eÅ¡Ã­ jejich vlastnÃ­ callback.
+            }
+
+            @Override
+            public void popupMenuCanceled(PopupMenuEvent e) {
+                runContextMenuCallback(contextMenuAfterCancelAction);
+                canvas.requestFocusInWindow();
+            }
+        });
         canvas.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -177,10 +200,10 @@ public class Window {
         });
 
         frame.setContentPane(root);
-        updateRightTabsPreferredWidth();
         frame.setBackground(FRAME_BG);
         frame.pack();
         frame.setMinimumSize(new Dimension(1060, 700));
+        syncResponsiveLayout();
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
 
@@ -199,6 +222,7 @@ public class Window {
         worldAxisUpX = 0.0;
         worldAxisUpY = 1.0;
         worldAxisUpZ = 0.0;
+        timelineDockManuallyResized = false;
         timelineResizeDragging = false;
         ensureBufferStrategy();
         canvas.requestFocusInWindow();
@@ -366,6 +390,7 @@ public class Window {
         backBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         canvas.setPreferredSize(new Dimension(width, height));
         frame.pack();
+        syncResponsiveLayout();
     }
 
     /** Tady uvolním AWT prostředky. */
@@ -465,20 +490,37 @@ public class Window {
         }
     }
 
-    public MenuItem addContextMenuItem(String label, Runnable action) {
-        MenuItem item = new MenuItem(label);
+    public JMenuItem addContextMenuItem(String label, Runnable action) {
+        JMenuItem item = new JMenuItem(label);
         item.addActionListener(e -> {
-            if (action != null) {
-                action.run();
+            try {
+                if (action != null) {
+                    action.run();
+                }
+            } finally {
+                runContextMenuCallback(contextMenuAfterAction);
+                canvas.requestFocusInWindow();
             }
-            canvas.requestFocusInWindow();
         });
+        UiTheme.styleMenuItem(item);
         contextMenu.add(item);
+        UiTheme.stylePopupMenu(contextMenu);
         return item;
     }
 
     public void clearContextMenuItems() {
         contextMenu.removeAll();
+    }
+
+    public void addContextMenuSeparator() {
+        contextMenu.addSeparator();
+        UiTheme.stylePopupMenu(contextMenu);
+    }
+
+    public void setContextMenuCallbacks(Runnable beforeShow, Runnable afterAction, Runnable afterCancel) {
+        contextMenuBeforeShowAction = beforeShow;
+        contextMenuAfterAction = afterAction;
+        contextMenuAfterCancelAction = afterCancel;
     }
 
     public void setCursorCaptured(boolean captured) {
@@ -646,10 +688,19 @@ public class Window {
         if (!e.isPopupTrigger()) {
             return;
         }
-        if (contextMenu.getItemCount() == 0) {
+        if (contextMenu.getComponentCount() == 0) {
             return;
         }
+        runContextMenuCallback(contextMenuBeforeShowAction);
+        UiTheme.stylePopupMenu(contextMenu);
         contextMenu.show(canvas, e.getX(), e.getY());
+        e.consume();
+    }
+
+    private void runContextMenuCallback(Runnable callback) {
+        if (callback != null) {
+            callback.run();
+        }
     }
 
     private void styleButton(JButton button) {
@@ -765,14 +816,15 @@ public class Window {
                     return;
                 }
                 int delta = timelineResizeStartScreenY - e.getYOnScreen();
+                timelineDockManuallyResized = true;
                 applyTimelineDockHeight(timelineResizeStartHeight + delta);
             }
         });
     }
 
     private void applyTimelineDockHeight(int targetHeight) {
-        int frameHeight = frame != null ? frame.getHeight() : (height + 120);
-        int max = Math.max(110, frameHeight - 240);
+        int frameHeight = currentFrameHeight();
+        int max = Math.max(computeDefaultTimelineDockHeight(frameHeight), frameHeight - 240);
         int min = UiTheme.BOTTOM_DOCK_MIN_HEIGHT;
         if (timelineDock != null) {
             Dimension dockMin = timelineDock.getMinimumSize();
@@ -781,11 +833,16 @@ public class Window {
             }
         }
         int clamped = Math.max(min, Math.min(max, targetHeight));
-        if (clamped == timelineDockHeight) {
+        int currentWidth = currentFrameWidth();
+        Dimension preferredSize = timelineDock.getPreferredSize();
+        if (clamped == timelineDockHeight
+                && preferredSize != null
+                && preferredSize.width == currentWidth
+                && preferredSize.height == timelineDockHeight) {
             return;
         }
         timelineDockHeight = clamped;
-        timelineDock.setPreferredSize(new Dimension(width, timelineDockHeight));
+        timelineDock.setPreferredSize(new Dimension(currentWidth, timelineDockHeight));
         timelineDock.revalidate();
         if (frame != null) {
             frame.revalidate();
@@ -796,11 +853,78 @@ public class Window {
         if (rightTabs == null) {
             return;
         }
-        int frameWidth = frame != null ? Math.max(width, frame.getWidth()) : width;
-        int preferred = Math.max(UiTheme.RIGHT_PANEL_MIN,
-                Math.min(UiTheme.RIGHT_PANEL_MAX, (int) Math.round(frameWidth * 0.29)));
-        rightTabs.setPreferredSize(new Dimension(preferred, Math.max(1, height)));
+        int frameWidth = currentFrameWidth();
+        int frameHeight = currentFrameHeight();
+        int preferred = computeRightPanelWidth(frameWidth, frameHeight);
+        rightTabs.setPreferredSize(new Dimension(preferred, Math.max(1, frameHeight)));
         rightTabs.revalidate();
+    }
+
+    private void syncResponsiveLayout() {
+        syncViewportMetrics();
+        updateRightTabsPreferredWidth();
+        if (timelineDockManuallyResized) {
+            applyTimelineDockHeight(timelineDockHeight);
+        } else {
+            applyTimelineDockHeight(computeDefaultTimelineDockHeight(currentFrameHeight()));
+        }
+        toolbar.revalidate();
+        timelineDock.revalidate();
+        if (frame != null && frame.getContentPane() != null) {
+            frame.getContentPane().revalidate();
+        }
+    }
+
+    private void syncViewportMetrics() {
+        if (canvas != null) {
+            if (canvas.getWidth() > 0) {
+                width = canvas.getWidth();
+            }
+            if (canvas.getHeight() > 0) {
+                height = canvas.getHeight();
+            }
+        }
+    }
+
+    private int currentFrameWidth() {
+        if (frame != null && frame.getContentPane() != null && frame.getContentPane().getWidth() > 0) {
+            return frame.getContentPane().getWidth();
+        }
+        return Math.max(1, width);
+    }
+
+    private int currentFrameHeight() {
+        if (frame != null && frame.getContentPane() != null && frame.getContentPane().getHeight() > 0) {
+            return frame.getContentPane().getHeight();
+        }
+        return Math.max(1, height + timelineDockHeight);
+    }
+
+    static int computeRightPanelWidth(int frameWidth, int frameHeight) {
+        int safeWidth = Math.max(1, frameWidth);
+        int safeHeight = Math.max(1, frameHeight);
+        double aspect = (double) safeWidth / (double) safeHeight;
+        double ratio;
+        if (aspect >= 2.05) {
+            ratio = 0.31;
+        } else if (aspect >= 1.77) {
+            ratio = 0.29;
+        } else if (aspect >= 1.59) {
+            ratio = 0.27;
+        } else {
+            ratio = 0.25;
+        }
+        int preferred = (int) Math.round(safeWidth * ratio);
+        return clampInt(preferred, UiTheme.RIGHT_PANEL_MIN, UiTheme.RIGHT_PANEL_MAX);
+    }
+
+    static int computeDefaultTimelineDockHeight(int frameHeight) {
+        int preferred = (int) Math.round(Math.max(1, frameHeight) * 0.12);
+        return clampInt(preferred, UiTheme.BOTTOM_DOCK_DEFAULT_HEIGHT, 180);
+    }
+
+    private static int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static final class RightTabContentPanel extends JPanel implements Scrollable {

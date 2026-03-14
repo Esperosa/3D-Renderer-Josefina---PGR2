@@ -2113,6 +2113,7 @@ final class MaterialGraphCanvas extends JComponent {
             session.markStructureChanged();
         });
         popup.add(reset);
+        UiTheme.stylePopupMenu(popup);
         popup.show(this, point.x, point.y);
     }
 

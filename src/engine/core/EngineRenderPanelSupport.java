@@ -92,7 +92,6 @@ final class EngineRenderPanelSupport {
                 outputSettings.shadows = engine.rayShadows;
                 outputSettings.reflections = engine.rayReflections;
                 outputSettings.denoise = engine.rayDenoise;
-                outputSettings.denoiseStartSamples = Math.max(1, engine.rayDenoiseStartSamples);
                 outputSettings.denoiseRadius = Math.max(1, engine.rayDenoiseRadius);
                 outputSettings.denoiseStrength = engine.rayDenoiseStrength;
             }
@@ -103,7 +102,6 @@ final class EngineRenderPanelSupport {
                 outputSettings.directLighting = engine.pathDirectLighting;
                 outputSettings.sky = engine.pathSkyEnvironment;
                 outputSettings.denoise = engine.pathDenoise;
-                outputSettings.denoiseStartSamples = Math.max(1, engine.pathDenoiseStartSamples);
                 outputSettings.denoiseRadius = Math.max(1, engine.pathDenoiseRadius);
                 outputSettings.denoiseStrength = engine.pathDenoiseStrength;
             }

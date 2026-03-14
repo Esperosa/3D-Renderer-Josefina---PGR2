@@ -25,21 +25,27 @@ function Get-JavaTool {
         ${env:ProgramFiles(x86)}
     ) | Where-Object { $_ }
     foreach ($programRoot in $programRoots) {
-        $javaRoot = Join-Path $programRoot "Java"
-        if (-not (Test-Path $javaRoot)) {
-            continue
-        }
-        $candidate = Get-ChildItem -Path $javaRoot -Directory -Filter "jdk*" -ErrorAction SilentlyContinue |
-            Sort-Object Name -Descending |
-            ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
-            Where-Object { Test-Path $_ } |
-            Select-Object -First 1
-        if ($candidate) {
-            return $candidate
+        $javaHomes = @(
+            (Join-Path $programRoot "Java"),
+            (Join-Path $programRoot "Eclipse Adoptium"),
+            (Join-Path $programRoot "Microsoft")
+        )
+        foreach ($javaHome in $javaHomes) {
+            if (-not (Test-Path $javaHome)) {
+                continue
+            }
+            $candidate = Get-ChildItem -Path $javaHome -Directory -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
+                Where-Object { Test-Path $_ } |
+                Select-Object -First 1
+            if ($candidate) {
+                return $candidate
+            }
         }
     }
 
-    throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME, ani mezi běžnými instalacemi JDK v Program Files. Nainstalujte JDK 17+ a nastavte PATH nebo JAVA_HOME."
+    throw "Tool '$Name' was not found in PATH, JAVA_HOME, or common JDK install folders under Program Files. Install JDK 17+ and set PATH or JAVA_HOME."
 }
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -56,26 +62,26 @@ $java = Get-JavaTool "java"
 if (Test-Path $testBuildRoot) {
     Remove-Item -Recurse -Force $testBuildRoot
 }
-New-Item -ItemType Directory -Path $mainOut | Out-Null
-New-Item -ItemType Directory -Path $testOut | Out-Null
+New-Item -ItemType Directory -Path $mainOut -Force | Out-Null
+New-Item -ItemType Directory -Path $testOut -Force | Out-Null
 
 $srcFiles = Get-ChildItem -Path (Join-Path $repoRoot "src") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 $testFiles = Get-ChildItem -Path (Join-Path $repoRoot "tests") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 
 if ($srcFiles.Count -eq 0) {
-    throw "Ve složce src nebyly nalezeny žádné Java zdrojáky."
+    throw "No Java source files were found in src."
 }
 if ($testFiles.Count -eq 0) {
-    throw "Ve složce tests nebyly nalezeny žádné Java testy."
+    throw "No Java test files were found in tests."
 }
 
-Write-Host "Kompiluji hlavní zdrojáky..."
+Write-Host "Compiling main sources..."
 & $javac "-encoding" "UTF-8" "-d" $mainOut @srcFiles
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Host "Kompiluji testy..."
+Write-Host "Compiling tests..."
 & $javac "-encoding" "UTF-8" "-cp" $mainOut "-d" $testOut @testFiles
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
@@ -84,17 +90,17 @@ if ($LASTEXITCODE -ne 0) {
 $pathSeparator = [System.IO.Path]::PathSeparator
 $classPath = "$mainOut$pathSeparator$testOut"
 $testClasses = Get-Content $testClassList |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        Where-Object { -not $_.TrimStart().StartsWith("#") } |
-        ForEach-Object { $_.Trim() }
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    Where-Object { -not $_.TrimStart().StartsWith("#") } |
+    ForEach-Object { $_.Trim() }
 
 foreach ($testClass in $testClasses) {
-    Write-Host "Spouštím $testClass ..."
+    Write-Host "Running $testClass ..."
     & $java "-cp" $classPath $testClass
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
 }
 
-Write-Host "Všechny testy prošly."
+Write-Host "All tests passed."
 exit 0

@@ -29,21 +29,27 @@ function Get-JavaTool {
         ${env:ProgramFiles(x86)}
     ) | Where-Object { $_ }
     foreach ($programRoot in $programRoots) {
-        $javaRoot = Join-Path $programRoot "Java"
-        if (-not (Test-Path $javaRoot)) {
-            continue
-        }
-        $candidate = Get-ChildItem -Path $javaRoot -Directory -Filter "jdk*" -ErrorAction SilentlyContinue |
-            Sort-Object Name -Descending |
-            ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
-            Where-Object { Test-Path $_ } |
-            Select-Object -First 1
-        if ($candidate) {
-            return $candidate
+        $javaHomes = @(
+            (Join-Path $programRoot "Java"),
+            (Join-Path $programRoot "Eclipse Adoptium"),
+            (Join-Path $programRoot "Microsoft")
+        )
+        foreach ($javaHome in $javaHomes) {
+            if (-not (Test-Path $javaHome)) {
+                continue
+            }
+            $candidate = Get-ChildItem -Path $javaHome -Directory -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                ForEach-Object { Join-Path $_.FullName "bin\$Name.exe" } |
+                Where-Object { Test-Path $_ } |
+                Select-Object -First 1
+            if ($candidate) {
+                return $candidate
+            }
         }
     }
 
-    throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME, ani mezi běžnými instalacemi JDK v Program Files. Nainstalujte JDK 17+ a nastavte PATH nebo JAVA_HOME."
+    throw "Tool '$Name' was not found in PATH, JAVA_HOME, or common JDK install folders under Program Files. Install JDK 17+ and set PATH or JAVA_HOME."
 }
 
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -60,16 +66,16 @@ New-Item -ItemType Directory -Path $mainOut -Force | Out-Null
 
 $srcFiles = Get-ChildItem -Path (Join-Path $repoRoot "src") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 if ($srcFiles.Count -eq 0) {
-    throw "Ve složce src nebyly nalezeny žádné Java zdrojáky."
+    throw "No Java source files were found in src."
 }
 
-Write-Host "Kompiluji hlavní zdrojáky..."
+Write-Host "Compiling main sources..."
 & $javac "-encoding" "UTF-8" "-d" $mainOut @srcFiles
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Host "Build dokončen do $mainOut"
+Write-Host "Build completed in $mainOut"
 if ($Run) {
     & $java "-cp" $mainOut Main
     exit $LASTEXITCODE

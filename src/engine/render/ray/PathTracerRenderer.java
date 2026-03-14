@@ -49,21 +49,28 @@ public class PathTracerRenderer implements Renderer {
     private boolean directLighting = true;
     private boolean skyEnabled = true;
     private boolean denoiseEnabled = true;
-    private int denoiseStartSamples = 12;
-    private int denoiseRadius = 1;
-    private double denoiseStrength = 0.24;
+    private int denoiseRadius = 2;
+    private double denoiseStrength = 0.58;
 
     private ThreadPool threadPool;
 
     private double[] accumR = new double[1];
     private double[] accumG = new double[1];
     private double[] accumB = new double[1];
+    private double[] accumLuma = new double[1];
+    private double[] accumLumaSq = new double[1];
     private double[] denoiseR = new double[1];
     private double[] denoiseG = new double[1];
     private double[] denoiseB = new double[1];
+    private double[] denoiseNoise = new double[1];
+    private double[] denoiseScratchR = new double[1];
+    private double[] denoiseScratchG = new double[1];
+    private double[] denoiseScratchB = new double[1];
     private float[] guideDepth = new float[1];
     private float[] guideNormal = new float[3];
+    private float[] guideAlbedo = new float[3];
     private long accumulatedSamples = 0;
+    private boolean guidesReady = false;
 
     private Triangle[] triangles = new Triangle[0];
     private int triangleCount = 0;
@@ -138,7 +145,7 @@ public class PathTracerRenderer implements Renderer {
 
         final long sampleTarget = accumulatedSamples + samplesPerFrame;
         final double invSamples = 1.0 / Math.max(1L, sampleTarget);
-        final boolean captureGuides = denoiseEnabled;
+        final boolean captureGuides = denoiseEnabled && !guidesReady;
 
         CameraState cam = buildCameraState(camera, fbWidth, fbHeight);
         int tileW = Math.max(8, tileSize);
@@ -172,7 +179,11 @@ public class PathTracerRenderer implements Renderer {
             accumulatedSamples = sampleTarget;
         }
 
-        if (denoiseEnabled && accumulatedSamples >= 2) {
+        if (captureGuides) {
+            guidesReady = true;
+        }
+
+        if (denoiseEnabled) {
             applyDenoiseAndResolve(outColor, invSamples);
         }
     }
@@ -237,10 +248,6 @@ public class PathTracerRenderer implements Renderer {
             denoiseEnabled = (Boolean) value;
             return;
         }
-        if ("denoisestartsamples".equals(k) && value instanceof Number) {
-            denoiseStartSamples = Math.max(1, Math.min(100000, ((Number) value).intValue()));
-            return;
-        }
         if ("denoiseradius".equals(k) && value instanceof Number) {
             denoiseRadius = Math.max(1, Math.min(4, ((Number) value).intValue()));
             return;
@@ -302,25 +309,59 @@ public class PathTracerRenderer implements Renderer {
                     continue;
                 }
 
-                if (captureGuides) {
-                    capturePrimaryGuide(camera, x, y, idx, ctx);
-                }
-
                 double batchR = 0.0;
                 double batchG = 0.0;
                 double batchB = 0.0;
+                double batchLuma = 0.0;
+                double batchLumaSq = 0.0;
+                boolean needsGuideCapture = captureGuides;
 
                 for (int s = 0; s < samplesPerFrame; s++) {
-                    generatePrimaryRay(camera, x, y, rng, ctx);
+                    if (needsGuideCapture && s == 0) {
+                        generatePrimaryRay(camera, x, y, 0.5, 0.5, ctx);
+                        beginPrimaryGuideCapture(ctx);
+                    } else {
+                        generatePrimaryRay(camera, x, y, rng, ctx);
+                    }
                     tracePath(ctx, rng);
-                    batchR += ctx.outR;
-                    batchG += ctx.outG;
-                    batchB += ctx.outB;
+                    if (needsGuideCapture) {
+                        storePrimaryGuide(idx, ctx);
+                        needsGuideCapture = false;
+                    }
+                    double sampleR = ctx.outR;
+                    double sampleG = ctx.outG;
+                    double sampleB = ctx.outB;
+                    double referenceLuma = DenoiseSupport.referenceLuminance(
+                            accumLuma[idx],
+                            accumulatedSamples,
+                            batchLuma,
+                            s);
+                    long referenceSamples = accumulatedSamples + s;
+                    double fireflyScale = DenoiseSupport.fireflyScale(
+                            sampleR,
+                            sampleG,
+                            sampleB,
+                            referenceLuma,
+                            referenceSamples);
+                    if (fireflyScale < 1.0) {
+                        sampleR *= fireflyScale;
+                        sampleG *= fireflyScale;
+                        sampleB *= fireflyScale;
+                    }
+
+                    double sampleLuma = DenoiseSupport.luminance(sampleR, sampleG, sampleB);
+                    batchR += sampleR;
+                    batchG += sampleG;
+                    batchB += sampleB;
+                    batchLuma += sampleLuma;
+                    batchLumaSq += sampleLuma * sampleLuma;
                 }
 
                 accumR[idx] += batchR;
                 accumG[idx] += batchG;
                 accumB[idx] += batchB;
+                accumLuma[idx] += batchLuma;
+                accumLumaSq[idx] += batchLumaSq;
 
                 outColor[idx] = packColor(
                         toneMap(accumR[idx] * invSamples),
@@ -349,6 +390,7 @@ public class PathTracerRenderer implements Renderer {
 
         for (int bounce = 0; bounce < maxBounces; bounce++) {
             if (!intersectClosest(ox, oy, oz, dx, dy, dz, RAY_EPS, INF_T, ctx.hit, ctx)) {
+                markPrimaryGuideMiss(ctx);
                 if (skyEnabled) {
                     sampleEnvironment(dx, dy, dz, ctx);
                     radianceR += throughputR * ctx.envR;
@@ -361,11 +403,14 @@ public class PathTracerRenderer implements Renderer {
             Triangle tri = ctx.hit.triangle;
             sampleSurface(tri, ctx.hit, dx, dy, dz, ctx.surface, ctx);
             if (ctx.surface.discard) {
+                advancePrimaryGuide(ctx);
                 ox = ctx.hit.px + dx * RAY_EPS;
                 oy = ctx.hit.py + dy * RAY_EPS;
                 oz = ctx.hit.pz + dz * RAY_EPS;
                 continue;
             }
+
+            capturePrimaryGuideSurface(ctx);
 
             double nx = ctx.surface.nx;
             double ny = ctx.surface.ny;
@@ -590,6 +635,8 @@ public class PathTracerRenderer implements Renderer {
             dy = nextDy;
             dz = nextDz;
         }
+
+        markPrimaryGuideMiss(ctx);
 
         ctx.outR = radianceR;
         ctx.outG = radianceG;
@@ -1271,46 +1318,73 @@ public class PathTracerRenderer implements Renderer {
         ctx.rayDz = camera.fz;
     }
 
-    private void capturePrimaryGuide(CameraState camera, int px, int py, int idx, TraceContext ctx) {
-        generatePrimaryRay(camera, px, py, 0.5, 0.5, ctx);
-        double ox = ctx.rayOx;
-        double oy = ctx.rayOy;
-        double oz = ctx.rayOz;
-        double dx = ctx.rayDx;
-        double dy = ctx.rayDy;
-        double dz = ctx.rayDz;
-        double totalT = 0.0;
+    private void beginPrimaryGuideCapture(TraceContext ctx) {
+        ctx.primaryGuidePending = true;
+        ctx.primaryGuideCaptured = false;
+        ctx.primaryGuideHasHit = false;
+        ctx.primaryGuideTravel = 0.0;
+        ctx.primaryGuideDepth = Double.POSITIVE_INFINITY;
+        ctx.primaryGuideNx = 0.0;
+        ctx.primaryGuideNy = 0.0;
+        ctx.primaryGuideNz = 0.0;
+        ctx.primaryGuideBaseR = 0.0;
+        ctx.primaryGuideBaseG = 0.0;
+        ctx.primaryGuideBaseB = 0.0;
+    }
 
-        for (int step = 0; step < 8; step++) {
-            if (!intersectClosest(ox, oy, oz, dx, dy, dz, RAY_EPS, INF_T, ctx.hit, ctx)) {
-                guideDepth[idx] = Float.POSITIVE_INFINITY;
-                int base = idx * 3;
-                guideNormal[base] = 0.0f;
-                guideNormal[base + 1] = 0.0f;
-                guideNormal[base + 2] = 0.0f;
-                return;
-            }
-
-            sampleSurface(ctx.hit.triangle, ctx.hit, dx, dy, dz, ctx.surface, ctx);
-            if (!ctx.surface.discard) {
-                guideDepth[idx] = (float) (totalT + ctx.hit.t);
-                int base = idx * 3;
-                guideNormal[base] = (float) ctx.surface.nx;
-                guideNormal[base + 1] = (float) ctx.surface.ny;
-                guideNormal[base + 2] = (float) ctx.surface.nz;
-                return;
-            }
-
-            totalT += ctx.hit.t;
-            ox = ctx.hit.px + dx * RAY_EPS;
-            oy = ctx.hit.py + dy * RAY_EPS;
-            oz = ctx.hit.pz + dz * RAY_EPS;
+    private void advancePrimaryGuide(TraceContext ctx) {
+        if (ctx.primaryGuidePending && !ctx.primaryGuideCaptured) {
+            ctx.primaryGuideTravel += ctx.hit.t;
         }
+    }
+
+    private void capturePrimaryGuideSurface(TraceContext ctx) {
+        if (!ctx.primaryGuidePending || ctx.primaryGuideCaptured) {
+            return;
+        }
+        ctx.primaryGuideCaptured = true;
+        ctx.primaryGuideHasHit = true;
+        ctx.primaryGuideDepth = ctx.primaryGuideTravel + ctx.hit.t;
+        ctx.primaryGuideNx = ctx.surface.nx;
+        ctx.primaryGuideNy = ctx.surface.ny;
+        ctx.primaryGuideNz = ctx.surface.nz;
+        ctx.primaryGuideBaseR = clamp01(ctx.surface.baseR);
+        ctx.primaryGuideBaseG = clamp01(ctx.surface.baseG);
+        ctx.primaryGuideBaseB = clamp01(ctx.surface.baseB);
+    }
+
+    private void markPrimaryGuideMiss(TraceContext ctx) {
+        if (ctx.primaryGuidePending && !ctx.primaryGuideCaptured) {
+            ctx.primaryGuideCaptured = true;
+            ctx.primaryGuideHasHit = false;
+        }
+    }
+
+    private void storePrimaryGuide(int idx, TraceContext ctx) {
+        if (ctx.primaryGuideCaptured && ctx.primaryGuideHasHit) {
+            guideDepth[idx] = (float) ctx.primaryGuideDepth;
+            int base = idx * 3;
+            guideNormal[base] = (float) ctx.primaryGuideNx;
+            guideNormal[base + 1] = (float) ctx.primaryGuideNy;
+            guideNormal[base + 2] = (float) ctx.primaryGuideNz;
+            guideAlbedo[base] = (float) ctx.primaryGuideBaseR;
+            guideAlbedo[base + 1] = (float) ctx.primaryGuideBaseG;
+            guideAlbedo[base + 2] = (float) ctx.primaryGuideBaseB;
+        } else {
+            clearPrimaryGuide(idx);
+        }
+        ctx.primaryGuidePending = false;
+    }
+
+    private void clearPrimaryGuide(int idx) {
         guideDepth[idx] = Float.POSITIVE_INFINITY;
         int base = idx * 3;
         guideNormal[base] = 0.0f;
         guideNormal[base + 1] = 0.0f;
         guideNormal[base + 2] = 0.0f;
+        guideAlbedo[base] = 0.0f;
+        guideAlbedo[base + 1] = 0.0f;
+        guideAlbedo[base + 2] = 0.0f;
     }
 
     private CameraState buildCameraState(Camera camera, int width, int height) {
@@ -1971,12 +2045,20 @@ public class PathTracerRenderer implements Renderer {
         Arrays.fill(accumR, 0.0);
         Arrays.fill(accumG, 0.0);
         Arrays.fill(accumB, 0.0);
+        Arrays.fill(accumLuma, 0.0);
+        Arrays.fill(accumLumaSq, 0.0);
         Arrays.fill(denoiseR, 0.0);
         Arrays.fill(denoiseG, 0.0);
         Arrays.fill(denoiseB, 0.0);
+        Arrays.fill(denoiseNoise, 0.0);
+        Arrays.fill(denoiseScratchR, 0.0);
+        Arrays.fill(denoiseScratchG, 0.0);
+        Arrays.fill(denoiseScratchB, 0.0);
         Arrays.fill(guideDepth, Float.POSITIVE_INFINITY);
         Arrays.fill(guideNormal, 0.0f);
+        Arrays.fill(guideAlbedo, 0.0f);
         accumulatedSamples = 0;
+        guidesReady = false;
     }
 
     private void allocateAccumulation(int w, int h) {
@@ -1984,31 +2066,53 @@ public class PathTracerRenderer implements Renderer {
         accumR = new double[count];
         accumG = new double[count];
         accumB = new double[count];
+        accumLuma = new double[count];
+        accumLumaSq = new double[count];
         denoiseR = new double[count];
         denoiseG = new double[count];
         denoiseB = new double[count];
+        denoiseNoise = new double[count];
+        denoiseScratchR = new double[count];
+        denoiseScratchG = new double[count];
+        denoiseScratchB = new double[count];
         guideDepth = new float[count];
         guideNormal = new float[count * 3];
+        guideAlbedo = new float[count * 3];
     }
 
     private void applyDenoiseAndResolve(int[] outColor, double invSamples) {
+        DenoiseSchedule.State schedule = DenoiseSchedule.resolve(
+                accumulatedSamples,
+                denoiseRadius,
+                denoiseStrength);
+        if (!schedule.active()) {
+            return;
+        }
         JointBilateralDenoiser.apply(
                 width,
                 height,
                 workerCount,
                 threadPool,
-                denoiseRadius,
-                clamp01(denoiseStrength),
+                schedule.radius(),
+                schedule.strength(),
                 exposure,
                 invSamples,
                 accumR,
                 accumG,
                 accumB,
+                accumLuma,
+                accumLumaSq,
+                accumulatedSamples,
                 guideDepth,
                 guideNormal,
+                guideAlbedo,
                 denoiseR,
                 denoiseG,
                 denoiseB,
+                denoiseNoise,
+                denoiseScratchR,
+                denoiseScratchG,
+                denoiseScratchB,
                 outColor
         );
     }
@@ -2021,13 +2125,21 @@ public class PathTracerRenderer implements Renderer {
         if (accumR.length < count
                 || accumG.length < count
                 || accumB.length < count
+                || accumLuma.length < count
+                || accumLumaSq.length < count
                 || denoiseR.length < count
                 || denoiseG.length < count
                 || denoiseB.length < count
+                || denoiseNoise.length < count
+                || denoiseScratchR.length < count
+                || denoiseScratchG.length < count
+                || denoiseScratchB.length < count
                 || guideDepth.length < count
-                || guideNormal.length < count * 3) {
+                || guideNormal.length < count * 3
+                || guideAlbedo.length < count * 3) {
             allocateAccumulation(fbWidth, fbHeight);
             accumulatedSamples = 0L;
+            guidesReady = false;
         }
         return true;
     }
@@ -2345,6 +2457,13 @@ public class PathTracerRenderer implements Renderer {
         double sampleDx, sampleDy, sampleDz;
         double envR, envG, envB;
         double outR, outG, outB;
+        boolean primaryGuidePending;
+        boolean primaryGuideCaptured;
+        boolean primaryGuideHasHit;
+        double primaryGuideTravel;
+        double primaryGuideDepth;
+        double primaryGuideNx, primaryGuideNy, primaryGuideNz;
+        double primaryGuideBaseR, primaryGuideBaseG, primaryGuideBaseB;
     }
 
     private static final class SplitMix64 {

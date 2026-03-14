@@ -242,6 +242,7 @@ final class EngineRenderRuntime {
         engine.orthographicCamera.setExtents(-6.0 * aspect, 6.0 * aspect, -6.0, 6.0);
 
         applyRenderScale(engine, false);
+        EngineToolbarController.applyResponsiveToolbarLayout(engine);
         System.out.println("Viewport resized: " + engine.baseWidth + "x" + engine.baseHeight
                 + " (render " + engine.frameBuffer.getWidth() + "x" + engine.frameBuffer.getHeight() + ")");
     }

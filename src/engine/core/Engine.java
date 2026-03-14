@@ -199,6 +199,7 @@ public class Engine {
     final Random random;
     Robot mouseRobot;
     boolean mouseCaptured;
+    boolean viewportContextMenuRecapturePending;
     boolean objectFocusMode;
     boolean draggingSelectedObject;
     boolean captureSelectLatch;
@@ -308,7 +309,6 @@ public class Engine {
     boolean rayShadows;
     boolean rayReflections;
     boolean rayDenoise;
-    int rayDenoiseStartSamples;
     int rayDenoiseRadius;
     double rayDenoiseStrength;
 
@@ -323,7 +323,6 @@ public class Engine {
     boolean pathDirectLighting;
     boolean pathSkyEnvironment;
     boolean pathDenoise;
-    int pathDenoiseStartSamples;
     int pathDenoiseRadius;
     double pathDenoiseStrength;
 
@@ -402,6 +401,7 @@ public class Engine {
         this.random = new Random(42L);
         this.orthographicProjection = false;
         this.mouseCaptured = false;
+        this.viewportContextMenuRecapturePending = false;
         this.objectFocusMode = false;
         this.draggingSelectedObject = false;
         this.captureSelectLatch = false;
@@ -529,9 +529,8 @@ public class Engine {
         this.rayShadows = true;
         this.rayReflections = true;
         this.rayDenoise = true;
-        this.rayDenoiseStartSamples = 6;
-        this.rayDenoiseRadius = 1;
-        this.rayDenoiseStrength = 0.28;
+        this.rayDenoiseRadius = 2;
+        this.rayDenoiseStrength = 0.52;
 
         this.pathSamplesPerFrame = 1;
         this.pathTileSize = 24;
@@ -544,9 +543,8 @@ public class Engine {
         this.pathDirectLighting = true;
         this.pathSkyEnvironment = true;
         this.pathDenoise = true;
-        this.pathDenoiseStartSamples = 12;
-        this.pathDenoiseRadius = 1;
-        this.pathDenoiseStrength = 0.24;
+        this.pathDenoiseRadius = 2;
+        this.pathDenoiseStrength = 0.58;
 
         this.suppressObjectFieldApply = false;
         this.sceneOutlinerModel = null;
@@ -882,7 +880,6 @@ public class Engine {
                 rayShadows,
                 rayReflections,
                 rayDenoise,
-                rayDenoiseStartSamples,
                 rayDenoiseRadius,
                 rayDenoiseStrength
         );
@@ -901,7 +898,6 @@ public class Engine {
                 pathDirectLighting,
                 pathSkyEnvironment,
                 pathDenoise,
-                pathDenoiseStartSamples,
                 pathDenoiseRadius,
                 pathDenoiseStrength
         );

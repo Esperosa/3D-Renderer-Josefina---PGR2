@@ -13,12 +13,20 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JList;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
+import javax.swing.plaf.FontUIResource;
+import javax.swing.plaf.basic.BasicMenuItemUI;
+import javax.swing.plaf.basic.BasicMenuUI;
+import javax.swing.plaf.basic.BasicPopupMenuUI;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import java.awt.BasicStroke;
@@ -91,8 +99,31 @@ public final class UiTheme {
     public static final int MATERIAL_WORKSPACE_INSPECTOR_MIN_WIDTH = 420;
     public static final int BOTTOM_DOCK_DEFAULT_HEIGHT = 72;
     public static final int BOTTOM_DOCK_MIN_HEIGHT = 72;
+    private static final int DEFAULT_COMBO_MIN_WIDTH = 140;
+    private static final int DEFAULT_COMBO_HORIZONTAL_PADDING = 8;
+    private static final int DEFAULT_COMBO_ITEM_VERTICAL_PADDING = 4;
+    private static final int TOOLBAR_COMBO_MIN_WIDTH = 120;
+    private static final int TOOLBAR_BUTTON_MIN_WIDTH = 52;
+    private static final Font POPUP_ITEM_FONT = new Font(Font.DIALOG, Font.PLAIN, 13);
+    private static final Font POPUP_MENU_FONT = new Font(Font.DIALOG, Font.BOLD, 13);
 
     private static Icon brandIcon16;
+
+    public record ToolbarMetrics(
+            float buttonFontSize,
+            float badgeFontSize,
+            float comboFontSize,
+            int buttonHeight,
+            int controlHeight,
+            int horizontalPadding,
+            int verticalPadding,
+            int groupHGap,
+            int groupVGap,
+            int rowHGap,
+            int comboMinWidth,
+            int badgeHorizontalPadding,
+            int badgeVerticalPadding) {
+    }
 
     private UiTheme() {
     }
@@ -139,6 +170,26 @@ public final class UiTheme {
         ));
     }
 
+    public static ToolbarMetrics toolbarMetricsForWidth(int availableWidth) {
+        int safeWidth = Math.max(980, availableWidth);
+        double t = clamp01((safeWidth - 1080.0) / 920.0);
+        return new ToolbarMetrics(
+                lerp(10.0f, 12.5f, t),
+                lerp(10.0f, 11.5f, t),
+                lerp(10.0f, 12.0f, t),
+                lerp(28, 34, t),
+                lerp(28, 32, t),
+                lerp(6, 10, t),
+                lerp(5, 8, t),
+                lerp(4, 6, t),
+                lerp(3, 4, t),
+                lerp(6, 10, t),
+                lerp(200, 320, t),
+                lerp(6, 8, t),
+                lerp(2, 3, t)
+        );
+    }
+
     public static void styleScrollPane(JScrollPane scroll, Color viewportBackground) {
         if (scroll == null) {
             return;
@@ -150,6 +201,76 @@ public final class UiTheme {
         scroll.getHorizontalScrollBar().setUnitIncrement(16);
         scroll.getVerticalScrollBar().setUI(new FlatScrollBarUi());
         scroll.getHorizontalScrollBar().setUI(new FlatScrollBarUi());
+    }
+
+    public static void stylePopupMenu(JPopupMenu popup) {
+        if (popup == null) {
+            return;
+        }
+        installPopupUiDefaults();
+        popup.setOpaque(true);
+        popup.setBackground(PANEL_INSET);
+        popup.setForeground(TEXT_PRIMARY);
+        popup.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_STRONG, 1, true),
+                BorderFactory.createEmptyBorder(6, 6, 6, 6)
+        ));
+        popup.setLightWeightPopupEnabled(false);
+        popup.setUI(new BasicPopupMenuUI());
+        for (Component component : popup.getComponents()) {
+            stylePopupComponent(component);
+        }
+    }
+
+    public static void styleMenuItem(JMenuItem item) {
+        if (item == null) {
+            return;
+        }
+        boolean enabled = item.isEnabled();
+        item.setOpaque(true);
+        item.setFocusable(false);
+        item.setBackground(PANEL_ELEVATED);
+        item.setForeground(enabled ? TEXT_PRIMARY : TEXT_HINT);
+        item.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 14));
+        item.setIconTextGap(8);
+        item.setFont(item instanceof JMenu ? POPUP_MENU_FONT : POPUP_ITEM_FONT);
+        if (item instanceof JMenu menu) {
+            menu.setUI(new BasicMenuUI());
+            stylePopupMenu(menu.getPopupMenu());
+        } else {
+            item.setUI(new BasicMenuItemUI());
+        }
+    }
+
+    private static void stylePopupComponent(Component component) {
+        if (component instanceof JMenuItem item) {
+            styleMenuItem(item);
+            return;
+        }
+        if (component instanceof JSeparator separator) {
+            separator.setForeground(BORDER_SUBTLE);
+            separator.setBackground(PANEL_INSET);
+        }
+    }
+
+    private static void installPopupUiDefaults() {
+        Border popupBorder = BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_STRONG, 1, true),
+                BorderFactory.createEmptyBorder(6, 6, 6, 6)
+        );
+        UIManager.put("PopupMenu.border", popupBorder);
+        UIManager.put("PopupMenu.background", PANEL_INSET);
+        UIManager.put("PopupMenu.foreground", TEXT_PRIMARY);
+        UIManager.put("Menu.font", new FontUIResource(POPUP_MENU_FONT));
+        UIManager.put("Menu.foreground", TEXT_PRIMARY);
+        UIManager.put("Menu.background", PANEL_ELEVATED);
+        UIManager.put("Menu.selectionForeground", TEXT_PRIMARY);
+        UIManager.put("Menu.selectionBackground", SELECTION_BG_SOFT);
+        UIManager.put("MenuItem.font", new FontUIResource(POPUP_ITEM_FONT));
+        UIManager.put("MenuItem.foreground", TEXT_PRIMARY);
+        UIManager.put("MenuItem.background", PANEL_ELEVATED);
+        UIManager.put("MenuItem.selectionForeground", TEXT_PRIMARY);
+        UIManager.put("MenuItem.selectionBackground", SELECTION_BG_SOFT);
     }
 
     public static void styleInspectorField(JTextField field) {
@@ -171,28 +292,17 @@ public final class UiTheme {
         if (combo == null) {
             return;
         }
-        combo.setFocusable(false);
-        combo.setBackground(PANEL_ELEVATED);
-        combo.setForeground(TEXT_PRIMARY);
-        combo.setBorder(BorderFactory.createLineBorder(BORDER_STRONG, 1, true));
-        combo.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list,
-                                                          Object value,
-                                                          int index,
-                                                          boolean isSelected,
-                                                          boolean cellHasFocus) {
-                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                setOpaque(true);
-                setBackground(isSelected ? SELECTION_BG_SOFT : PANEL_ELEVATED);
-                setForeground(isSelected ? TEXT_PRIMARY : TEXT_SECONDARY);
-                setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-                return this;
-            }
-        });
-        Dimension preferred = combo.getPreferredSize();
-        combo.setPreferredSize(new Dimension(Math.max(140, preferred.width), INPUT_HEIGHT));
-        combo.setMaximumSize(new Dimension(Integer.MAX_VALUE, INPUT_HEIGHT));
+        styleComboBoxBase(combo, combo.getFont(), DEFAULT_COMBO_HORIZONTAL_PADDING);
+        applyComboBoxSizing(combo, DEFAULT_COMBO_MIN_WIDTH, DEFAULT_COMBO_MIN_WIDTH, INPUT_HEIGHT);
+    }
+
+    public static void styleToolbarComboBox(JComboBox<?> combo, ToolbarMetrics metrics) {
+        if (combo == null || metrics == null) {
+            return;
+        }
+        Font comboFont = deriveToolbarFont(combo.getFont(), Font.BOLD, metrics.comboFontSize());
+        styleComboBoxBase(combo, comboFont, metrics.horizontalPadding());
+        applyComboBoxSizing(combo, metrics.comboMinWidth(), TOOLBAR_COMBO_MIN_WIDTH, metrics.controlHeight());
     }
 
     public static void styleCheckBox(JCheckBox checkBox) {
@@ -256,6 +366,43 @@ public final class UiTheme {
         styleButton(button, PANEL_ELEVATED, BORDER_SUBTLE, TEXT_SECONDARY);
     }
 
+    public static void styleToolbarToggle(AbstractButton button, boolean active, ToolbarMetrics metrics) {
+        if (button == null || metrics == null) {
+            return;
+        }
+        if (active) {
+            styleToolbarButton(button, ACCENT_PURPLE_SOFT, ACCENT_PURPLE, TEXT_PRIMARY, metrics);
+        } else {
+            styleToolbarButton(button, new Color(35, 46, 58), BORDER_SUBTLE, TEXT_SECONDARY, metrics);
+        }
+        button.setSelected(active);
+    }
+
+    public static void styleToolbarGhostButton(AbstractButton button, ToolbarMetrics metrics) {
+        if (button == null || metrics == null) {
+            return;
+        }
+        styleToolbarButton(button, PANEL_ELEVATED, BORDER_SUBTLE, TEXT_SECONDARY, metrics);
+    }
+
+    public static void styleToolbarBadge(JLabel label, ToolbarMetrics metrics) {
+        if (label == null || metrics == null) {
+            return;
+        }
+        label.setOpaque(true);
+        label.setBackground(new Color(48, 39, 31));
+        label.setForeground(ACCENT_GLOW);
+        label.setFont(deriveToolbarFont(label.getFont(), Font.BOLD, metrics.badgeFontSize()));
+        label.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(119, 80, 41), 1, true),
+                BorderFactory.createEmptyBorder(
+                        metrics.badgeVerticalPadding(),
+                        metrics.badgeHorizontalPadding(),
+                        metrics.badgeVerticalPadding(),
+                        metrics.badgeHorizontalPadding())
+        ));
+    }
+
     private static void styleButton(AbstractButton button, Color background, Color border, Color foreground) {
         if (button == null) {
             return;
@@ -270,6 +417,78 @@ public final class UiTheme {
         ));
         Dimension preferred = button.getPreferredSize();
         button.setPreferredSize(new Dimension(preferred.width, BUTTON_HEIGHT));
+    }
+
+    private static void styleToolbarButton(
+            AbstractButton button,
+            Color background,
+            Color border,
+            Color foreground,
+            ToolbarMetrics metrics) {
+        button.setFocusPainted(false);
+        button.setOpaque(true);
+        button.setBackground(background);
+        button.setForeground(foreground);
+        button.setFont(deriveToolbarFont(button.getFont(), Font.BOLD, metrics.buttonFontSize()));
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(border, 1, true),
+                BorderFactory.createEmptyBorder(
+                        metrics.verticalPadding(),
+                        metrics.horizontalPadding(),
+                        metrics.verticalPadding(),
+                        metrics.horizontalPadding())
+        ));
+        button.setPreferredSize(null);
+        button.setMinimumSize(null);
+        Dimension preferred = button.getPreferredSize();
+        button.setPreferredSize(new Dimension(Math.max(TOOLBAR_BUTTON_MIN_WIDTH, preferred.width), metrics.buttonHeight()));
+        button.setMinimumSize(new Dimension(TOOLBAR_BUTTON_MIN_WIDTH, metrics.buttonHeight()));
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, metrics.buttonHeight()));
+    }
+
+    private static void styleComboBoxBase(JComboBox<?> combo, Font font, int horizontalPadding) {
+        combo.setFocusable(false);
+        combo.setBackground(PANEL_ELEVATED);
+        combo.setForeground(TEXT_PRIMARY);
+        combo.setBorder(BorderFactory.createLineBorder(BORDER_STRONG, 1, true));
+        if (font != null) {
+            combo.setFont(font);
+        }
+        combo.setRenderer(createComboBoxRenderer(font, horizontalPadding));
+    }
+
+    private static DefaultListCellRenderer createComboBoxRenderer(Font font, int horizontalPadding) {
+        return new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list,
+                                                          Object value,
+                                                          int index,
+                                                          boolean isSelected,
+                                                          boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                setOpaque(true);
+                if (font != null) {
+                    setFont(font);
+                }
+                setBackground(isSelected ? SELECTION_BG_SOFT : PANEL_ELEVATED);
+                setForeground(isSelected ? TEXT_PRIMARY : TEXT_SECONDARY);
+                setBorder(BorderFactory.createEmptyBorder(
+                        DEFAULT_COMBO_ITEM_VERTICAL_PADDING,
+                        horizontalPadding,
+                        DEFAULT_COMBO_ITEM_VERTICAL_PADDING,
+                        horizontalPadding));
+                return this;
+            }
+        };
+    }
+
+    private static void applyComboBoxSizing(JComboBox<?> combo, int preferredMinWidth, int minWidth, int height) {
+        combo.setPreferredSize(null);
+        combo.setMinimumSize(null);
+        Dimension preferred = combo.getPreferredSize();
+        combo.setPreferredSize(new Dimension(Math.max(preferredMinWidth, preferred.width), height));
+        combo.setMinimumSize(new Dimension(minWidth, height));
+        combo.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
     }
 
     public static void styleToggle(AbstractButton button, boolean active) {
@@ -398,6 +617,23 @@ public final class UiTheme {
             button.setMaximumSize(new Dimension(0, 0));
             return button;
         }
+    }
+
+    private static Font deriveToolbarFont(Font baseFont, int style, float size) {
+        Font seed = baseFont == null ? new Font(Font.DIALOG, style, Math.round(size)) : baseFont;
+        return seed.deriveFont(style, size);
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static float lerp(float min, float max, double t) {
+        return (float) (min + (max - min) * t);
+    }
+
+    private static int lerp(int min, int max, double t) {
+        return (int) Math.round(min + (max - min) * t);
     }
 
     private static final class PropertiesTabbedPaneUi extends BasicTabbedPaneUI {

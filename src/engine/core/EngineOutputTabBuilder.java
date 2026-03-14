@@ -633,11 +633,6 @@ final class EngineOutputTabBuilder {
                     outputSettings.denoise = value;
                     refreshOutputTab(engine);
                 });
-        engine.addNumericRow(section, "Start denoise", Integer.toString(outputSettings.denoiseStartSamples), text -> {
-            outputSettings.denoiseStartSamples = Math.max(1, Math.min(200000,
-                    (int) Math.round(engine.parseOrFallback(text, outputSettings.denoiseStartSamples))));
-            refreshOutputTab(engine);
-        });
         engine.addNumericRow(section, "Radius denoise", Integer.toString(outputSettings.denoiseRadius), text -> {
             outputSettings.denoiseRadius = Math.max(1, Math.min(4,
                     (int) Math.round(engine.parseOrFallback(text, outputSettings.denoiseRadius))));

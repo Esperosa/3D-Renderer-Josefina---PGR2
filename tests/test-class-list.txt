@@ -16,6 +16,10 @@ engine.core.MaterialDockRefactorTests
 engine.core.AsciiViewportStabilityTests
 engine.core.EngineSafetyControllerTests
 engine.core.EngineSafetyRendererCoverageTests
+engine.core.WindowResponsiveLayoutTests
+engine.core.EngineToolbarLayoutTests
+engine.ui.UiThemePopupMenuTests
+engine.ui.UiThemeToolbarResponsiveTests
 ObjMaterialImportTests
 ObjMultiMaterialImportTests
 GltfMaterialExtensionImportTests

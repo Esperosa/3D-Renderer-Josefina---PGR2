@@ -313,11 +313,6 @@ final class EngineViewportRenderTabBuilder {
             engine.rayDenoise = value;
             engine.applyRaySettings();
         });
-        engine.addNumericRow(raySection, "Start denoise", Integer.toString(engine.rayDenoiseStartSamples), text -> {
-            engine.rayDenoiseStartSamples = Math.max(1, Math.min(100000,
-                    (int) Math.round(engine.parseOrFallback(text, engine.rayDenoiseStartSamples))));
-            engine.applyRaySettings();
-        });
         engine.addNumericRow(raySection, "Radius denoise", Integer.toString(engine.rayDenoiseRadius), text -> {
             engine.rayDenoiseRadius = Math.max(1, Math.min(4,
                     (int) Math.round(engine.parseOrFallback(text, engine.rayDenoiseRadius))));
@@ -375,11 +370,6 @@ final class EngineViewportRenderTabBuilder {
         });
         engine.addBooleanRow(pathSection, "Denoise", engine.pathDenoise, value -> {
             engine.pathDenoise = value;
-            engine.applyPathSettings();
-        });
-        engine.addNumericRow(pathSection, "Start denoise", Integer.toString(engine.pathDenoiseStartSamples), text -> {
-            engine.pathDenoiseStartSamples = Math.max(1, Math.min(100000,
-                    (int) Math.round(engine.parseOrFallback(text, engine.pathDenoiseStartSamples))));
             engine.applyPathSettings();
         });
         engine.addNumericRow(pathSection, "Radius denoise", Integer.toString(engine.pathDenoiseRadius), text -> {

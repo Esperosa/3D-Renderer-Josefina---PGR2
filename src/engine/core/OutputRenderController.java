@@ -72,9 +72,8 @@ public class OutputRenderController {
         public boolean reflections = true;
         public boolean sky = true;
         public boolean denoise = true;
-        public int denoiseStartSamples = 24;
-        public int denoiseRadius = 1;
-        public double denoiseStrength = 0.32;
+        public int denoiseRadius = 2;
+        public double denoiseStrength = 0.50;
         public boolean wireframeDepthHiddenLines = true;
         public boolean wireframeSilhouetteBoost = true;
         public boolean wireframeDashedMode = false;
@@ -443,7 +442,6 @@ public class OutputRenderController {
         job.reflections = settings.reflections;
         job.sky = settings.sky;
         job.denoise = settings.denoise;
-        job.denoiseStartSamples = Math.max(1, Math.min(200000, settings.denoiseStartSamples));
         job.denoiseRadius = Math.max(1, Math.min(4, settings.denoiseRadius));
         job.denoiseStrength = Math.max(0.0, Math.min(1.0, settings.denoiseStrength));
         job.wireframeDepthHiddenLines = settings.wireframeDepthHiddenLines;
@@ -1047,7 +1045,6 @@ public class OutputRenderController {
                 renderer.setParameter("reflections", job.reflections);
                 renderer.setParameter("sky", job.sky);
                 renderer.setParameter("denoise", job.denoise);
-                renderer.setParameter("denoiseStartSamples", job.denoiseStartSamples);
                 renderer.setParameter("denoiseRadius", job.denoiseRadius);
                 renderer.setParameter("denoiseStrength", job.denoiseStrength);
                 renderer.setParameter("reset", true);
@@ -1063,7 +1060,6 @@ public class OutputRenderController {
                 renderer.setParameter("directLighting", job.directLighting);
                 renderer.setParameter("sky", job.sky);
                 renderer.setParameter("denoise", job.denoise);
-                renderer.setParameter("denoiseStartSamples", job.denoiseStartSamples);
                 renderer.setParameter("denoiseRadius", job.denoiseRadius);
                 renderer.setParameter("denoiseStrength", job.denoiseStrength);
                 renderer.setParameter("reset", true);

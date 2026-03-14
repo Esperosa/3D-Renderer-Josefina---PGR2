@@ -42,7 +42,6 @@ public final class RayDenoiseSmokeTests {
         renderer.setParameter("workerCount", 2);
         renderer.setParameter("samplesPerFrame", 3);
         renderer.setParameter("denoise", true);
-        renderer.setParameter("denoiseStartSamples", 1);
         renderer.setParameter("denoiseRadius", 2);
         renderer.setParameter("denoiseStrength", 0.65);
         renderer.setParameter("sky", false);
@@ -59,7 +58,6 @@ public final class RayDenoiseSmokeTests {
         renderer.setParameter("workerCount", 2);
         renderer.setParameter("samplesPerFrame", 4);
         renderer.setParameter("denoise", true);
-        renderer.setParameter("denoiseStartSamples", 1);
         renderer.setParameter("denoiseRadius", 2);
         renderer.setParameter("denoiseStrength", 0.55);
         renderer.setParameter("sky", false);
