@@ -489,13 +489,13 @@ flowchart LR
     Path --> Output
 ```
 
-## Svetla, stiny, sklo a materialova odezva
+## Světla, stíny, sklo a materiálová odezva
 
-Tato cast je implementacni a datova: popisuje fyzikalni aspekty svetla, ktere jsou v projektu skutecne resene v ray/path pipeline.
+Tato část je implementační a datová: popisuje fyzikální aspekty světla, které jsou v projektu skutečně řešené v ray/path pipeline.
 
-### 1. Zakladni svetelna rovnice v projektu
+### 1. Základní světelná rovnice v projektu
 
-Pro ray/path vetve je vystupni radiance skladana jako prubezne scitani prispevku po bounce:
+Pro ray/path větve je výstupní radiance skládaná jako průběžné sčítání příspěvků po bounce:
 
 $$
 \mathbf{L} \leftarrow \mathbf{L} + \mathbf{T}\odot\left(\mathbf{L}_{direct}+\mathbf{L}_{emission}+\mathbf{L}_{env}\right)
@@ -505,21 +505,21 @@ $$
 \mathbf{T}_{k+1}=\mathbf{T}_k\odot\mathbf{w}_{branch}
 $$
 
-Luminance pro rozhodovani o ukonceni vetve je v kodu vedena jako:
+Luminance pro rozhodování o ukončení větve je v kódu vedena jako:
 
 $$
 Y = 0.2126R + 0.7152G + 0.0722B
 $$
 
-### 2. BRDF pravidla, ktera jsou realne pouzita
+### 2. BRDF pravidla, která jsou reálně použita
 
-| Pravidlo | Implementacni chovani |
+| Pravidlo | Implementační chování |
 | --- | --- |
 | Fresnel | Schlick varianta (`schlickFresnel` a `schlickFresnelColor`) |
 | Specular lobe | GGX (`ggxSpecularTerm`) |
-| Clearcoat | samostatny GGX lobe + Fresnel s F0 = 0.04 |
-| Sheen | samostatny `sheenLobeTerm` (lze vypnout v motion carrier profilu) |
-| Multi-scatter kompenzace | path ma `GGX_MULTISCATTER_STRENGTH = 0.55` |
+| Clearcoat | samostatný GGX lobe + Fresnel s F0 = 0.04 |
+| Sheen | samostatný `sheenLobeTerm` (lze vypnout v motion carrier profilu) |
+| Multi-scatter kompenzace | path má `GGX_MULTISCATTER_STRENGTH = 0.55` |
 
 Schlick Fresnel forma:
 
@@ -527,22 +527,38 @@ $$
 F(\cos\theta)=F_0+(1-F_0)(1-\cos\theta)^5
 $$
 
-### 3. Vlnova delka svetla (spektralni model)
+### 3. Vlnová délka světla a `SPECTRAL_BAND_COUNT` workflow
 
-Path tracer obsahuje explicitni spektralni vrstvu (v still full-tier preview/reference vetvi):
+Path tracer má explicitní spektrální vrstvu (hybrid RGB + spektrální výpočet):
 
 - `SPECTRAL_BAND_COUNT = 14`
-- spektralni rozsah: `390 nm .. 720 nm`
-- RGB projekce pres spektralni bazove krivky (gauss):
+- rozsah pásem: `390 nm .. 720 nm`
+- spektrální báze (Gauss):
   - R centrum `610 nm`, sigma `45`
   - G centrum `545 nm`, sigma `38`
   - B centrum `455 nm`, sigma `30`
 
-To znamena, ze projekt nepracuje jen s trikanalovym "RGB hacks" modelem. Pro cast svetelnych jevu (hlavne sklo, fresnel vrstvy, emisivni/env prispevky) umi jit pres hero-band a companion-band spektralni projekci.
+Jak s tím engine pracuje krok po kroku:
 
-### 4. Lom svetla, IOR a dispersion
+1. Spektrální režim se aktivuje v plném still-tier průchodu (`spectral14Active = fullStillTierActive`).
+2. Pro každý path se vybere `hero band` a k němu `companion band` (přibližně opačná část spektra).
+3. RGB vstupy (`env`, `emission`, části BRDF/Fresnel) se promítnou do spektrální reprezentace přes `spectralHeroProjectRgb(...)`.
+4. Spektrální odezva se vrací zpět do RGB přes interní báze, takže výstup jde pořád do RGB framebufferu, ale mezivýpočet už respektuje vlnovou závislost.
+5. Pokud spektrální režim aktivní není, běží fallback přes kanálové `dispersedIor(..., -1/0/+1)`.
 
-Lom je resen explicitne pres refrakci smeru paprsku a materialovy index lomu:
+Tím je propojené „klasické RGB“ i „fyzikální spektrální“ chování: nejde o čistý full-spectral renderer, ale ani o čistě trikanálovou aproximaci.
+
+Vnitřní fyzikální vazba je v zásadě:
+
+$$
+\eta = \eta(\lambda),\quad F = F(\lambda,\cos\theta),\quad T = T(\lambda, d),\quad \mathbf{L}_{rgb}=\int_{\lambda_{min}}^{\lambda_{max}} L(\lambda)\,\mathbf{b}_{rgb}(\lambda)\,d\lambda
+$$
+
+Právě tato řada (`ior -> Fresnel -> transmission -> throughput`) vysvětluje, proč se spektrální chování promítne nejen do skla, ale i do intenzity stínů, caustic koncentrace a RR přežití dalších bounce.
+
+### 4. Lom světla, IOR a disperze
+
+Lom je řešen explicitně přes refrakci směru paprsku a materiálový index lomu:
 
 $$
 \mathbf{d}_{refr} = refract(\mathbf{d},\mathbf{n},\eta)
@@ -550,15 +566,22 @@ $$
 
 Kde:
 
-- `ior` je drzeno minimalne na `>= 1.0` (material graph i material tridy),
-- `dispersion` je clampovana na `0..1`,
-- v path traceru je pouzita spektralni disperze s konstantou `DISPERSION_IOR_SPREAD = 0.06`.
+- `ior` je drženo minimálně na `>= 1.0` (material graph i material třídy),
+- `dispersion` je clampována na `0..1`,
+- v path traceru je použita spektrální disperze s konstantou `DISPERSION_IOR_SPREAD = 0.06`.
 
-Prakticky: pri nenulove disperzi se efektivni IOR meni podle spektralni slozky, takze svetlo neni jen "jedna bila lomova stopa", ale kanalove/spektralne odlisena odezva.
+Prakticky: při nenulové disperzi se efektivní IOR mění podle spektrální složky, takže světlo není jen „jedna bílá lomová stopa“, ale kanálově/spektrálně odlišená odezva.
 
-### 5. Fyzikalni branch pravidla pro sklo a material
+Vazba na ostatní fyzikální části:
 
-Path tracer stavi branch pravdepodobnosti explicitne (preview transport):
+- lom/disperze ovlivní branch volbu (`transmission` vs. `spec/clearcoat`),
+- branch výsledek vstupuje do throughputu a tím do energie dalších bounce,
+- stejný path pak vstupuje do RR (ukončení) i do caustic carry/boost modelu,
+- u volumetrie se na lom naváže medium transmittance (`mediumDirectionalTransmittance`).
+
+### 5. Fyzikální branch pravidla pro sklo a materiál
+
+Path tracer staví branch pravděpodobnosti explicitně (preview transport):
 
 $$
 p_t = clamp01(transmission\cdot(1-fresnel))
@@ -573,20 +596,20 @@ $$
 p_d = clamp01(1-p_t-p_c-p_s)
 $$
 
-To je presne duvod, proc glass/transmission odezva v path modu neni jen "efekt", ale branch-driven integrace s vazbou na IOR, roughness a Fresnel.
+To je přesně důvod, proč glass/transmission odezva v path módu není jen "efekt", ale branch-driven integrace s vazbou na IOR, roughness a Fresnel.
 
-### 6. Stiny a area svetla: konkretni datove chovani
+### 6. Stíny a area světla: konkrétní datové chování
 
-Ray tracer ma explicitni pravidlo pro area shadow samples (`resolveAreaShadowSamples`):
+Ray tracer má explicitní pravidlo pro area shadow samples (`resolveAreaShadowSamples`):
 
-- v klidu kamery: min `12`, max `64`, navyseni proti base vzorkovani,
-- pri pohybu: redukce area samples na priblizne `65 %` (pokud je vzorku vice nez 1).
+- v klidu kamery: min `12`, max `64`, navýšení proti base vzorkování,
+- při pohybu: redukce area samples na přibližně `65 %` (pokud je vzorků více než 1).
 
-To je duvod, proc pri pohybu klesa mekkost/cistota stinu a po zastaveni se opet vraci.
+To je důvod, proč při pohybu klesá měkkost/čistota stínů a po zastavení se opět vrací.
 
-### 7. Russian roulette a ukonceni drah
+### 7. Russian roulette a ukončení drah
 
-Path tracer pouziva RR pro delsi drahy; survival pravdepodobnost je svazana s throughputem:
+Path tracer používá RR pro delší dráhy; survival pravděpodobnost je svázaná s throughputem:
 
 $$
 rr = clamp\left(max(T_r,T_g,T_b),\ 0.05,\ 0.98\right)
@@ -596,64 +619,64 @@ $$
 P(continue)=rr,\qquad \mathbf{T}\leftarrow\mathbf{T}/rr
 $$
 
-Krome RR existuje i explicitni motion ukonceni vetve podle luminance throughputu:
+Kromě RR existuje i explicitní motion ukončení větve podle luminance throughputu:
 
 $$
 Y(\mathbf{T}) \le \tau_{motion} \Rightarrow \text{terminate path}
 $$
 
-kde $\tau_{motion}$ odpovida `previewMotionThroughputTermination`.
+kde $\tau_{motion}$ odpovídá `previewMotionThroughputTermination`.
 
-### 8. Volume, absorpce a Beer-Lambert chovani
+### 8. Volume, absorpce a Beer-Lambert chování
 
-Renderer pracuje s homogenim volumem (ne plny heterogenni solver). V kodu se projevi pres transmittance faktor `tr` a prispevek `1-tr`:
+Renderer pracuje s homogenním volumem (ne plný heterogenní solver). V kódu se projeví přes transmittance faktor `tr` a příspěvek `1-tr`:
 
 $$
 L_{vol,emit} \propto (1-tr),\qquad
 \mathbf{T}\leftarrow\mathbf{T}\cdot tr
 $$
 
-Konceptualne odpovida Beer-Lambert zakonitosti:
+Konceptuálně odpovídá Beer-Lambert zákonitosti:
 
 $$
 tr \approx e^{-\sigma_t d}
 $$
 
-V kodu jsou navic explicitni limity a parametry globalniho homogeniho media:
+V kódu jsou navíc explicitní limity a parametry globálního homogenního media:
 
-- `globalVolumeDensity` je clampovano do `0..4.0`,
-- volumetricka emise je drzena nezapornou (`>= 0` pro RGB slozky),
-- volume je kombinovano s throughputem po segmentech i pri miss/exit vetvi.
+- `globalVolumeDensity` je clampováno do `0..4.0`,
+- volumetrická emise je držena nezápornou (`>= 0` pro RGB složky),
+- volume je kombinováno s throughputem po segmentech i při miss/exit větvi.
 
-### 9. Caustics a opticky carry model
+### 9. Caustics a optický carry model
 
-Path tracer ma explicitni caustic guidance/carry vrstvu (neni to jen nahodny sum):
+Path tracer má explicitní caustic guidance/carry vrstvu (není to jen náhodný šum):
 
 - `CAUSTIC_BOOST_MAX = 1.45`
 - carry decay po bounce:
   - delta event: `0.74`
   - non-delta event: `0.48`
 
-Direct contribution muze byt skaleny caustic boost faktorem podle opticke cesty a typu povrchu, coz zlepsuje cteni svetelnych koncentraci za lomivymi/odrazivymi materialy.
+Direct contribution může být škálovaný caustic boost faktorem podle optické cesty a typu povrchu, což zlepšuje čtení světelných koncentrací za lomivými/odrazivými materiály.
 
-### 10. Ktere fyzikalni jevy jsou realne pokryte
+### 10. Které fyzikální jevy jsou reálně pokryté
 
-| Fyzikalni jev | Stav v projektu |
+| Fyzikální jev | Stav v projektu |
 | --- | --- |
-| Fresnel odrazivost | ano (Schlick + spektralni varianta) |
-| Lom svetla (Snell-like refrakce smeru) | ano |
-| Dispersion (zavislost na vlnove delce) | ano, spektralni ior spread |
-| Spektralni sampling (vlnove pasmo) | ano, 14 pasem 390-720 nm |
+| Fresnel odrazivost | ano (Schlick + spektrální varianta) |
+| Lom světla (Snell-like refrakce směru) | ano |
+| Dispersion (závislost na vlnové délce) | ano, spektrální ior spread |
+| Spektrální sampling (vlnové pásmo) | ano, 14 pásmy 390-720 nm |
 | GGX mikrofacet specular | ano |
-| Clearcoat druhy lobe | ano |
+| Clearcoat druhý lobe | ano |
 | Sheen lobe | ano |
-| Homogeni volumetricka absorpce/transmittance | ano |
-| Emisivni volumetricky prispevek | ano |
-| Polarizace svetla | ne |
+| Homogenní volumetrická absorpce/transmittance | ano |
+| Emisivní volumetrický příspěvek | ano |
+| Polarizace světla | ne |
 | Interference/difrakce | ne |
-| Heterogenni volumetricky transport (full) | ne (jen homogeni model) |
+| Heterogenní volumetrický transport (full) | ne (jen homogenní model) |
 
-### 11. Presne rozsahy parametru (z implementace)
+### 11. Přesné rozsahy parametrů (z implementace)
 
 | Parametr | Ray | Path |
 | --- | --- | --- |
@@ -669,14 +692,14 @@ Direct contribution muze byt skaleny caustic boost faktorem podle opticke cesty 
 | `previewMotionThroughputTermination` | `0.0..1.0` | `0.0..1.0` |
 | `previewMotionRoughnessSecondarySkip` | `0.0..1.0` | `0.0..1.0` |
 
-Ray ma navic implementacni rozsahy:
+Ray má navíc implementační rozsahy:
 
 - `previewMotionPolishScale`: `0.08..1.0`
 - `previewMotionBaseShadingScale`: `0.18..1.0`
 
-### 12. Datove defaulty relevantni pro svetlo/stin/material
+### 12. Datové defaulty relevantní pro světlo/stín/materiál
 
-| Oblast | Default v kodu |
+| Oblast | Default v kódu |
 | --- | --- |
 | Ray `maxDepth` | `3` |
 | Path `maxBounces` | `4` |
@@ -685,12 +708,12 @@ Ray ma navic implementacni rozsahy:
 | Ray `shadowsEnabled` | `true` |
 | Ray `reflectionsEnabled` | `true` |
 
-### 13. Co to znamena pro prakticky lookdev
+### 13. Co to znamená pro praktický lookdev
 
-1. Pro validni cteni stinu a odrazu nehodnotit jen motion frame; still faze ma jiny quality profil.
-2. U skla kontrolovat branch chovani (transmission/spec/clearcoat), ne jen jednu statickou screenshot hodnotu.
-3. Pri ladeni materialu drzet oddelene cile: viewport rychlost (motion tier) a fyzikalni vernost (still/reference tier).
-4. Finalni rozhodnuti o svetelnem setupu delat az po kontrole path konvergence (RR + throughput + depth budget).
+1. Pro validní čtení stínů a odrazů nehodnotit jen motion frame; still fáze má jiný quality profil.
+2. U skla kontrolovat branch chování (transmission/spec/clearcoat), ne jen jednu statickou screenshot hodnotu.
+3. Při ladění materiálu držet oddělené cíle: viewport rychlost (motion tier) a fyzikální věrnost (still/reference tier).
+4. Finální rozhodnutí o světelném setupu dělat až po kontrole path konvergence (RR + throughput + depth budget).
 
 ## Matematické jádro
 
