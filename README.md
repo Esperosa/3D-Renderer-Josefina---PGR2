@@ -61,7 +61,7 @@ README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na deskto
 - [Co program aktuálně umí](#co-program-aktuálně-umí)
 - [Architektura programu](#architektura-programu)
 - [Renderery a stylizované režimy](#renderery-a-stylizované-režimy)
-- [Svetla, stiny, sklo a materialova odezva](#svetla-stiny-sklo-a-materialova-odezva)
+- [Světla, stíny, sklo a materiálová odezva](#světla-stíny-sklo-a-materiálová-odezva)
 - [Matematické jádro](#matematické-jádro)
 - [Materiálový systém](#materiálový-systém)
 - [Temporal Noise](#temporal-noise)
