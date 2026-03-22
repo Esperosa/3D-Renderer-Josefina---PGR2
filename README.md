@@ -61,6 +61,7 @@ README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na deskto
 - [Co program aktuálně umí](#co-program-aktuálně-umí)
 - [Architektura programu](#architektura-programu)
 - [Renderery a stylizované režimy](#renderery-a-stylizované-režimy)
+- [Svetla, stiny, sklo a materialova odezva](#svetla-stiny-sklo-a-materialova-odezva)
 - [Matematické jádro](#matematické-jádro)
 - [Materiálový systém](#materiálový-systém)
 - [Temporal Noise](#temporal-noise)
@@ -132,8 +133,6 @@ Podrobný build, packaging a benchmark workflow je níže v [Build, spuštění 
 | Output workflow | stabilní | still / sequence / GIF / AVI (MJPEG), session folders |
 | Spray / splash částice | experimentální | částicový overlay, ne fluid solver |
 | Galaxy systém | experimentální scaffold | bez orbitálního nebo N-body solveru |
-
-![Renderer overview](docs/readme-assets/renderer-overview.svg)
 
 ## Tvrdá data a ověřené statistiky
 
@@ -489,6 +488,67 @@ flowchart LR
     Ray --> Output[Output framebuffer]
     Path --> Output
 ```
+
+  ## Svetla, stiny, sklo a materialova odezva
+
+  Tato sekce je zamerena na to nejdulezitejsi pro lookdev: jak se v projektu realne sklada svetlo, stin, odraz, prenos a materialova odezva.
+
+  ### Typy svetel a jejich role
+
+  | Typ svetla | Co ovlivnuje nejvic | Poznamka v praxi |
+  | --- | --- | --- |
+  | Directional | globalni smerove osvetleni, cistota tvaru | vhodne pro citelny key light bez silneho utlumeni |
+  | Point | lokalni modelace objemu a detailu | rychle odhali roughness/normal map artefakty |
+  | Area | mekkost stinu a prirozenejsi highlighty | drazsi na vypocet, ale nejlepsi pro realisticky kontakt stinu |
+  | Emissive material | lokalni svitici plochy | vyrazne pomaha u stylizovanych i filmovych setupu |
+  | Sky/environment | globalni naplneni sceny energií | dulezite pro glass/transmission a celkovou tonalitu |
+
+  ### Jak se lisi stiny podle rendereru
+
+  | Oblast | Raster (PHONG) | Ray Tracing | Path Tracing |
+  | --- | --- | --- | --- |
+  | Zakladni stinovani | preview aproximace | fyzikalnejsi primy stin | fyzikalnejsi primy + neprimy prispevek |
+  | Mekkost stinu | omezeny preview model | area-sample podle quality tieru | nejvernejsi chovani s Monte Carlo sumem |
+  | Kontaktni stiny | orientacni | stabilni pri dostatku vzorku | nejpresnejsi, ale nejdrazsi |
+  | Chovani pri pohybu kamery | preferuje rychlost | motion tier omezi cast detailu | motion tier omezi bounce/sampling, po zastaveni dorovna kvalitu |
+
+  ### Sklo, transparentnost a prenos svetla
+
+  | Materialova oblast | Raster | Ray | Path |
+  | --- | --- | --- | --- |
+  | Glass BSDF | aproximace | pouzitelne pro lookdev | nejpresnejsi interpretace v projektu |
+  | Transparent BSDF | aproximace | pouzitelne | pouzitelne |
+  | Fresnel a odraz/lom | zjednodusene | realnejsi vyhodnoceni | nejkompletnejsi vyhodnoceni |
+  | Prace s tloustkou a volumem | omezena | castena podpora homogeniho media | nejlepsi homogeni volume varianta |
+
+  Prakticky dopad:
+
+  - Pokud ladis sklo a jemne odrazy, prepinat z rasteru alespon do Ray Preview.
+  - Pokud ladis finalni materialovou energii (hlavne transmission + volume), pouzij Path Preview nebo output path render.
+
+  ### Klicove UI parametry pro svetlo a material
+
+  | Skupina | Parametry | Co delaji |
+  | --- | --- | --- |
+  | Ray Tracing | directLighting, shadows, reflections, samplesPerFrame, maxDepth, denoise | rychly pomer mezi cistotou stinu a casem framu |
+  | Path Tracing | directLighting, sky, samplesPerFrame, maxDepth, denoise | hlavni ovladani konvergence a realismu |
+  | Motion quality | preview motion cadence, tile subset cadence, depth/samples limit | drzi odezvu pri pohybu kamery |
+  | Material graph | Principled/Glass/Transparent/Mix/Volume | urcuje povrchovou i objemovou odezvu |
+
+  ### Doporuceny workflow pro lookdev svetel a materialu
+
+  1. Blokovani sceny a svetel v PHONG modu pro rychly feedback.
+  2. Kontrola tvaru stinu v Ray Tracing modu (stability check).
+  3. Ladeni skla, roughness a transmission v Path Preview.
+  4. Finalni validace v output path renderu s cilovymi samples.
+  5. Porovnani staticke kamery vs pohybu kamery, aby se odhalilo, jestli nastaveni funguje i mimo idealni still frame.
+
+  ### Nejcastejsi chyby pri ladeni svetla a skla
+
+  - Prilis nizky sample budget a rychly zaver, ze je material "spatne".
+  - Ladeni glassu jen v raster preview bez kontroly v ray/path.
+  - Ignorovani sky/environment prispevku, ktery meni vnimani roughness a specular.
+  - Hodnoceni kvality jen za pohybu kamery; po zastaveni muze renderer prepnout do vyssi quality faze a obraz vypada jinak.
 
 ## Matematické jádro
 
