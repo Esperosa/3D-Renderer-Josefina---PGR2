@@ -1,3 +1,6 @@
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
 import engine.camera.PerspectiveCamera;
 import engine.geometry.Mesh;
 import engine.material.PhongMaterial;
@@ -9,13 +12,9 @@ import engine.scene.DirectionalLight;
 import engine.scene.Entity;
 import engine.scene.Scene;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-
 public final class ShadowTerminatorRegressionTests {
     private static final double SHADOW_PLANE_EPS = 1e-3;
     private static final double RAY_EPS = 1e-4;
-
 
     private ShadowTerminatorRegressionTests() {
     }
@@ -28,13 +27,13 @@ public final class ShadowTerminatorRegressionTests {
         assertPathKeepsLighting(scene, camera);
         assertShadowOriginPushesPastPlane(
                 "engine.render.ray.RayTracerRenderer",
-            "engine.render.ray.RayHit",
-            "engine.render.ray.RaySurfaceState",
-            "engine.render.ray.RayTraceContext");
+                "engine.render.ray.RayHit",
+                "engine.render.ray.RaySurfaceState",
+                "engine.render.ray.RayTraceContext");
         assertShadowOriginPushesPastPlane(
                 "engine.render.ray.PathTracerRenderer",
-            "engine.render.ray.Hit",
-            "engine.render.ray.SurfaceState",
+                "engine.render.ray.Hit",
+                "engine.render.ray.SurfaceState",
                 "engine.render.ray.PathTracerRenderer$TraceContext");
 
         System.out.println("ShadowTerminatorRegressionTests: ALL TESTS PASSED");
