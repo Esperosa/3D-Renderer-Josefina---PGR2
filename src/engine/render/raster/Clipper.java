@@ -1,8 +1,8 @@
 package engine.render.raster;
 
 /**
- * Tady ořezávám trojúhelníky proti view frustu, minimálně proti near plane.
- * Z jednoho vstupního trojúhelníku si tím vrátím 0, 1 nebo 2 trojúhelníky.
+ * ořezávám trojúhelníky proti view frustu, minimálně proti near plane.
+ * Z jednoho vstupního trojúhelníku si tím vrátí 0, 1 nebo 2 trojúhelníky.
  */
 public class Clipper {
 
@@ -21,17 +21,17 @@ public class Clipper {
         this.outVertexCount = 0;
     }
 
-    /**
-     * Tady oříznu jeden trojúhelník proti near plane v clip prostoru.
-     * Používám k tomu Sutherland-Hodgman algoritmus.
-     *
-     * @param clipX sem předám hodnoty x v clip prostoru pro 3 vrcholy
-     * @param clipY sem předám hodnoty y v clip prostoru
-     * @param clipZ sem předám hodnoty z v clip prostoru
-     * @param clipW sem předám hodnoty w v clip prostoru
-     * @param attrs sem předám pole atributů po vrcholech k interpolaci, třeba normály, UV a world pozice
-     * @return tím vrátím počet výstupních trojúhelníků, tedy 0, 1 nebo 2
-     */
+ /**
+ * oříznu jeden trojúhelník proti near plane v clip prostoru.
+ * Používám k tomu Sutherland-Hodgman algoritmus.
+ *
+ * @param clipX hodnoty x v clip prostoru pro 3 vrcholy
+ * @param clipY hodnoty y v clip prostoru
+ * @param clipZ hodnoty z v clip prostoru
+ * @param clipW hodnoty w v clip prostoru
+ * @param attrs pole atributů po vrcholech k interpolaci, třeba normály, UV a world pozice
+ * @return tím vrátí počet výstupních trojúhelníků, tedy 0, 1 nebo 2
+ */
     public int clipTriangleNear(float[] clipX, float[] clipY, float[] clipZ, float[] clipW,
                                 float[][] attrs) {
         if (clipX == null || clipY == null || clipZ == null || clipW == null

@@ -5,7 +5,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 
 /**
- * Tady držím stav jedné výstupní session během renderu.
+ * Represents stav jedné výstupní session během renderu.
  */
 final class OutputRenderSessionContext {
     final ArrayList<Path> generatedFiles = new ArrayList<>();

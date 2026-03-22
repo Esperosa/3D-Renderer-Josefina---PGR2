@@ -4,7 +4,7 @@ import engine.math.AABB;
 import engine.math.BoundingSphere;
 
 /**
- * Tady počítám bounding volumes z mesh dat.
+ * Computes bounding volumes z mesh dat.
  */
 public final class BoundingVolumeBuilder {
 

@@ -3,9 +3,8 @@ package engine.render.ray.core;
 import engine.math.AABB;
 
 /**
- * Tady drÅ¾Ã­m uzel bounding volume hierarchy.
- * Do internÃ­ch uzlÅ¯ uklÃ¡dÃ¡m AABB a dva potomky.
- * Do listÅ¯ si odkazuju rozsah trojÃºhelnÃ­kÅ¯.
+ * Bounding volume hierarchy node.
+ * Internal nodes store bounds with two children; leaf nodes store a triangle range.
  */
 public class BVHNode {
 
@@ -41,7 +40,7 @@ public class BVHNode {
         return triangleCount > 0;
     }
 
-    // Tady drÅ¾Ã­m pÅ™Ã­stupovÃ© metody.
+ // Accessors.
     public AABB getBounds() {
         return bounds;
     }
@@ -62,4 +61,3 @@ public class BVHNode {
         return triangleCount;
     }
 }
-

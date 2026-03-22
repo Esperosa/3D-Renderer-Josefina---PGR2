@@ -3,7 +3,7 @@ package engine.scene;
 import engine.math.Vec3;
 
 /**
- * Tady držím nekonečně vzdálené světlo s jednotným směrem, třeba jako slunce.
+ * Represents nekonečně vzdálené světlo s jednotným směrem, třeba jako slunce.
  */
 public class DirectionalLight extends Light {
 
@@ -14,7 +14,7 @@ public class DirectionalLight extends Light {
         this.direction = direction == null ? new Vec3(0.0, -1.0, 0.0) : direction.normalize();
     }
 
-    // Tady přepisuju chování světla.
+ // přepisuju chování světla.
     @Override
     public Vec3 directionFrom(Vec3 surfacePoint) {
         return direction.negate();
@@ -25,7 +25,7 @@ public class DirectionalLight extends Light {
         return 1.0;
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Vec3 getDirection() {
         return direction;
     }

@@ -1,7 +1,7 @@
 package engine.core.history;
 
 /**
- * Tady držím jednoduchý příkaz založený na dvojici undo/redo callbacků.
+ * Represents jednoduchý příkaz založený na dvojici undo/redo callbacků.
  */
 public final class SnapshotEditorCommand implements EditorCommand {
     private final String label;

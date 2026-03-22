@@ -20,7 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Tady zapisuju artefakty a serializuju výsledky output renderu.
+ * Writes artefakty a serializuju výsledky output renderu.
  */
 final class OutputRenderArtifacts {
 

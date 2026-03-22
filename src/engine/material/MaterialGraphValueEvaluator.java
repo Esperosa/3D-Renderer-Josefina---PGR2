@@ -648,10 +648,10 @@ final class MaterialGraphValueEvaluator {
         return fallback;
     }
 
-    /**
-     * Tady klíče socketů v materiálovém grafu držím jako ASCII identifikátory.
-     * V nejteplejší cestě vykreslení proto nepoužívám převod na malá písmena závislý na jazykovém prostředí.
-     */
+ /**
+ * klíče socketů v materiálovém grafu drží jako ASCII identifikátory.
+ * V nejteplejší cestě vykreslení proto nepoužívá převod na malá písmena závislý na jazykovém prostředí.
+ */
     private static String normalizeSocketKey(String value, String fallback) {
         if (value == null) {
             return fallback;

@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím matici 4x4 uloženou po řádcích.
+ * Represents matici 4x4 uloženou po řádcích.
  * Používám ji jako základní typ pro model, view a projekční transformace.
  */
 public class Mat4 {
@@ -41,7 +41,7 @@ public class Mat4 {
         return this;
     }
 
-    // Tady držím aritmetické operace.
+ // Represents aritmetické operace.
     public Mat4 multiply(Mat4 other) {
         return multiply(other, new Mat4());
     }
@@ -201,7 +201,7 @@ public class Mat4 {
         );
     }
 
-    // Tady skládám modelové transformace.
+ // Builds modelové transformace.
     public static Mat4 identity() {
         return new Mat4();
     }
@@ -273,7 +273,7 @@ public class Mat4 {
         );
     }
 
-    // Tady skládám view a projekční transformace.
+ // Builds view a projekční transformace.
     public static Mat4 lookAt(Vec3 eye, Vec3 target, Vec3 up) {
         Vec3 f = target.sub(eye).normalize();
         Vec3 s = f.cross(up).normalize();
@@ -318,7 +318,7 @@ public class Mat4 {
         );
     }
 
-    // Tady držím pomocné utility.
+ // Represents pomocné utility.
     public Mat3 toMat3() {
         return new Mat3(
                 m[0], m[1], m[2],

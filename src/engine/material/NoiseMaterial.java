@@ -1,7 +1,7 @@
 package engine.material;
 
 /**
- * Tady držím parametry materiálu pro temporal-noise renderer.
+ * Represents parametry materiálu pro temporal-noise renderer.
  * Používám je jen jako datový kontejner pro kompatibilitu starších cest.
  */
 public class NoiseMaterial extends Material {

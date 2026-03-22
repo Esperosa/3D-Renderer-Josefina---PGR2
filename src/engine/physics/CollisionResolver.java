@@ -5,7 +5,7 @@ import engine.math.Vec3;
 import java.util.List;
 
 /**
- * Tady řeším nalezené kolize přes impulzní odezvu.
+ * Handles nalezené kolize přes impulzní odezvu.
  */
 public class CollisionResolver {
 
@@ -17,11 +17,11 @@ public class CollisionResolver {
         this.slop = 0.01;
     }
 
-    /**
-     * Tady vyřeším všechny kontakty kolizí pro aktuální snímek.
-     *
-     * @param contacts sem předám seznam detekovaných kolizí
-     */
+ /**
+ * vyřeší všechny kontakty kolizí pro aktuální snímek.
+ *
+ * @param contacts seznam detekovaných kolizí
+ */
     public void resolve(List<CollisionResult> contacts) {
         for (CollisionResult contact : contacts) {
             RigidBody a = contact.getBodyA();

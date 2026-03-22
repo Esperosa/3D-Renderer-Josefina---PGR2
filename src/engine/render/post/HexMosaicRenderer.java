@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 
 /**
- * Tady držím adaptivní hexagonální mozaikový renderer s buněčně stínovaným vzhledem.
+ * Represents adaptivní hexagonální mozaikový renderer s buněčně stínovaným vzhledem.
  * Rozkládám v něm obraz na hexagonální buňky, které plním kvantizovanou barvou a volitelným stylizovaným patternem.
  */
 public class HexMosaicRenderer implements Renderer {
@@ -213,7 +213,7 @@ public class HexMosaicRenderer implements Renderer {
             return;
         }
 
-        // Tady přepošlu sdílené raster ovladače do základního passu.
+ // přepošlu sdílené raster ovladače do základního passu.
         baseRenderer.setParameter(key, value);
     }
 
@@ -294,7 +294,7 @@ public class HexMosaicRenderer implements Renderer {
             }
         }
 
-        // Tady si předpočítám statickou masku hran a faktor hran hexů, abych se vyhnul těžké matematice v každém snímku.
+ // si předpočítá statickou masku hran a faktor hran hexů, abych se vyhnul těžké matematice v každém snímku.
         for (int y = 0; y < height; y++) {
             int row = y * width;
             for (int x = 0; x < width; x++) {

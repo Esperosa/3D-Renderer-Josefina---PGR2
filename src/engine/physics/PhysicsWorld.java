@@ -9,7 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Tady držím jednoduchý fyzikální svět pro rigid body.
+ * Represents jednoduchý fyzikální svět pro rigid body.
  */
 public class PhysicsWorld {
 
@@ -31,7 +31,7 @@ public class PhysicsWorld {
         this.fixedTimeStep = 1.0 / 60.0;
     }
 
-    // Tady spravuju těla ve fyzikálním světě.
+ // spravuje těla ve fyzikálním světě.
     public void addBody(RigidBody body) {
         if (body != null) {
             bodies.add(body);
@@ -46,11 +46,11 @@ public class PhysicsWorld {
         return Collections.unmodifiableList(bodies);
     }
 
-    /**
-     * Tady posunu fyziku o jeden fixed timestep.
-     *
-     * @param dt sem předám fixed delta čas v sekundách
-     */
+ /**
+ * posunu fyziku o jeden fixed timestep.
+ *
+ * @param dt fixed delta čas v sekundách
+ */
     public void step(double dt) {
         double step = dt > 0.0 ? dt : fixedTimeStep;
         for (RigidBody body : bodies) {
@@ -60,7 +60,7 @@ public class PhysicsWorld {
         resolver.resolve(contacts);
     }
 
-    // Tady držím základní konfiguraci světa.
+ // Represents základní konfiguraci světa.
     public void setGravity(Vec3 g) {
         gravity = g;
     }
@@ -77,7 +77,7 @@ public class PhysicsWorld {
         this.fixedTimeStep = Math.max(1e-4, fixedTimeStep);
     }
 
-    // Tady řeším raycasty proti fyzikálním tělesům.
+ // Handles raycasty proti fyzikálním tělesům.
     public RaycastResult raycast(Ray ray, double maxDistance) {
         List<RaycastResult> all = raycastAll(ray, maxDistance);
         return all.isEmpty() ? new RaycastResult() : all.get(0);

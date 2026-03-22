@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím neměnný 2D vektor pro UV souřadnice a obrazové pozice.
+ * Represents neměnný 2D vektor pro UV souřadnice a obrazové pozice.
  */
 public class Vec2 {
 

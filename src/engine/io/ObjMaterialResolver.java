@@ -14,7 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Tady řeším materiály OBJ a MTL.
+ * Handles materiály OBJ a MTL.
  * Načítám si pojmenované materiály z navázaných MTL souborů a rozvazuju texturové mapy.
  */
 final class ObjMaterialResolver {
@@ -166,7 +166,7 @@ final class ObjMaterialResolver {
                 try {
                     mat.setDiffuseTexture(Texture.load(tex.toString()));
                 } catch (RuntimeException ignored) {
-                    // Tady držím materiál validní i tehdy, když načtení textury selže.
+ // Represents materiál validní i tehdy, když načtení textury selže.
                 }
             }
         }
@@ -284,7 +284,7 @@ final class ObjMaterialResolver {
                     return path;
                 }
             } catch (InvalidPathException ignored) {
-                // Tady přeskočím poškozený kandidátní text a zkusím realističtější náhradní řešení.
+ // Skips poškozený kandidátní text a zkusím realističtější náhradní řešení.
             }
         }
         return null;

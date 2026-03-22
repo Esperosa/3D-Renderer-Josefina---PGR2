@@ -71,7 +71,7 @@ public final class EngineSafetyRendererCoverageTests {
                                                    long now,
                                                    String scenarioName,
                                                    boolean heavyAccumulator) throws Exception {
-        // Tady overload jen simuluju přes omezené frame časy, takže test ověří watchdog bez reálného pálení CPU.
+ // overload jen simuluje přes omezené frame časy, takže test ověří watchdog bez reálného pálení CPU.
         double severeFrameMs = heavyAccumulator ? 1900.0 : 720.0;
         EngineSafetyController.recordFrame(engine, severeFrameMs, now, true);
         if (heavyAccumulator) {

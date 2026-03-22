@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Tady vyhodnocuju materiálový graf uzlů do konkrétních parametrů shaderu pro všechny režimy vykreslení.
+ * vyhodnocuju materiálový graf uzlů do konkrétních parametrů shaderu pro všechny režimy vykreslení.
  */
 public final class MaterialGraphEvaluator {
 

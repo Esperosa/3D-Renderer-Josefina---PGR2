@@ -63,7 +63,7 @@ import engine.util.ThreadPool;
 import engine.util.UiBuilder;
 
 /**
- * Tady držím centrální řídicí třídu enginu.
+ * Represents centrální řídicí třídu enginu.
  */
 public class Engine {
 
@@ -755,25 +755,25 @@ public class Engine {
         this.historyRestoring = false;
     }
 
-    /**
-     * Tady inicializuju subsystémy a spustím hlavní smyčku aplikace.
-     */
+ /**
+ * inicializuju subsystémy a spustí hlavní smyčku aplikace.
+ */
     public void start() {
         EngineLifecycleController.start(this);
     }
 
-    /**
-     * Tady za běhu přepnu aktivní renderer podle zvoleného režimu.
-     *
-     * @param mode sem předám cílový režim vykreslování
-     */
+ /**
+ * za běhu přepnu aktivní renderer podle zvoleného režimu.
+ *
+ * @param mode cílový režim vykreslování
+ */
     public void setRenderMode(RenderMode mode) {
         EngineLifecycleController.setRenderMode(this, mode);
     }
 
-    /**
-     * Tady vyžádám korektní ukončení aplikace.
-     */
+ /**
+ * vyžádám korektní ukončení aplikace.
+ */
     public void shutdown() {
         EngineLifecycleController.shutdown(this);
     }
@@ -1689,4 +1689,3 @@ public class Engine {
         }
     }
 }
-

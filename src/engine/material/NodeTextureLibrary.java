@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tady držím sdílenou mezipaměť pro textury materiálových uzlů načítané ze souborů.
+ * Represents sdílenou mezipaměť pro textury materiálových uzlů načítané ze souborů.
  */
 public final class NodeTextureLibrary {
 

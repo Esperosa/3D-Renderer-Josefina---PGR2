@@ -3,7 +3,7 @@ package engine.material;
 import engine.math.MathUtil;
 
 /**
- * Tady vyhodnocuju objemovou větev materiálového grafu.
+ * vyhodnocuju objemovou větev materiálového grafu.
  */
 final class MaterialGraphVolumeEvaluator {
 

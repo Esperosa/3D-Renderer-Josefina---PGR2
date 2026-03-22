@@ -7,7 +7,7 @@ import engine.render.Renderer;
 import engine.scene.Scene;
 
 /**
- * Tady držím herní smyčku s pevným krokem a proměnlivou render frekvencí.
+ * Represents herní smyčku s pevným krokem a proměnlivou render frekvencí.
  */
 public class GameLoop {
 
@@ -45,9 +45,9 @@ public class GameLoop {
         this.running = false;
     }
 
-    /**
-     * Tady vstoupím do hlavní smyčky a zůstanu v ní, dokud nepožádám o vypnutí.
-     */
+ /**
+ * vstoupím do hlavní smyčky a zůstanu v ní, dokud nepožádám o vypnutí.
+ */
     public void run() {
         if (renderer == null || scene == null || camera == null || frameBuffer == null) {
             return;
@@ -82,11 +82,11 @@ public class GameLoop {
         }
     }
 
-    /**
-     * Tady provedu jeden fixed-step update tick.
-     *
-     * @param dt sem předám fixed delta čas v sekundách
-     */
+ /**
+ * Performs jeden fixed-step update tick.
+ *
+ * @param dt fixed delta čas v sekundách
+ */
     private void update(double dt) {
         if (physicsWorld != null) {
             physicsWorld.step(dt);
@@ -96,9 +96,9 @@ public class GameLoop {
         }
     }
 
-    /**
-     * Tady požádám o ukončení smyčky po dokončení aktuálního framu.
-     */
+ /**
+ * požádám o ukončení smyčky po dokončení aktuálního framu.
+ */
     public void stop() {
         running = false;
     }

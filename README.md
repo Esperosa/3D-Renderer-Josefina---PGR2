@@ -249,7 +249,7 @@ xychart-beta
   line "Ray Tracing" [9.36, 13.13, 37.10, 424.58]
 ```
 
-Tady je vidět násobení s počtem pixelů a zároveň odlišný charakter obou offline rendererů v aktuální konfiguraci benchmarku. V tomhle měření vychází `Path Tracing` výrazně náročněji než `Ray Tracing`.
+Je zde vidět násobení s počtem pixelů i odlišný charakter obou offline rendererů v aktuální konfiguraci benchmarku. V tomto měření vychází `Path Tracing` výrazně náročněji než `Ray Tracing`.
 
 ### Graf 3: First-frame vs. steady-frame v nejtěžším `static-steady` stress case
 

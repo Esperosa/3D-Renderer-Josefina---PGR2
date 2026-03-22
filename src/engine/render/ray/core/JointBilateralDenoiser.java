@@ -783,9 +783,9 @@ final class JointBilateralDenoiser {
                         double filteredSpecularB = filteredB - filteredDiffuseB;
 
                         double diffuseBlend = DenoiseSupport.clamp01(effectiveBlend
-                            * (DIFFUSE_BLEND_BASE + roughness * DIFFUSE_BLEND_ROUGHNESS_SCALE));
+ * (DIFFUSE_BLEND_BASE + roughness * DIFFUSE_BLEND_ROUGHNESS_SCALE));
                         double specularBlend = DenoiseSupport.clamp01(effectiveBlend
-                            * (SPECULAR_BLEND_BASE + roughness * SPECULAR_BLEND_ROUGHNESS_SCALE));
+ * (SPECULAR_BLEND_BASE + roughness * SPECULAR_BLEND_ROUGHNESS_SCALE));
 
                         targetR[idx] = DenoiseSupport.lerp(centerDiffuseR, filteredDiffuseR, diffuseBlend)
                             + DenoiseSupport.lerp(centerSpecularR, filteredSpecularR, specularBlend);
@@ -895,8 +895,8 @@ final class JointBilateralDenoiser {
     private static double resolveBlend(double baseStrength, double noise, int passIndex, double roughness) {
         double surfaceFactor = balancedSurfaceFactor(roughness);
         double baseBlend = DenoiseSupport.clamp01(baseStrength
-                * (BLEND_BASE_FLOOR + noise * BLEND_NOISE_SCALE)
-                * surfaceFactor);
+ * (BLEND_BASE_FLOOR + noise * BLEND_NOISE_SCALE)
+ * surfaceFactor);
         double passGate = DenoiseSupport.clamp01(noise * BLEND_PASS_GATE_NOISE
                 - passIndex * BLEND_PASS_GATE_DECAY
                 + BLEND_PASS_GATE_BIAS);
@@ -968,7 +968,7 @@ final class JointBilateralDenoiser {
         }
         double safeFilteredLuma = Math.max(0.0, filteredLuma);
         double thresholdLuma = safeFilteredLuma
-            * (HOT_PIXEL_THRESHOLD_BASE + (1.0 - noise) * HOT_PIXEL_THRESHOLD_STABILITY_SCALE)
+ * (HOT_PIXEL_THRESHOLD_BASE + (1.0 - noise) * HOT_PIXEL_THRESHOLD_STABILITY_SCALE)
             + HOT_PIXEL_THRESHOLD_LUMA_BIAS
             + (1.0 - baseStrength) * HOT_PIXEL_THRESHOLD_STRENGTH_BIAS;
         if (centerLuma <= thresholdLuma) {
@@ -978,8 +978,8 @@ final class JointBilateralDenoiser {
         double normalizedOverflow = overflow / Math.max(HOT_PIXEL_NORMALIZATION_FLOOR, thresholdLuma);
         double surfaceFactor = balancedSurfaceFactor(roughness);
         return DenoiseSupport.clamp01(normalizedOverflow
-            * (HOT_PIXEL_BASE + noise * HOT_PIXEL_NOISE_SCALE)
-            * surfaceFactor);
+ * (HOT_PIXEL_BASE + noise * HOT_PIXEL_NOISE_SCALE)
+ * surfaceFactor);
     }
 
     private static double resolveColorSigma(double centerLuma,
@@ -1079,7 +1079,7 @@ final class JointBilateralDenoiser {
                 / DETAIL_RECOVERY_SAMPLE_RANGE);
         double baseRecovery = DETAIL_RECOVERY_BASE * balancedSurfaceFactor(roughness) * smartDetailScale;
         if (context.guideRoughness == null) {
-            // Without roughness guides keep conservative but still allow mild texture recovery.
+ // Without roughness guides keep conservative but still allow mild texture recovery.
             baseRecovery *= 0.60;
         }
         return DenoiseSupport.clamp01(stability * baseRecovery * (1.0 + DETAIL_RECOVERY_SAMPLE_BOOST * sampleBoost));
@@ -1331,4 +1331,3 @@ final class JointBilateralDenoiser {
         }
     }
 }
-

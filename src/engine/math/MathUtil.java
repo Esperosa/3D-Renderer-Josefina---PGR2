@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím společné matematické pomocníky pro interpolaci, clamp a převody.
+ * Represents společné matematické pomocníky pro interpolaci, clamp a převody.
  */
 public final class MathUtil {
 
@@ -14,7 +14,7 @@ public final class MathUtil {
 
     private MathUtil() {}
 
-    // Tady řeším clamp a wrap operace.
+ // Handles clamp a wrap operace.
     public static double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -43,7 +43,7 @@ public final class MathUtil {
         return t * t * (3.0 - 2.0 * t);
     }
 
-    // Tady držím trigonometrické zkratky.
+ // Represents trigonometrické zkratky.
     public static double toRadians(double degrees) {
         return degrees * DEG_TO_RAD;
     }
@@ -52,7 +52,7 @@ public final class MathUtil {
         return radians * RAD_TO_DEG;
     }
 
-    // Tady počítám barycentrické hodnoty.
+ // Computes barycentrické hodnoty.
     public static Vec3 barycentric(Vec2 p, Vec2 a, Vec2 b, Vec2 c) {
         double denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
         if (Math.abs(denom) < EPSILON) {
@@ -68,7 +68,7 @@ public final class MathUtil {
         return a * bary.x + b * bary.y + c * bary.z;
     }
 
-    // Tady řeším perspektivně správnou interpolaci.
+ // Handles perspektivně správnou interpolaci.
     public static double perspectiveCorrectInterpolate(
             double attr0, double attr1, double attr2,
             double w0, double w1, double w2,
@@ -81,7 +81,7 @@ public final class MathUtil {
         return n / d;
     }
 
-    // Tady převádím mezi prostory přes Mat4.
+ // Converts mezi prostory přes Mat4.
     public static Vec3 worldToView(Vec3 worldPos, Mat4 viewMatrix) {
         return viewMatrix.transformPoint(worldPos);
     }
@@ -100,7 +100,7 @@ public final class MathUtil {
         return new Vec2(x, y);
     }
 
-    // Tady držím jednoduché náhodné pomocníky.
+ // Represents jednoduché náhodné pomocníky.
     public static double randomDouble() {
         return Math.random();
     }

@@ -5,7 +5,7 @@ import engine.geometry.Mesh;
 import java.nio.file.Path;
 
 /**
- * Tady držím hlavní dispatcher pro import modelů podle přípony souboru.
+ * Represents hlavní dispatcher pro import modelů podle přípony souboru.
  */
 public class ModelImporter {
 

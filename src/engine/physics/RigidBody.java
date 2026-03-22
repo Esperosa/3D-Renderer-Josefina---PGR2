@@ -4,19 +4,19 @@ import engine.math.Vec3;
 import engine.scene.Entity;
 
 /**
- * Tady držím fyzikální tělo navázané na scénovou entitu.
+ * Represents fyzikální tělo navázané na scénovou entitu.
  */
 public class RigidBody {
 
-    /**
-     * Tady rozliším typ fyzikálního těla.
-     */
+ /**
+ * Distinguishes typ fyzikálního těla.
+ */
     public enum BodyType {
-        /** Tady nechám tělo ovlivňovat silami i kolizemi. */
+ /** Keeps tělo ovlivňovat silami i kolizemi. */
         DYNAMIC,
-        /** Tady tělo posouvám kódem, ale kolize pořád řeším. */
+ /** tělo posouvám kódem, ale kolize pořád řeší. */
         KINEMATIC,
-        /** Tady tělo nikdy nehýbu a beru ho jako nekonečně těžké. */
+ /** tělo nikdy nehýbu a beru ho jako nekonečně těžké. */
         STATIC
     }
 
@@ -54,7 +54,7 @@ public class RigidBody {
         }
     }
 
-    // Tady pracuju se silami a impulzy.
+ // pracuju se silami a impulzy.
     public void applyForce(Vec3 force) {
         this.force = this.force.add(force);
         sleeping = false;
@@ -72,7 +72,7 @@ public class RigidBody {
         this.force = Vec3.ZERO;
     }
 
-    // Tady provádím integraci pohybu.
+ // provádím integraci pohybu.
     public void integrate(double dt, Vec3 gravity) {
         if (type == BodyType.STATIC || sleeping || entity == null) {
             clearForces();
@@ -86,7 +86,7 @@ public class RigidBody {
         clearForces();
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Entity getEntity() {
         return entity;
     }

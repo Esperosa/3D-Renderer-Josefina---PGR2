@@ -1,7 +1,7 @@
 package engine.core;
 
 /**
- * Tady držím lehký watchdog nad viewport loopem, aby mi editor při přetížení radši krátce zvolnil,
+ * Represents lehký watchdog nad viewport loopem, aby mi editor při přetížení radši krátce zvolnil,
  * než aby dlouho dusil CPU a přestal reagovat.
  */
 final class EngineSafetyController {
@@ -37,7 +37,7 @@ final class EngineSafetyController {
         if (!engine.safetyRecoveryActive && isMemoryPressureCritical()) {
             armRecovery(engine, now, "Paměťový tlak");
         }
-        // Safety uz nesmi stopnout viewport loop; fallback render mode resi EngineRenderRuntime.
+ // Safety uz nesmi stopnout viewport loop; fallback render mode resi EngineRenderRuntime.
         return false;
     }
 
@@ -123,8 +123,8 @@ final class EngineSafetyController {
         engine.safetySevereFrameStreak = 0;
         engine.safetyViewportScaleClamp = Math.min(engine.safetyViewportScaleClamp, RECOVERY_SCALE_CLAMP);
 
-        // Safety recovery má jen tlumit viewport scale; progresivní akumulaci nerestartujeme,
-        // protože to ve špičkách vede k viditelnému cyklickému resetování sample countu.
+ // Safety recovery má jen tlumit viewport scale; progresivní akumulaci nerestartujeme,
+ // protože to ve špičkách vede k viditelnému cyklickému resetování sample countu.
         if (engine.frameBuffer != null
                 && !(engine.pathAccumulationLock && engine.activeMode == RenderMode.PATH_TRACING)) {
             EngineRenderRuntime.applyRenderScale(engine, false);

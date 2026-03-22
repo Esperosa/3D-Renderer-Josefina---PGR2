@@ -4,7 +4,7 @@ import engine.math.MathUtil;
 import engine.math.Vec3;
 
 /**
- * Tady držím kuželové světlo podobné spot lightu.
+ * Represents kuželové světlo podobné spot lightu.
  */
 public class ConeLight extends PointLight {
 

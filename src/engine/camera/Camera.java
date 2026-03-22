@@ -4,7 +4,7 @@ import engine.math.Mat4;
 import engine.math.Vec3;
 
 /**
- * Tady definuju abstraktní kameru s view a projekční maticí.
+ * Defines abstraktní kameru s view a projekční maticí.
  */
 public abstract class Camera {
 
@@ -32,7 +32,7 @@ public abstract class Camera {
         this.projDirty = true;
     }
 
-    // Tady řeším view matici.
+ // Handles view matici.
     public Mat4 getViewMatrix() {
         if (viewDirty) {
             rebuildViewMatrix();
@@ -45,11 +45,11 @@ public abstract class Camera {
         viewDirty = false;
     }
 
-    // Tady řeším projekční matici.
+ // Handles projekční matici.
     public abstract Mat4 getProjectionMatrix();
     protected abstract void rebuildProjectionMatrix();
 
-    // Tady řeším orientaci kamery.
+ // Handles orientaci kamery.
     public void lookAt(Vec3 target) {
         Vec3 dir = target.sub(position).normalize();
         if (dir.lengthSquared() < 1e-10) {
@@ -85,7 +85,7 @@ public abstract class Camera {
         return right;
     }
 
-    // Tady řeším clipping rozsah.
+ // Handles clipping rozsah.
     public double getNear() {
         return near;
     }

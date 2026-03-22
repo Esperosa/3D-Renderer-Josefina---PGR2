@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím měnitelný 4D vektor pro homogenní souřadnice a RGBA barvy.
+ * Represents měnitelný 4D vektor pro homogenní souřadnice a RGBA barvy.
  */
 public class Vec4 {
 
@@ -18,9 +18,9 @@ public class Vec4 {
         set(x, y, z, w);
     }
 
-    /**
-     * Tady vytvořím Vec4 z Vec3 a samostatné složky w.
-     */
+ /**
+ * Creates Vec4 z Vec3 a samostatné složky w.
+ */
     public Vec4(Vec3 v, double w) {
         this(v.x, v.y, v.z, w);
     }

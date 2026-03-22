@@ -1,7 +1,7 @@
 package engine.core;
 
 /**
- * Tady držím odložený požadavek na spuštění výstupního renderu.
+ * Represents odložený požadavek na spuštění výstupního renderu.
  */
 final class OutputRenderPendingRequest {
     OutputRenderRequestType type;

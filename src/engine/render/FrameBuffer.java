@@ -5,7 +5,7 @@ import engine.math.Vec3;
 import java.util.Arrays;
 
 /**
- * Tady držím softwarový framebuffer s barvou, hloubkou a volitelnými pomocnými buffery.
+ * Represents softwarový framebuffer s barvou, hloubkou a volitelnými pomocnými buffery.
  * Všechny buffery ukládám do plochých polí o velikosti width * height, aby se mi k nim přistupovalo co nejlépe přes mezipaměť procesoru.
  */
 public class FrameBuffer {
@@ -16,7 +16,7 @@ public class FrameBuffer {
     private float[] depthBuffer;
     private boolean gBufferEnabled;
 
-    // Tady držím volitelné kanály G-bufferu.
+ // Represents volitelné kanály G-bufferu.
     private int[] objectIdBuffer;
     private int[] faceIdBuffer;
     private float[] normalBuffer;
@@ -31,7 +31,7 @@ public class FrameBuffer {
         allocate(width, height);
     }
 
-    // Tady čistím obsah framebufferu.
+ // Clears obsah framebufferu.
     public void clear(int clearColor, float clearDepth) {
         Arrays.fill(colorBuffer, clearColor);
         Arrays.fill(depthBuffer, clearDepth);
@@ -50,7 +50,7 @@ public class FrameBuffer {
         Arrays.fill(worldPosBuffer, 0.0f);
     }
 
-    // Tady zapisuju data po pixelech.
+ // Writes data po pixelech.
     public void setPixel(int x, int y, int argb) {
         if (!inBounds(x, y)) {
             return;
@@ -71,7 +71,7 @@ public class FrameBuffer {
         return false;
     }
 
-    // Tady zapisuju data do G-bufferu.
+ // Writes data do G-bufferu.
     public void setObjectId(int x, int y, int id) {
         if (gBufferEnabled && inBounds(x, y)) {
             objectIdBuffer[index(x, y)] = id;
@@ -104,7 +104,7 @@ public class FrameBuffer {
         worldPosBuffer[base + 2] = wz;
     }
 
-    // Tady držím čtecí metody.
+ // Represents čtecí metody.
     public int getColor(int x, int y) {
         if (!inBounds(x, y)) {
             return 0;
@@ -142,7 +142,7 @@ public class FrameBuffer {
         return new Vec3(worldPosBuffer[base], worldPosBuffer[base + 1], worldPosBuffer[base + 2]);
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public int getWidth() {
         return width;
     }
@@ -179,7 +179,7 @@ public class FrameBuffer {
         return worldPosBuffer;
     }
 
-    // Tady řeším resize.
+ // Handles resize.
     public void resize(int newWidth, int newHeight) {
         allocate(newWidth, newHeight);
     }

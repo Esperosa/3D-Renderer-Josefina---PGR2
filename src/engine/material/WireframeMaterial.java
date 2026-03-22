@@ -3,7 +3,7 @@ package engine.material;
 import engine.math.Vec3;
 
 /**
- * Tady držím parametry materiálu pro wireframe renderer.
+ * Represents parametry materiálu pro wireframe renderer.
  * Řídím si sem základní barvu, profil vzdálenosti a zvýraznění hran.
  */
 public class WireframeMaterial extends Material {
@@ -27,7 +27,7 @@ public class WireframeMaterial extends Material {
         this.dashLength = 8.0;
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public double getMinBrightness() {
         return minBrightness;
     }

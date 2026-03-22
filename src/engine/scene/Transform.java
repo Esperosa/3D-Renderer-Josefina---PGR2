@@ -5,7 +5,7 @@ import engine.math.Quaternion;
 import engine.math.Vec3;
 
 /**
- * Tady držím pozici, rotaci a scale entity i její lokální matici.
+ * Represents pozici, rotaci a scale entity i její lokální matici.
  */
 public class Transform {
 
@@ -21,7 +21,7 @@ public class Transform {
         this.dirtyListener = dirtyListener;
     }
 
-    // Tady měním transformaci.
+ // měním transformaci.
     public void setPosition(Vec3 p) {
         position = p;
         markDirty();
@@ -47,7 +47,7 @@ public class Transform {
         markDirty();
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Vec3 getPosition() {
         return position;
     }
@@ -68,7 +68,7 @@ public class Transform {
         return revision;
     }
 
-    // Tady skládám lokální matici.
+ // Builds lokální matici.
     public Mat4 getLocalMatrix() {
         if (dirty) {
             rebuildMatrix();
@@ -84,7 +84,7 @@ public class Transform {
         dirty = false;
     }
 
-    // Tady držím pohodlné Euler převody.
+ // Represents pohodlné Euler převody.
     public void setEulerAngles(double pitch, double yaw, double roll) {
         rotation = Quaternion.fromEuler(pitch, yaw, roll);
         markDirty();

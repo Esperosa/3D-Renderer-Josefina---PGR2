@@ -23,7 +23,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Tady držím klíče časové osy pro objekty, světla, síly a výstupní kameru.
+ * Represents klíče časové osy pro objekty, světla, síly a výstupní kameru.
  */
 final class SceneTimeline {
 

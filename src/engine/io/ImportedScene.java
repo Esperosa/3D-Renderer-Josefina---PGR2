@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Tady držím výsledný kontejner pro import modelu nebo scény.
+ * Represents výsledný kontejner pro import modelu nebo scény.
  * Každou položkou v něm reprezentuju jednu mesh instanci s transformací.
  */
 public final class ImportedScene {

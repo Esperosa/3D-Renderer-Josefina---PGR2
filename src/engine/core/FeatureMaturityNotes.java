@@ -1,7 +1,7 @@
 package engine.core;
 
 /**
- * Tady držím centralizované krátké maturity poznámky pro editorové UI a dokumentaci.
+ * Represents centralizované krátké maturity poznámky pro editorové UI a dokumentaci.
  */
 public final class FeatureMaturityNotes {
 

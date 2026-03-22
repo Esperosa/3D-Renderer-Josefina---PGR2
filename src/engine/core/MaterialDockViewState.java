@@ -3,7 +3,7 @@ package engine.core;
 import engine.material.MaterialPreviewRenderer;
 
 /**
- * Tady držím čistě UI stav materiálového workspace.
+ * Represents čistě UI stav materiálového workspace.
  */
 final class MaterialDockViewState {
     private boolean lookdevPanelExpanded = true;

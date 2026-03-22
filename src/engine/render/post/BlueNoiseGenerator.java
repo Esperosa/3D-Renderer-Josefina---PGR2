@@ -3,8 +3,8 @@ package engine.render.post;
 import java.util.Random;
 
 /**
- * Tady držím generátor prahové mapy podobné modrému šumu.
- * Protože nemám externí knihovny, používám aproximaci typu void-and-cluster
+ * Represents generátor prahové mapy podobné modrému šumu.
+ * Protože nemám externí knihovny, používá aproximaci typu void-and-cluster
  * nebo malou předpočítanou dlaždici, kterou opakuju beze švu.
  */
 public final class BlueNoiseGenerator {
@@ -24,13 +24,13 @@ public final class BlueNoiseGenerator {
         generate();
     }
 
-    /**
-     * Tady vygeneruju prahovou mapu podobnou modrému šumu.
-     * Používám zjednodušený algoritmus typu void-and-cluster:
-     * 1. začnu s prázdnou mřížkou
-     * 2. iterativně pokládám body tam, kde vyjde nejnižší energie
-     * 3. podle pořadí pokládání přiřadím pořadí prahu
-     */
+ /**
+ * vygeneruje prahovou mapu podobnou modrému šumu.
+ * Používám zjednodušený algoritmus typu void-and-cluster:
+ * 1. začnu s prázdnou mřížkou
+ * 2. iterativně pokládám body tam, kde vyjde nejnižší energie
+ * 3. podle pořadí pokládání přiřadím pořadí prahu
+ */
     public final void generate() {
         int total = mapSize * mapSize;
         boolean[] used = new boolean[total];
@@ -66,13 +66,13 @@ public final class BlueNoiseGenerator {
         }
     }
 
-    /**
-     * Tady vrátím threshold hodnotu na tiled souřadnicích.
-     *
-     * @param x sem předám pixelovou souřadnici x opakovanou přes modulo
-     * @param y sem předám pixelovou souřadnici y opakovanou přes modulo
-     * @return tím vrátím práh v intervalu [0, maxLevel)
-     */
+ /**
+ * Returns threshold hodnotu na tiled souřadnicích.
+ *
+ * @param x pixelovou souřadnici x opakovanou přes modulo
+ * @param y pixelovou souřadnici y opakovanou přes modulo
+ * @return tím vrátí práh v intervalu [0, maxLevel)
+ */
     public int getThreshold(int x, int y) {
         int tx = Math.floorMod(x, mapSize);
         int ty = Math.floorMod(y, mapSize);

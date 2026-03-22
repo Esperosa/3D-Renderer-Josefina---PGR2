@@ -5,7 +5,7 @@ import engine.math.MathUtil;
 import engine.math.Vec3;
 
 /**
- * Tady držím perspektivní kameru s nastavitelným FOV a aspect ratio.
+ * Represents perspektivní kameru s nastavitelným FOV a aspect ratio.
  */
 public class PerspectiveCamera extends Camera {
 
@@ -19,7 +19,7 @@ public class PerspectiveCamera extends Camera {
         this.projDirty = true;
     }
 
-    // Tady řeším projekční matici.
+ // Handles projekční matici.
     @Override
     public Mat4 getProjectionMatrix() {
         if (projDirty) {
@@ -34,7 +34,7 @@ public class PerspectiveCamera extends Camera {
         projDirty = false;
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public double getFovY() {
         return fovY;
     }

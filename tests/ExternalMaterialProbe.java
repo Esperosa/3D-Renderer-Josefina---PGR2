@@ -6,9 +6,9 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Tady vypisuju praktické materiálové a UV schopnosti nalezené v importovaných modelech.
+ * vypisuje praktické materiálové a UV schopnosti nalezené v importovaných modelech.
  * Spustím to takto:
- *   java -cp <classpath> ExternalMaterialProbe <file1> [file2 ...]
+ * java -cp <classpath> ExternalMaterialProbe <file1> [file2 ...]
  */
 public final class ExternalMaterialProbe {
 

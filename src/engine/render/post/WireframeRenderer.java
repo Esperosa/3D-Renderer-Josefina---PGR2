@@ -15,7 +15,7 @@ import engine.scene.Entity;
 import engine.scene.Scene;
 
 /**
- * Tady držím gradientní wireframe renderer.
+ * Represents gradientní wireframe renderer.
  */
 public class WireframeRenderer implements Renderer {
 
@@ -33,7 +33,7 @@ public class WireframeRenderer implements Renderer {
 
     @Override
     public void init(int width, int height) {
-        // Tady nepotřebuju žádné další buffery.
+ // nepotřebuju žádné další buffery.
     }
 
     @Override
@@ -117,7 +117,7 @@ public class WireframeRenderer implements Renderer {
 
     @Override
     public void resize(int width, int height) {
-        // Nothing to resize.
+ // Nothing to resize.
     }
 
     @Override

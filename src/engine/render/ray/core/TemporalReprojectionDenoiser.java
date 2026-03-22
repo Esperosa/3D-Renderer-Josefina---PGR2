@@ -106,8 +106,8 @@ final class TemporalReprojectionDenoiser {
             int resolvedSampleCount = AdaptiveSamplingSupport.resolveSampleCount(pixelSampleCounts, i, sampleCount);
             double lowSampleFactor = 1.0 - DenoiseSupport.clamp01(resolvedSampleCount / 20.0);
             double blend = DenoiseSupport.clamp01((BASE_BLEND + noise * NOISE_BLEND_SCALE + lowSampleFactor * LOW_SAMPLE_BLEND_SCALE)
-                    * guideConfidence
-                    * effectiveBlendScale);
+ * guideConfidence
+ * effectiveBlendScale);
             if (blend <= 1e-5) {
                 continue;
             }
@@ -175,4 +175,3 @@ final class TemporalReprojectionDenoiser {
         return Math.max(center - range, Math.min(center + range, value));
     }
 }
-

@@ -687,7 +687,7 @@ public final class UiTheme {
 
         @Override
         protected void paintContentBorder(Graphics g, int tabPlacement, int selectedIndex) {
-            // Tady pro pravý properties panel nechávám vlastní border, aby se mi neslil s viewportem.
+ // pro pravý properties panel nechávám vlastní border, aby se mi neslil s viewportem.
         }
     }
 

@@ -3,7 +3,7 @@ package engine.physics;
 import engine.math.Vec3;
 
 /**
- * Tady držím výstup úzké fáze kolizního testu.
+ * Represents výstup úzké fáze kolizního testu.
  * Ukládám si sem normálu kontaktu, hloubku průniku a zúčastněná těla.
  */
 public class CollisionResult {

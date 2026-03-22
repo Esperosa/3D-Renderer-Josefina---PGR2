@@ -3,7 +3,7 @@ package engine.render.post;
 import java.util.Random;
 
 /**
- * Tady držím procedurální generátor šumu bez externích knihoven.
+ * Represents procedurální generátor šumu bez externích knihoven.
  * Poskytuju si přes něj hash, hodnotový a gradientní šum s časovou kontinuitou.
  */
 public class NoiseGenerator {
@@ -33,7 +33,7 @@ public class NoiseGenerator {
         }
     }
 
-    // Tady držím hash šum.
+ // Represents hash šum.
     public int hash(int x, int y) {
         int h = x * 0x45d9f3b ^ y * 0x119de1f3;
         h ^= (h >>> 16);
@@ -54,7 +54,7 @@ public class NoiseGenerator {
         return h;
     }
 
-    // Tady držím hodnotový šum.
+ // Represents hodnotový šum.
     public double valueNoise2D(double x, double y) {
         int x0 = fastFloor(x);
         int y0 = fastFloor(y);
@@ -110,7 +110,7 @@ public class NoiseGenerator {
         return lerp(y0v, y1v, w);
     }
 
-    // Tady držím gradientní šum typu podobného Perlinovi.
+ // Represents gradientní šum typu podobného Perlinovi.
     public double gradientNoise2D(double x, double y) {
         int xi = fastFloor(x) & 255;
         int yi = fastFloor(y) & 255;
@@ -162,7 +162,7 @@ public class NoiseGenerator {
         return lerp(y1, y2, w);
     }
 
-    // Tady držím FBM vrstevnění.
+ // Represents FBM vrstevnění.
     public double fbm2D(double x, double y, int octaves, double lacunarity, double persistence) {
         int oct = Math.max(1, octaves);
         double amp = 0.5;
@@ -195,7 +195,7 @@ public class NoiseGenerator {
         return norm > 1e-12 ? sum / norm : 0.0;
     }
 
-    // Tady držím pomocné metody.
+ // Represents pomocné metody.
     public static double fade(double t) {
         return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
     }

@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Tady držím minimální načítač glTF 2.0 pro soubory .gltf a .glb.
+ * Represents minimální načítač glTF 2.0 pro soubory .gltf a .glb.
  * Importuju s ním trojúhelníkové primitivy a transformace scénových uzlů.
  */
 public class GltfLoader {

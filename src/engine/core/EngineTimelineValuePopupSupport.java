@@ -10,7 +10,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
 /**
- * Tady přidávám kontextové timeline akce na editorová vstupní pole.
+ * přidávám kontextové timeline akce na editorová vstupní pole.
  */
 final class EngineTimelineValuePopupSupport {
 

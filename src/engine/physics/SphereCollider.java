@@ -4,7 +4,7 @@ import engine.math.AABB;
 import engine.math.Vec3;
 
 /**
- * Tady držím kulový kolizní tvar.
+ * Represents kulový kolizní tvar.
  */
 public class SphereCollider extends Collider {
 

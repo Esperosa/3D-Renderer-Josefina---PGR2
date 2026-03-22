@@ -368,7 +368,7 @@ final class EngineRenderRuntime {
         boolean heavyMotion = (mode == RenderMode.RAY_TRACING || mode == RenderMode.PATH_TRACING)
                 && engine != null
                 && engine.viewportInteractionActiveLast;
-        // Allow heavy preview modes to fully use dynamic resolution tiers under motion.
+ // Allow heavy preview modes to fully use dynamic resolution tiers under motion.
         double minScale = heavyMotion ? HEAVY_MOTION_MIN_DYNAMIC_SCALE : 0.35;
         return clamp(engine.viewportAdaptiveScaleApplied, minScale, 1.0);
     }
@@ -401,7 +401,7 @@ final class EngineRenderRuntime {
                         RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_SWITCHES, 1L);
                         RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_DOWNSHIFTS, 1L);
                     }
-                    // Allow immediate additional downshift in the next heavy-assist step when frame time is bad.
+ // Allow immediate additional downshift in the next heavy-assist step when frame time is bad.
                     engine.viewportDynamicResolutionLastSwitchNanos = now - DYNAMIC_RESOLUTION_DOWNSHIFT_DWELL_NS;
                     engine.viewportDynamicResolutionDownshiftArmFrames = DYNAMIC_RESOLUTION_DOWNSHIFT_ARM_FRAMES;
                 }
@@ -419,8 +419,8 @@ final class EngineRenderRuntime {
             engine.viewportCriticalPreviewActive = false;
             engine.viewportCriticalPreviewStartNanos = 0L;
             engine.interactiveRenderScaleActive = false;
-            // Keep renderer motion profile synchronized even when accumulation lock short-circuits
-            // adaptive scaling updates, otherwise PT can stay in reduced moving settings.
+ // Keep renderer motion profile synchronized even when accumulation lock short-circuits
+ // adaptive scaling updates, otherwise PT can stay in reduced moving settings.
             applyViewportRayPathProfile(
                     engine,
                     activeMode,
@@ -451,7 +451,7 @@ final class EngineRenderRuntime {
         boolean scaleChanged = Math.abs(previousAppliedScale - engine.viewportAdaptiveScaleApplied) > 1e-6;
         boolean interactiveStateChanged = shouldUseInteractiveScale != engine.interactiveRenderScaleActive;
         boolean criticalPreviewChanged = previousCriticalPreview != engine.viewportCriticalPreviewActive;
-        // Keep FAST denoise only for interaction/pressure windows; static heavy modes can stay QUALITY.
+ // Keep FAST denoise only for interaction/pressure windows; static heavy modes can stay QUALITY.
         boolean useFastViewportDenoise = withinInteractionTail
             || engine.viewportCriticalPreviewActive
             || shouldUseInteractiveScale;
@@ -1291,7 +1291,7 @@ final class EngineRenderRuntime {
                     engine.viewportDynamicResolutionDownshiftArmFrames = 0;
                 }
             }
-            // If we are safely below the 25 FPS cap target during motion, reclaim quality tiers.
+ // If we are safely below the 25 FPS cap target during motion, reclaim quality tiers.
             boolean upshiftHeadroom = tier > 0
                     && overloadRatio <= 0.86
                     && engine.viewportFrameDropStreak <= 0
@@ -1753,7 +1753,7 @@ final class EngineRenderRuntime {
             : CRITICAL_FALLBACK_DELAY_NS;
         String autoPolicyTier = "BALANCED";
 
-        // Auto-tune fallback aggressiveness from real viewport pressure. No manual preset needed.
+ // Auto-tune fallback aggressiveness from real viewport pressure. No manual preset needed.
         if (predictedOverloadRatio >= 2.0 || pressureSeconds >= 2.5 || engine.viewportFrameDropStreak >= 4) {
             autoPolicyTier = "AGGRESSIVE";
             multiplier -= 0.12;

@@ -3,13 +3,13 @@ package engine.util;
 import engine.math.MathUtil;
 
 /**
- * Tady držím pomocné operace pro práci s ARGB barvami.
+ * Represents pomocné operace pro práci s ARGB barvami.
  */
 public final class ColorUtil {
 
     private ColorUtil() {}
 
-    // Tady barvy balím a rozbaluju.
+ // barvy balím a rozbaluju.
     public static int pack(int r, int g, int b) {
         return pack(255, r, g, b);
     }
@@ -46,7 +46,7 @@ public final class ColorUtil {
         return (argb >>> 24) & 0xFF;
     }
 
-    // Tady převádím barvy na float reprezentaci.
+ // Converts barvy na float reprezentaci.
     public static double redF(int argb) {
         return red(argb) / 255.0;
     }
@@ -59,7 +59,7 @@ public final class ColorUtil {
         return blue(argb) / 255.0;
     }
 
-    // Tady skládám základní barevné operace.
+ // Builds základní barevné operace.
     public static int lerp(int color0, int color1, double t) {
         double k = MathUtil.clamp01(t);
         int a = (int) Math.round(alpha(color0) + (alpha(color1) - alpha(color0)) * k);

@@ -15,7 +15,7 @@ import java.nio.file.Path;
 import java.util.Iterator;
 
 /**
- * Tady zapisuju animovaný GIF jen přes JDK ImageIO.
+ * Writes animovaný GIF jen přes JDK ImageIO.
  */
 public final class AnimatedGifWriter implements Closeable {
 

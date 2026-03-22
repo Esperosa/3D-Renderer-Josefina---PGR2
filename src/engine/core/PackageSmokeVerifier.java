@@ -10,7 +10,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 
 /**
- * Tady ověřím, že zabalená aplikace opravdu obsahuje minimální runtime assety,
+ * ověřím, že zabalená aplikace opravdu obsahuje minimální runtime assety,
  * které potřebuji pro start okna a výchozí scénu.
  */
 public final class PackageSmokeVerifier {

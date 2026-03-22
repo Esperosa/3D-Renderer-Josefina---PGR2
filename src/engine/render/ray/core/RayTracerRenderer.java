@@ -36,7 +36,7 @@ import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
 
 /**
- * Tady drÅ¾Ã­m progresivnÃ­ CPU ray tracer s BVH akceleracÃ­, tiled renderingem a volitelnÃ½m odÅ¡umÄ›nÃ­m.
+ * Progressive CPU ray tracer with BVH acceleration, tiled rendering, and optional denoising.
  */
 public class RayTracerRenderer implements Renderer {
 
@@ -2462,7 +2462,7 @@ public class RayTracerRenderer implements Renderer {
                                 continue;
                             }
                             double sampleAtt = areaLight.attenuation(sampleDist)
-                                    * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
+ * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
                             if (sampleAtt <= 0.0) {
                                 continue;
                             }
@@ -2760,7 +2760,7 @@ public class RayTracerRenderer implements Renderer {
             return false;
         }
 
-        // Keep environment reflections visible even for dielectric materials with low F0.
+ // Keep environment reflections visible even for dielectric materials with low F0.
         double reflectionCarryBoost = previewMotionActive
             ? MOTION_REFLECTION_CARRY_BOOST
             : STILL_CINEMATIC_REFLECTION_CARRY_BOOST;
@@ -2957,7 +2957,7 @@ public class RayTracerRenderer implements Renderer {
                             }
 
                             double sampleAtt = areaLight.attenuation(sampleDist)
-                                    * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
+ * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
                             if (sampleAtt <= 0.0) {
                                 continue;
                             }
@@ -3043,7 +3043,7 @@ public class RayTracerRenderer implements Renderer {
                     }
 
                     double att = light.light.attenuation(dist)
-                            * light.light.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
+ * light.light.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
                     if (att <= 0.0) {
                         continue;
                     }
@@ -3189,7 +3189,7 @@ public class RayTracerRenderer implements Renderer {
 
             lastSpecularEvent = ctx.surface.roughness <= 0.22 || ctx.surface.clearcoatFactor > 0.2;
 
-            // Keep environment reflections visible even for dielectric materials with low F0.
+ // Keep environment reflections visible even for dielectric materials with low F0.
                 double reflectionCarryBoost = previewMotionActive
                     ? MOTION_REFLECTION_CARRY_BOOST
                     : STILL_CINEMATIC_REFLECTION_CARRY_BOOST;
@@ -3412,7 +3412,7 @@ public class RayTracerRenderer implements Renderer {
         }
         switch (materialProfile) {
             case "RT" -> {
-                // Keep general RT look slightly punchy, but make transmissive materials read as clear glass.
+ // Keep general RT look slightly punchy, but make transmissive materials read as clear glass.
                 out.roughness = clamp01(out.roughness * 0.90);
                 out.reflectivity = clamp01(out.reflectivity * 1.02);
                 out.transmission = clamp01(out.transmission * 1.18);
@@ -3433,7 +3433,7 @@ public class RayTracerRenderer implements Renderer {
                 out.transmission = clamp01(out.transmission * 0.58);
             }
             default -> {
-                // PHONG/AUTO/default: keep extracted values unchanged.
+ // PHONG/AUTO/default: keep extracted values unchanged.
             }
         }
     }
@@ -3727,9 +3727,9 @@ public class RayTracerRenderer implements Renderer {
 
     private static double dispersedIor(double baseIor, double dispersion, double opticsWeight, double channelBias) {
         double spread = DISPERSION_IOR_SPREAD
-                * clamp01(dispersion)
-                * clamp01(opticsWeight)
-                * Math.max(0.25, baseIor - 1.0);
+ * clamp01(dispersion)
+ * clamp01(opticsWeight)
+ * Math.max(0.25, baseIor - 1.0);
         return Math.max(1.0, baseIor + spread * channelBias);
     }
 
@@ -4057,7 +4057,7 @@ public class RayTracerRenderer implements Renderer {
         if (ctx.shadowSurface.transmission > 0.55 && ctx.shadowSurface.refractiveIndex > 1.01) {
             double iorFocus = clamp01((ctx.shadowSurface.refractiveIndex - 1.0) / 1.2);
             glassOcclusion = clamp01(ctx.shadowSurface.opacity
-                    * (0.08 + 0.18 * iorFocus + 0.32 * clamp01(ctx.shadowSurface.reflectivity)));
+ * (0.08 + 0.18 * iorFocus + 0.32 * clamp01(ctx.shadowSurface.reflectivity)));
         }
         double occlusion = Math.max(opaqueOcclusion, glassOcclusion);
         return occlusion > 0.05;
@@ -4859,8 +4859,8 @@ public class RayTracerRenderer implements Renderer {
         if (!previewQualityLadderEnabled) {
             return true;
         }
-        // Keep full-frame updates during motion to avoid tile desync artifacts
-        // (black flicker/ghosting) in hybrid base + polish composition.
+ // Keep full-frame updates during motion to avoid tile desync artifacts
+ // (black flicker/ghosting) in hybrid base + polish composition.
         return true;
     }
 
@@ -5132,8 +5132,8 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private boolean shouldUseHybridMovingBaseLayer(PreviewQualityTierPlan plan) {
-        // Hybrid moving base currently introduces visible correctness artifacts in motion
-        // (flipped faces and missing environment/floor). Keep motion on pure RT carrier path.
+ // Hybrid moving base currently introduces visible correctness artifacts in motion
+ // (flipped faces and missing environment/floor). Keep motion on pure RT carrier path.
         return false;
     }
 
@@ -5419,8 +5419,8 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private void softResetMotionCarrierPreserveAccumulation() {
-        // Motion-phase camera updates must not retain stale carrier accumulation,
-        // otherwise previous camera samples leak as visible ghosting trails.
+ // Motion-phase camera updates must not retain stale carrier accumulation,
+ // otherwise previous camera samples leak as visible ghosting trails.
         softResetAccumulationPreserveHistory();
     }
 
@@ -5544,7 +5544,7 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private void resetStillReferenceHandoff() {
-        // Still-reference handoff path was removed; keep a no-op to preserve call sites.
+ // Still-reference handoff path was removed; keep a no-op to preserve call sites.
     }
 
     private void ensureHybridBaseResources(int targetWidth, int targetHeight) {
@@ -5862,7 +5862,7 @@ public class RayTracerRenderer implements Renderer {
                 double blendCoverage = (double) blendCount / (double) Math.max(1, candidateCount);
                 double tileCoverage = (double) blendCount / (double) Math.max(1, activeTilePixels);
                 if (blendCoverage < 0.35 || tileCoverage < 0.22) {
-                    // On sparse partial frames, disable cached polish contribution to avoid visible tile breakup.
+ // On sparse partial frames, disable cached polish contribution to avoid visible tile breakup.
                     polishContribution = 0.0;
                 } else if (blendCoverage < 0.75 || tileCoverage < 0.45) {
                     double blendRamp = (blendCoverage - 0.35) / 0.40;
@@ -7432,5 +7432,4 @@ public class RayTracerRenderer implements Renderer {
     }
 
 }
-
 

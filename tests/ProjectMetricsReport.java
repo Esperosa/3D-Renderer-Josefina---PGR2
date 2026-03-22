@@ -51,8 +51,8 @@ import engine.util.MjpegAviWriter;
 import engine.util.ThreadPool;
 
 /**
- * Tady generuju reprodukovatelný report s metrikami projektu a lehkým renderer benchmarkem.
- * Používám ho jako zdroj tvrdých dat pro README, aby tabulky nevznikaly ručně.
+ * generuje reprodukovatelný report s metrikami projektu a lehkým renderer benchmarkem.
+ * It serves as a reproducible data source for README metrics tables.
  */
 public final class ProjectMetricsReport {
 
@@ -617,7 +617,7 @@ public final class ProjectMetricsReport {
         try {
             renderer.setParameter("shutdown", true);
         } catch (RuntimeException ignored) {
-            // Some renderers do not use an explicit shutdown flag.
+ // Some renderers do not use an explicit shutdown flag.
         }
     }
 

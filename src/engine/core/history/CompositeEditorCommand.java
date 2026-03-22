@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Tady seskupuju více dílčích příkazů do jednoho logického kroku.
+ * seskupuju více dílčích příkazů do jednoho logického kroku.
  */
 public final class CompositeEditorCommand implements EditorCommand {
     private final String label;

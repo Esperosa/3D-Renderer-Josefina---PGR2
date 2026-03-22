@@ -3,7 +3,7 @@ package engine.material;
 import engine.math.Vec3;
 
 /**
- * Tady držím kurátorovanou knihovnu presetů pro současný hybridní Phong a fyzikální materiálový postup.
+ * Represents kurátorovanou knihovnu presetů pro současný hybridní Phong a fyzikální materiálový postup.
  * Udržuju tím materiály použitelné v dnešních rendererech a zároveň si nechávám data pro budoucí
  * rozšíření kolem vody, skla, mlhy a node editoru.
  */

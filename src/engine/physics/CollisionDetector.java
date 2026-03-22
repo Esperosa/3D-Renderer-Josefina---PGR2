@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Tady detekuju kolizní páry mezi fyzikálními těly.
+ * detekuju kolizní páry mezi fyzikálními těly.
  */
 public class CollisionDetector {
 
@@ -16,12 +16,12 @@ public class CollisionDetector {
         this.contacts = new ArrayList<>();
     }
 
-    /**
-     * Tady spustím detekci kolizí pro všechny dvojice těles.
-     *
-     * @param bodies sem předám seznam aktivních rigid body
-     * @return vrátím seznam nalezených kontaktů
-     */
+ /**
+ * Runs detekci kolizí pro všechny dvojice těles.
+ *
+ * @param bodies seznam aktivních rigid body
+ * @return vrátí seznam nalezených kontaktů
+ */
     public List<CollisionResult> detectCollisions(List<RigidBody> bodies) {
         contacts.clear();
         for (int i = 0; i < bodies.size(); i++) {

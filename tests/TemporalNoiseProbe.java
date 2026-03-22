@@ -12,7 +12,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 
 /**
- * Tady držím pomocnou vizuální sondu pro ruční kontrolu temporal-noise výstupu.
+ * Represents pomocnou vizuální sondu pro ruční kontrolu temporal-noise výstupu.
  */
 public final class TemporalNoiseProbe {
 

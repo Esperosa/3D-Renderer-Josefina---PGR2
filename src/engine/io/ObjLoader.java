@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Tady parsuju OBJ soubory formátu Wavefront.
- * Čtu si z nich pozice vertexů, normály, UV souřadnice i stěny a čtyřúhelníky převádím přes vějířovou triangulaci.
+ * Parses OBJ soubory formátu Wavefront.
+ * Čtu si z nich pozice vertexů, normály, UV souřadnice i stěny a čtyřúhelníky převádí přes vějířovou triangulaci.
  */
 public class ObjLoader {
 
@@ -117,13 +117,13 @@ public class ObjLoader {
 
     public ObjLoader() {}
 
-    /**
-     * Tady načtu mesh z OBJ souboru.
-     *
-     * @param filePath sem předám cestu k .obj souboru
-     * @return tím vrátím hotový mesh s pozicemi, normálami a indexy
-     * @throws RuntimeException když soubor nepřečtu nebo nenaparsuju
-     */
+ /**
+ * Loads mesh z OBJ souboru.
+ *
+ * @param filePath cestu k .obj souboru
+ * @return tím vrátí hotový mesh s pozicemi, normálami a indexy
+ * @throws RuntimeException když soubor nepřečtu nebo nenaparsuje
+ */
     public Mesh load(String filePath) {
         List<String> lines = FileUtil.readLines(filePath);
 
@@ -273,9 +273,9 @@ public class ObjLoader {
         return mesh;
     }
 
-    /**
-     * Tady načtu OBJ jako scénu rozdělenou podle objektů, skupin a přiřazených materiálů.
-     */
+ /**
+ * Loads OBJ jako scénu rozdělenou podle objektů, skupin a přiřazených materiálů.
+ */
     public ImportedScene loadScene(String filePath) {
         List<String> lines = FileUtil.readLines(filePath);
         List<Vec3> tempPositions = new ArrayList<>();
@@ -374,7 +374,7 @@ public class ObjLoader {
         return out;
     }
 
-    // Tady držím interní pomocné metody.
+ // Represents interní pomocné metody.
     private int[] parseFaceVertex(String token) {
         int[] out = new int[]{-1, -1, -1};
         String[] parts = token.split("/", -1);

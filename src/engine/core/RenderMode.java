@@ -1,34 +1,34 @@
 package engine.core;
 
 /**
- * Tady vyjmenovávám všechny dostupné render módy.
+ * vyjmenovává všechny dostupné render módy.
  */
 public enum RenderMode {
 
-    /** Tady držím extrémně lehký model preview bez materiálů a textur. */
+ /** Represents extrémně lehký model preview bez materiálů a textur. */
     MODEL,
 
-    /** Tady držím rychlý nerastrovaný flat-color režim pro debugging. */
+ /** Represents rychlý nerastrovaný flat-color režim pro debugging. */
     BASIC,
 
-    /** Tady držím per-pixel Phong/Blinn-Phong rasterizér. */
+ /** Represents per-pixel Phong/Blinn-Phong rasterizér. */
     PHONG,
 
-    /** Tady držím gradientní wireframe s modulací podle vzdálenosti a úhlu. */
+ /** Represents gradientní wireframe s modulací podle vzdálenosti a úhlu. */
     WIREFRAME,
 
-    /** Tady držím CPU ray tracer se stíny a odrazy. */
+ /** Represents CPU ray tracer se stíny a odrazy. */
     RAY_TRACING,
 
-    /** Tady držím progresivní Monte Carlo path tracer s akumulací. */
+ /** Represents progresivní Monte Carlo path tracer s akumulací. */
     PATH_TRACING,
 
-    /** Tady držím stylizovaný režim ditheringu. */
+ /** Represents stylizovaný režim ditheringu. */
     DITHERING,
 
-    /** Tady držím temporal-noise renderer, kde tvar čtu ze změny šumu v čase. */
+ /** Represents temporal-noise renderer, kde tvar čtu ze změny šumu v čase. */
     TEMPORAL_NOISE,
 
-    /** Tady držím hexagonální adaptivní mozaiku. */
+ /** Represents hexagonální adaptivní mozaiku. */
     HEX_MOSAIC
 }

@@ -336,11 +336,11 @@ public final class MaterialNodeGraph {
             return Collections.unmodifiableMap(new HashMap<>(texts));
         }
 
-        /**
-         * Normalizaci klíčů v nejteplejší cestě vykreslení nedělám přes převod závislý na jazykovém prostředí.
-         * Tady sockety a interní klíče držím v ASCII, takže je pro mě levnější i stabilnější
-         * držet vlastní malou normalizaci bez volání String.toLowerCase(...).
-         */
+ /**
+ * Normalizaci klíčů v nejteplejší cestě vykreslení nedělám přes převod závislý na jazykovém prostředí.
+ * sockety a interní klíče drží v ASCII, takže je pro mě levnější i stabilnější
+ * držet vlastní malou normalizaci bez volání String.toLowerCase(...).
+ */
         private static String normalizeKey(String key) {
             if (key == null) {
                 return "";

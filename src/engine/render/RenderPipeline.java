@@ -8,7 +8,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Tady skládám celý render pipeline pro jeden snímek.
+ * Builds celý render pipeline pro jeden snímek.
  */
 public class RenderPipeline {
 
@@ -24,14 +24,14 @@ public class RenderPipeline {
         this.postProcessors = new ArrayList<>();
     }
 
-    /**
-     * Tady spustím celý render pipeline pro jeden snímek.
-     *
-     * @param scene sem předám scénu k vykreslení
-     * @param camera sem předám kameru
-     * @param fb sem předám cílový framebuffer
-     * @param time sem předám uplynulý čas
-     */
+ /**
+ * Runs celý render pipeline pro jeden snímek.
+ *
+ * @param scene scénu k vykreslení
+ * @param camera kameru
+ * @param fb cílový framebuffer
+ * @param time uplynulý čas
+ */
     public void execute(Scene scene, Camera camera, FrameBuffer fb, double time) {
         if (fb == null) {
             return;

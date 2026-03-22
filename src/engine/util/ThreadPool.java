@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * Tady držím pevně velký thread pool pro paralelní vykreslování.
+ * Represents pevně velký thread pool pro paralelní vykreslování.
  */
 public class ThreadPool {
 
@@ -52,11 +52,11 @@ public class ThreadPool {
         return Math.max(1, cpu - reserve);
     }
 
-    /**
-     * Tady odešlu dávku úloh a počkám, až se všechny dokončí.
-     *
-     * @param tasks sem předám pole úloh
-     */
+ /**
+ * Submits dávku úloh a počkám, až se všechny dokončí.
+ *
+ * @param tasks pole úloh
+ */
     public void submitAndWait(Runnable[] tasks) {
         if (tasks == null || tasks.length == 0) {
             return;
@@ -100,12 +100,12 @@ public class ThreadPool {
                 Math.max(0L, totalWindowNanos - busyNanos));
     }
 
-    /**
-     * Tady odešlu jednu úlohu asynchronně.
-     *
-     * @param task sem předám úlohu
-     * @return vrátím objekt Future pro sledování dokončení
-     */
+ /**
+ * Submits jednu úlohu asynchronně.
+ *
+ * @param task úlohu
+ * @return vrátí objekt Future pro sledování dokončení
+ */
     public Future<?> submit(Runnable task) {
         if (task == null) {
             return null;
@@ -113,12 +113,12 @@ public class ThreadPool {
         return executor.submit(task);
     }
 
-    /** @return vrátím počet pracovních vláken */
+ /** @return vrátí počet pracovních vláken */
     public int getThreadCount() {
         return threadCount;
     }
 
-    /** Tady pool ukončím při vypnutí enginu. */
+ /** pool ukončím při vypnutí enginu. */
     public void shutdown() {
         executor.shutdownNow();
     }

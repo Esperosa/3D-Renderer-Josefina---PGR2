@@ -8,9 +8,9 @@ import java.util.Locale;
 
 public final class WorldPresetCatalog {
 
-    // Bundled HDRIs are CC0 from Poly Haven:
-    // https://polyhaven.com/license
-    // https://polyhaven.com/a/farmland_overcast
+ // Bundled HDRIs are CC0 from Poly Haven:
+ // https://polyhaven.com/license
+ // https://polyhaven.com/a/farmland_overcast
     public static final Definition CLOUDY_DAY = new Definition(
             "Cloudy Day",
             "Oblacny den",
@@ -31,7 +31,7 @@ public final class WorldPresetCatalog {
             0.46
     );
 
-    // https://polyhaven.com/a/plains_sunset
+ // https://polyhaven.com/a/plains_sunset
     public static final Definition WARM_SUNSET = new Definition(
             "Warm Sunset",
             "Teply zapad",
@@ -52,7 +52,7 @@ public final class WorldPresetCatalog {
             0.38
     );
 
-    // https://polyhaven.com/a/ludwikowice_farmland
+ // https://polyhaven.com/a/ludwikowice_farmland
     public static final Definition CLASSIC_DAY = new Definition(
             "Classic Day",
             "Klasicky den",
@@ -73,7 +73,7 @@ public final class WorldPresetCatalog {
             0.44
     );
 
-    // https://polyhaven.com/a/studio_small_08
+ // https://polyhaven.com/a/studio_small_08
     public static final Definition STUDIO_SOFT = new Definition(
             "Studio Soft",
             "Studio svetla",
@@ -94,7 +94,7 @@ public final class WorldPresetCatalog {
             0.40
     );
 
-    // https://polyhaven.com/a/qwantani_night
+ // https://polyhaven.com/a/qwantani_night
     public static final Definition COOL_NIGHT = new Definition(
             "Cool Night",
             "Chladna noc",

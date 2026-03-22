@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím měnitelný 3D vektor pro pozice, normály a barvy.
+ * Represents měnitelný 3D vektor pro pozice, normály a barvy.
  */
 public class Vec3 {
 

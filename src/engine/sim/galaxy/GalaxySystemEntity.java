@@ -8,8 +8,8 @@ import engine.math.Vec3;
 import engine.scene.Entity;
 
 /**
- * Tady držím experimentální kotevní entitu pro budoucí galaxy systém.
- * Dnes ji používám jen jako viditelný zástupný objekt pro práci se scénou a layoutem.
+ * Represents experimentální kotevní entitu pro budoucí galaxy systém.
+ * Dnes ji používá jen jako viditelný zástupný objekt pro práci se scénou a layoutem.
  */
 public final class GalaxySystemEntity extends Entity {
 

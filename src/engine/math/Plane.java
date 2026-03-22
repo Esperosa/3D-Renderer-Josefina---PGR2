@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím 3D rovinu určenou normálou a vzdáleností od počátku.
+ * Represents 3D rovinu určenou normálou a vzdáleností od počátku.
  */
 public class Plane {
 

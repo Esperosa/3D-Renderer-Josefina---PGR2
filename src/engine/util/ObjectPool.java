@@ -1,9 +1,9 @@
 package engine.util;
 
 /**
- * Tady držím jednoduchý generický objektový pool, abych omezil alokace v nejteplejších smyčkách.
+ * Represents jednoduchý generický objektový pool, abych omezil alokace v nejteplejších smyčkách.
  *
- * @param <T> tím označím typ objektu v poolu
+ * @param <T> tím označí typ objektu v poolu
  */
 public class ObjectPool<T> {
 
@@ -26,11 +26,11 @@ public class ObjectPool<T> {
         }
     }
 
-    /**
-     * Tady si vezmu objekt z poolu.
-     *
-     * @return vrátím recyklovaný objekt nebo novou instanci, když je pool prázdný
-     */
+ /**
+ * Acquires objekt z poolu.
+ *
+ * @return vrátí recyklovaný objekt nebo novou instanci, když je pool prázdný
+ */
     @SuppressWarnings("unchecked")
     public T acquire() {
         if (size > 0) {
@@ -42,11 +42,11 @@ public class ObjectPool<T> {
         return factory.get();
     }
 
-    /**
-     * Tady vrátím objekt zpátky do poolu pro další použití.
-     *
-     * @param obj sem předám objekt k recyklaci
-     */
+ /**
+ * Returns objekt zpátky do poolu pro další použití.
+ *
+ * @param obj objekt k recyklaci
+ */
     public void release(T obj) {
         if (obj == null) {
             return;
@@ -64,9 +64,9 @@ public class ObjectPool<T> {
         return size;
     }
 
-    /**
-     * Tady držím jednoduché rozhraní pro vytváření objektů.
-     */
+ /**
+ * Represents jednoduché rozhraní pro vytváření objektů.
+ */
     @FunctionalInterface
     public interface Supplier<T> {
         T get();

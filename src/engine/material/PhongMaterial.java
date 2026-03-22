@@ -4,7 +4,7 @@ import engine.math.Vec3;
 import engine.render.Texture;
 
 /**
- * Tady držím materiál s parametry pro Phong/Blinn-Phong stínování.
+ * Represents materiál s parametry pro Phong/Blinn-Phong stínování.
  * Používám ho v rasterizéru i ray traceru pro realističtější nasvícení.
  */
 public class PhongMaterial extends Material {
@@ -66,7 +66,7 @@ public class PhongMaterial extends Material {
         setRoughness(roughnessFromShininess(shininess));
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Vec3 getAmbientColor() {
         return ambientColor;
     }

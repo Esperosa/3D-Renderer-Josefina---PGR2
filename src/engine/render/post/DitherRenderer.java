@@ -8,22 +8,22 @@ import engine.scene.Scene;
 import engine.util.BitFont;
 
 /**
- * Tady držím stylizovaný dithering renderer s více podrežimy.
- * Typ A používám pro dithering po pixelech s mapou podobnou modrému šumu v monochromatické nebo omezené paletě.
- * Typ B používám pro blokový vzorový dithering v buňkách 2x2, 3x3 a 4x4.
- * Typ C používám pro porovnání obrazového bloku s bitmapami znaků ASCII.
+ * Represents stylizovaný dithering renderer s více podrežimy.
+ * Typ A používá pro dithering po pixelech s mapou podobnou modrému šumu v monochromatické nebo omezené paletě.
+ * Typ B používá pro blokový vzorový dithering v buňkách 2x2, 3x3 a 4x4.
+ * Typ C používá pro porovnání obrazového bloku s bitmapami znaků ASCII.
  */
 public class DitherRenderer implements Renderer {
 
-    /**
-     * Tady rozliším aktivní dithering podrežim.
-     */
+ /**
+ * Distinguishes aktivní dithering podrežim.
+ */
     public enum DitherStyle {
-        /** Tady použiju prahování po pixelech s rozložením podobným modrému šumu. */
+ /** použiju prahování po pixelech s rozložením podobným modrému šumu. */
         BLUE_NOISE,
-        /** Tady použiju blokový pattern přes Bayer matici nebo vlastní vzor. */
+ /** použiju blokový pattern přes Bayer matici nebo vlastní vzor. */
         PATTERN,
-        /** Tady vyberu ASCII glyph podle podobnosti skutečného obrazového bloku. */
+ /** vyberu ASCII glyph podle podobnosti skutečného obrazového bloku. */
         ASCII
     }
 
@@ -239,7 +239,7 @@ public class DitherRenderer implements Renderer {
             return;
         }
 
-        // Tady předám obecné parametry vykreslení a výkonu do základního rasterizéru.
+ // předám obecné parametry vykreslení a výkonu do základního rasterizéru.
         baseRenderer.setParameter(key, value);
     }
 
@@ -307,7 +307,7 @@ public class DitherRenderer implements Renderer {
                         activeSum += asciiCellBuffer[activeIndex];
                     }
 
-                    // Tady ASCII držím jako čistě bílý glyph na černé, takže kontrast dělám výběrem bitmapy.
+ // ASCII drží jako čistě bílý glyph na černé, takže kontrast dělám výběrem bitmapy.
                     double error = cellEnergy - 2.0 * activeSum + candidate.activeCount;
                     if (error < bestError) {
                         bestError = error;
@@ -405,7 +405,7 @@ public class DitherRenderer implements Renderer {
             return energy;
         }
 
-        // Tady si blok převzorkuju do stejné mřížky, ve které mám uloženou bitmapu glyphu.
+ // si blok převzorkuju do stejné mřížky, ve které mám uloženou bitmapu glyphu.
         for (int gy = 0; gy < cellH; gy++) {
             int sampleY = y0 + (int) (((gy + 0.5) * srcH) / cellH);
             if (sampleY >= y1) {
@@ -455,7 +455,7 @@ public class DitherRenderer implements Renderer {
             }
         }
 
-        // Tady stejné tónové úrovně promítnu i do ASCII, aby mi Počet tónů fungoval napříč všemi dither styly.
+ // stejné tónové úrovně promítnu i do ASCII, aby mi Počet tónů fungoval napříč všemi dither styly.
         for (int i = 0; i < pixelCount; i++) {
             asciiLuminanceBuffer[i] = quantizeNearest(asciiLuminanceBuffer[i], toneCount);
         }
@@ -507,7 +507,7 @@ public class DitherRenderer implements Renderer {
             detailLuminanceBuffer[i] = expandContrast(detailLuminanceBuffer[i], detailRange, DETAIL_CONTRAST_RESPONSE);
         }
 
-        // Tady si chytře míchám nasvícený obraz a unlit detail tak, aby mi světlo nezahodilo texturu ani malé rozdíly.
+ // si chytře míchám nasvícený obraz a unlit detail tak, aby mi světlo nezahodilo texturu ani malé rozdíly.
         for (int y = 0; y < h; y++) {
             int row = y * w;
             for (int x = 0; x < w; x++) {
@@ -520,7 +520,7 @@ public class DitherRenderer implements Renderer {
                         ? estimateDetailResidual(x, y, w, h, depth, objectId)
                         : 0.0;
                 double recoveryMix = clamp01((0.12 + 0.24 * rangeDeficit + 0.18 * extreme)
-                        * (0.35 + 0.65 * detailGap));
+ * (0.35 + 0.65 * detailGap));
                 double detailBoost = 0.06 + 0.14 * rangeDeficit + 0.10 * extreme;
                 sourceLuminanceBuffer[idx] = clamp01(mix(shadedNorm, detailNorm, recoveryMix)
                         + detailResidual * detailBoost);
@@ -545,9 +545,9 @@ public class DitherRenderer implements Renderer {
                 double contactShadow = estimateContactShadow(x, y, w, h, depth, objectId, normal);
                 double skyFacing = clamp01(ny * 0.5 + 0.5);
                 double shadowLift = lightAssist
-                        * (0.05 + 0.23 * skyFacing)
-                        * Math.pow(1.0 - baseLum, 1.18)
-                        * (1.0 - contactShadow * 0.55);
+ * (0.05 + 0.23 * skyFacing)
+ * Math.pow(1.0 - baseLum, 1.18)
+ * (1.0 - contactShadow * 0.55);
                 double shadowFactor = 1.0 - lightAssist * 0.24 * contactShadow;
                 shadedLuminanceBuffer[idx] = clamp01(baseLum * shadowFactor + shadowLift);
             }
@@ -646,7 +646,7 @@ public class DitherRenderer implements Renderer {
         baseRenderer.setParameter("flatShading", false);
         baseRenderer.setParameter("modelPreviewMode", false);
         try {
-            // Tady si vyrenderuju pomocnou unlit referenci, abych z ní vytáhl texturu a lokální detail bez vlivu světla.
+ // si vykreslí pomocnou unlit referenci, abych z ní vytáhl texturu a lokální detail bez vlivu světla.
             baseRenderer.render(scene, camera, detailFrame, time);
         } finally {
             baseRenderer.setParameter("unlitMode", rasterUnlitMode);
@@ -942,7 +942,7 @@ public class DitherRenderer implements Renderer {
             for (int x = 0; x < BLUE_NOISE_SIZE; x++) {
                 int h = hash(x, y);
                 float rnd = (h & 0xFFFF) / 65535.0f;
-                // Add mild directional decorrelation to avoid visible grids.
+ // Add mild directional decorrelation to avoid visible grids.
                 float warp = (((x * 17 + y * 29) & 63) / 63.0f) * 0.35f;
                 blueNoiseMap[row + x] = clamp01(rnd * 0.65f + warp);
             }

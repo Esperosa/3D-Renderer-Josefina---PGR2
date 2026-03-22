@@ -9,7 +9,7 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 
 /**
- * Tady držím sdílené pomocné metody pro render panely.
+ * Represents sdílené pomocné metody pro render panely.
  */
 final class EngineRenderPanelSupport {
 

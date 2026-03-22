@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Tady držím jednu entitu ve scénovém grafu.
+ * Represents jednu entitu ve scénovém grafu.
  */
 public class Entity {
 
@@ -58,7 +58,7 @@ public class Entity {
         this.cachedParentWorldVersion = Long.MIN_VALUE;
     }
 
-    // Tady řeším hierarchii entity.
+ // Handles hierarchii entity.
     public void addChild(Entity child) {
         if (child == null || child == this) {
             return;
@@ -89,7 +89,7 @@ public class Entity {
         return parent;
     }
 
-    // Tady řeším transformaci entity.
+ // Handles transformaci entity.
     public Transform getTransform() {
         return transform;
     }
@@ -125,7 +125,7 @@ public class Entity {
         }
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Mesh getMesh() {
         return mesh;
     }

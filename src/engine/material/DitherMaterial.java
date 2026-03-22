@@ -3,7 +3,7 @@ package engine.material;
 import engine.util.BitFont;
 
 /**
- * Tady držím parametry materiálu pro dithering a ASCII režimy vykreslení.
+ * Represents parametry materiálu pro dithering a ASCII režimy vykreslení.
  */
 public class DitherMaterial extends Material {
 

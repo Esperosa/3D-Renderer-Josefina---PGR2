@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím matici 3x3 uloženou po řádcích.
+ * Represents matici 3x3 uloženou po řádcích.
  * Používám ji pro transformace normál a menší 2D operace.
  */
 public class Mat3 {

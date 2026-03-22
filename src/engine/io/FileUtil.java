@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Tady držím základní vstupně-výstupní souborové pomocníky bez externích knihoven.
+ * Represents základní vstupně-výstupní souborové pomocníky bez externích knihoven.
  */
 public final class FileUtil {
 

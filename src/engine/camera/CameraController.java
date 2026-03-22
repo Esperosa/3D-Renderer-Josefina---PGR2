@@ -8,19 +8,19 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 
 /**
- * Tady zpracovávám pohyb a rotaci kamery z uživatelského vstupu.
+ * Processes pohyb a rotaci kamery z uživatelského vstupu.
  */
 public class CameraController {
 
-    /**
-     * Tady rozliším režim ovládání kamery.
-     */
+ /**
+ * Distinguishes režim ovládání kamery.
+ */
     public enum Mode {
-        /** Tady používám volný pohled přes WASD a myš. */
+ /** Uses volný pohled přes WASD a myš. */
         FREE_LOOK,
-        /** Tady držím kameru na objektu a myší otáčím pohled. */
+ /** Represents kameru na objektu a myší otáčím pohled. */
         FIRST_PERSON,
-        /** Tady obíhám kolem cílového bodu. */
+ /** Orbits kolem cílového bodu. */
         ORBIT
     }
 
@@ -47,12 +47,12 @@ public class CameraController {
         this.mouseLookAlways = false;
     }
 
-    /**
-     * Tady zpracovávám vstup a aktualizuju pozici i orientaci kamery.
-     *
-     * @param input sem předám stav vstupu pro aktuální snímek
-     * @param dt sem předám delta čas v sekundách
-     */
+ /**
+ * Processes vstup a aktualizuje pozici i orientaci kamery.
+ *
+ * @param input stav vstupu pro aktuální snímek
+ * @param dt delta čas v sekundách
+ */
     public void update(Input input, double dt) {
         if (mode == Mode.ORBIT) {
             updateOrbit(input, dt);
@@ -69,7 +69,7 @@ public class CameraController {
             yaw += dx * rotateSpeed;
             pitch = MathUtil.clamp(pitch - dy * rotateSpeed, -1.54, 1.54);
         } else {
-            // Tady používám náhradní rozhlížení z klávesnice, když myší zrovna neotáčím.
+ // Uses náhradní rozhlížení z klávesnice, když myší zrovna neotáčím.
             double keyYaw = 0.0;
             double keyPitch = 0.0;
             if (input.isKeyDown(KeyEvent.VK_J)) {
@@ -198,7 +198,7 @@ public class CameraController {
         }
     }
 
-    // Tady držím základní přístupové metody.
+ // Represents základní přístupové metody.
     public void setMode(Mode mode) {
         this.mode = mode;
         if (mode == Mode.ORBIT) {

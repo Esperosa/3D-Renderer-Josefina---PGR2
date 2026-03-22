@@ -2,9 +2,9 @@ import engine.io.ImportedScene;
 import engine.io.ModelImporter;
 
 /**
- * Tady držím ruční rychlý test pro externí import souborů.
+ * Represents ruční rychlý test pro externí import souborů.
  * Spustím to takto:
- *   java -cp <classpath> ExternalImportSmokeTest <file1> [file2 ...]
+ * java -cp <classpath> ExternalImportSmokeTest <file1> [file2 ...]
  */
 public class ExternalImportSmokeTest {
 

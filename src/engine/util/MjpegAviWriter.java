@@ -18,7 +18,7 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Tady zapisuju minimální MJPEG AVI nad RIFF AVI a JPEG enkódováním z ImageIO.
+ * Writes minimální MJPEG AVI nad RIFF AVI a JPEG enkódováním z ImageIO.
  */
 public final class MjpegAviWriter implements Closeable {
 

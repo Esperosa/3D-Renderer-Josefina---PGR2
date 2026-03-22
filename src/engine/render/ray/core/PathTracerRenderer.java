@@ -36,7 +36,7 @@ import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
 
 /**
- * Tady držím progresivní CPU path tracer s BVH akcelerací a tiled multithreadingem.
+ * Progressive CPU path tracer with BVH acceleration and tiled multithreading.
  */
 public class PathTracerRenderer implements Renderer {
 
@@ -1601,7 +1601,7 @@ public class PathTracerRenderer implements Renderer {
                             continue;
                         }
                         double centerAtt = areaLight.attenuation(centerDist)
-                                * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
+ * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
                         if (centerAtt <= 0.0) {
                             if (metrics != null) {
                                 pointLightNanos += System.nanoTime() - lightStart;
@@ -1639,7 +1639,7 @@ public class PathTracerRenderer implements Renderer {
                                 continue;
                             }
                             double sampleAtt = areaLight.attenuation(sampleDist)
-                                    * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
+ * areaLight.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
                             if (sampleAtt <= 0.0) {
                                 continue;
                             }
@@ -1768,7 +1768,7 @@ public class PathTracerRenderer implements Renderer {
                     }
 
                     double att = light.light.attenuation(dist)
-                            * light.light.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
+ * light.light.angularAttenuation(ctx.hit.px, ctx.hit.py, ctx.hit.pz);
                     if (att <= 0.0) {
                         if (metrics != null) {
                             pointLightNanos += System.nanoTime() - lightStart;
@@ -2517,7 +2517,7 @@ public class PathTracerRenderer implements Renderer {
                     }
 
                     double attenuation = areaLight.attenuation(dist)
-                            * areaLight.angularAttenuation(hit.px, hit.py, hit.pz);
+ * areaLight.angularAttenuation(hit.px, hit.py, hit.pz);
                     if (attenuation <= 0.0) {
                         continue;
                     }
@@ -2565,7 +2565,7 @@ public class PathTracerRenderer implements Renderer {
             }
 
             double attenuation = light.light.attenuation(dist)
-                    * light.light.angularAttenuation(hit.px, hit.py, hit.pz);
+ * light.light.angularAttenuation(hit.px, hit.py, hit.pz);
             if (attenuation <= 0.0) {
                 continue;
             }
@@ -2654,8 +2654,8 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
-        // Získám náhodný směr ze kterého přijde světlo z prostředí.
-        // Pro HDRI mapu to použije importance sampling, takže preferuje jasné pixely.
+ // Získám náhodný směr ze kterého přijde světlo z prostředí.
+ // Pro HDRI mapu to použije importance sampling, takže preferuje jasné pixely.
         double lightPdf = sampleEnvironmentBackgroundDirection(rng, ctx);
         double wiX = ctx.sampleDx;
         double wiY = ctx.sampleDy;
@@ -2669,7 +2669,7 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
-        // Zkontroluju jestli není směr k vybranému světlu zablokovaný.
+ // Zkontroluju jestli není směr k vybranému světlu zablokovaný.
         prepareShadowRay(hit, surface, wiX, wiY, wiZ, ctx);
         if (intersectAny(
                 ctx.shadowOx, ctx.shadowOy, ctx.shadowOz,
@@ -2678,7 +2678,7 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
-        // Získám barvu světla z prostředí pro daný směr.
+ // Získám barvu světla z prostředí pro daný směr.
         sampleEnvironmentBackground(wiX, wiY, wiZ, ctx);
         if (ctx.spectralHeroBand >= 0) {
             spectralHeroProjectRgb(ctx.envR, ctx.envG, ctx.envB, ctx.spectralHeroBand, ctx.spectralCompanionBand, ctx.spectralScratch0, ctx.spectralRgb0);
@@ -2696,7 +2696,7 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
-        // Vynásobím světlo BRDF funkcí a pak vydělím PDF, abych získal správný příspěvek.
+ // Vynásobím světlo BRDF funkcí a pak vydělím PDF, abych získal správný příspěvek.
         double lightScale = misWeight / lightPdf;
         accumulatePreviewBsdfLight(
                 surface,
@@ -2736,7 +2736,7 @@ public class PathTracerRenderer implements Renderer {
             double nDotH = Math.max(0.0, surface.nx * hx + surface.ny * hy + surface.nz * hz);
             double vDotH = Math.max(0.0, lobes.viewX * hx + lobes.viewY * hy + lobes.viewZ * hz);
             specularTerm = ggxSpecularTerm(nDotV, nDotL, nDotH, lobes.specularAlphaSq, lobes.specularRoughness)
-                    * lobes.specularEnergyComp;
+ * lobes.specularEnergyComp;
                 if (isPreviewStillFullTierActive()) {
                     spectralLayeredFresnelRgb(
                             vDotH,
@@ -3178,19 +3178,19 @@ public class PathTracerRenderer implements Renderer {
         double nDotL = surface.nx * wiX + surface.ny * wiY + surface.nz * wiZ;
         if (lobes.diffuseWeight > 1e-8 && nDotL > 1e-6) {
             pdf += (lobes.diffuseWeight / lobes.totalWeight)
-                    * PathTracingSamplingSupport.cosineHemispherePdf(nDotL);
+ * PathTracingSamplingSupport.cosineHemispherePdf(nDotL);
         }
         if (lobes.sheenWeight > 1e-8 && nDotL > 1e-6) {
             pdf += (lobes.sheenWeight / lobes.totalWeight)
-                    * PathTracingSamplingSupport.cosineHemispherePdf(nDotL);
+ * PathTracingSamplingSupport.cosineHemispherePdf(nDotL);
         }
         if (lobes.specularWeight > 1e-8) {
             pdf += (lobes.specularWeight / lobes.totalWeight)
-                    * referenceSpecularPdf(surface, lobes, wiX, wiY, wiZ);
+ * referenceSpecularPdf(surface, lobes, wiX, wiY, wiZ);
         }
         if (lobes.clearcoatWeight > 1e-8) {
             pdf += (lobes.clearcoatWeight / lobes.totalWeight)
-                    * referenceClearcoatPdf(surface, lobes, wiX, wiY, wiZ);
+ * referenceClearcoatPdf(surface, lobes, wiX, wiY, wiZ);
         }
         return pdf;
     }
@@ -3546,7 +3546,7 @@ public class PathTracerRenderer implements Renderer {
         double nDotV = Math.max(1e-6, surface.nx * viewX + surface.ny * viewY + surface.nz * viewZ);
         double nDotH = Math.max(1e-6, surface.nx * hx + surface.ny * hy + surface.nz * hz);
         double specularTerm = ggxSpecularTerm(nDotV, nDotNext, nDotH, lobes.specularAlphaSq, lobes.specularRoughness)
-            * lobes.specularEnergyComp;
+ * lobes.specularEnergyComp;
         double fresnelR;
         double fresnelG;
         double fresnelB;
@@ -3846,9 +3846,9 @@ public class PathTracerRenderer implements Renderer {
                                                 double opticsWeight,
                                                 double wavelengthNm) {
         double spread = DISPERSION_IOR_SPREAD
-                * clamp01(dispersion)
-                * clamp01(opticsWeight)
-                * Math.max(0.25, baseIor - 1.0);
+ * clamp01(dispersion)
+ * clamp01(opticsWeight)
+ * Math.max(0.25, baseIor - 1.0);
         double bias = (550.0 - wavelengthNm) / 165.0;
         return Math.max(1.0, baseIor + spread * bias);
     }
@@ -4113,10 +4113,10 @@ public class PathTracerRenderer implements Renderer {
         double phase = henyeyGreensteinPhase(surface.anisotropy, cosTheta);
         double transmissionAssist = 0.35 + 0.65 * clamp01(surface.transmission);
         return clamp01(surface.subsurface)
-                * SUBSURFACE_DIRECT_STRENGTH
-                * transmissionAssist
-                * (0.45 * mediumScatter + 0.55 * pathScatter)
-                * (phase * 4.0 * PI);
+ * SUBSURFACE_DIRECT_STRENGTH
+ * transmissionAssist
+ * (0.45 * mediumScatter + 0.55 * pathScatter)
+ * (phase * 4.0 * PI);
     }
 
     private double contributionClampScale(double contributionR, double contributionG, double contributionB, boolean directPath) {
@@ -4392,7 +4392,7 @@ public class PathTracerRenderer implements Renderer {
         }
         switch (materialProfile) {
             case "PT" -> {
-                // Keep PT profile physically neutral by default.
+ // Keep PT profile physically neutral by default.
             }
             case "RT" -> {
                 out.roughness = clamp01(out.roughness * 0.92);
@@ -4405,7 +4405,7 @@ public class PathTracerRenderer implements Renderer {
                 out.transmission = clamp01(out.transmission * 0.54);
             }
             default -> {
-                // PHONG/AUTO/default: keep extracted values unchanged.
+ // PHONG/AUTO/default: keep extracted values unchanged.
             }
         }
     }
@@ -4673,9 +4673,9 @@ public class PathTracerRenderer implements Renderer {
 
     private static double dispersedIor(double baseIor, double dispersion, double opticsWeight, double channelBias) {
         double spread = DISPERSION_IOR_SPREAD
-                * clamp01(dispersion)
-                * clamp01(opticsWeight)
-                * Math.max(0.25, baseIor - 1.0);
+ * clamp01(dispersion)
+ * clamp01(opticsWeight)
+ * Math.max(0.25, baseIor - 1.0);
         return Math.max(1.0, baseIor + spread * channelBias);
     }
 
@@ -4841,7 +4841,7 @@ public class PathTracerRenderer implements Renderer {
         if (ctx.shadowSurface.transmission > 0.55 && ctx.shadowSurface.refractiveIndex > 1.01) {
             double iorFocus = clamp01((ctx.shadowSurface.refractiveIndex - 1.0) / 1.2);
             glassOcclusion = clamp01(ctx.shadowSurface.opacity
-                    * (0.08 + 0.18 * iorFocus + 0.32 * clamp01(ctx.shadowSurface.reflectivity)));
+ * (0.08 + 0.18 * iorFocus + 0.32 * clamp01(ctx.shadowSurface.reflectivity)));
         }
         double occlusion = Math.max(opaqueOcclusion, glassOcclusion);
         return occlusion > 0.05;
@@ -6012,7 +6012,7 @@ public class PathTracerRenderer implements Renderer {
             return true;
         }
         if (previewPhase == PreviewPhase.MOTION_STEADY) {
-            // Keep all tiles phase-aligned during motion to prevent per-tile temporal drift.
+ // Keep all tiles phase-aligned during motion to prevent per-tile temporal drift.
             return true;
         }
         return true;
@@ -6178,9 +6178,9 @@ public class PathTracerRenderer implements Renderer {
             return environmentMap.pdfForDirection(rx, ry, rz2);
         }
         double skyPdf = environmentSkySampleWeight
-                * PathTracingSamplingSupport.cosineHemispherePdf(Math.max(0.0, dy));
+ * PathTracingSamplingSupport.cosineHemispherePdf(Math.max(0.0, dy));
         double groundPdf = environmentGroundSampleWeight
-                * PathTracingSamplingSupport.cosineHemispherePdf(Math.max(0.0, -dy));
+ * PathTracingSamplingSupport.cosineHemispherePdf(Math.max(0.0, -dy));
         double uniformPdf = environmentUniformSampleWeight * PathTracingSamplingSupport.uniformSpherePdf();
         return skyPdf + groundPdf + uniformPdf;
     }

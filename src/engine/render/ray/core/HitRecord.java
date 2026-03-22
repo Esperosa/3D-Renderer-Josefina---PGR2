@@ -4,8 +4,7 @@ import engine.math.Ray;
 import engine.math.Vec3;
 
 /**
- * Tady drÅ¾Ã­m informace o prÅ¯seÄÃ­ku paprsku se scÃ©nou.
- * NaplÅˆuju je v intersection rutinÃ¡ch a Ätu je pÅ™i shadingu.
+ * Ray-scene intersection payload used during shading.
  */
 public class HitRecord {
 

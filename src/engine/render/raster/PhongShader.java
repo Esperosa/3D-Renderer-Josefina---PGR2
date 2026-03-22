@@ -6,7 +6,7 @@ import engine.scene.Light;
 import engine.scene.PointLight;
 
 /**
- * Tady držím výpočet nasvícení typu Phong / Blinn-Phong.
+ * Represents výpočet nasvícení typu Phong / Blinn-Phong.
  * Metody nechávám bezstavové a volám je po fragmentech z rasterizačního potrubí.
  */
 public class PhongShader {
@@ -55,13 +55,13 @@ public class PhongShader {
         this.previewPointLightsDiffuseOnly = false;
     }
 
-    /**
-     * Tady shader nastavím pro aktuální snímek.
-     *
-     * @param ambientColor sem předám globální ambientní barvu
-     * @param ambientIntensity sem předám sílu ambientu
-     * @param lights sem předám světla aktivní v tomto framu
-     */
+ /**
+ * shader nastavím pro aktuální snímek.
+ *
+ * @param ambientColor globální ambientní barvu
+ * @param ambientIntensity sílu ambientu
+ * @param lights světla aktivní v tomto framu
+ */
     public void setup(Vec3 ambientColor, double ambientIntensity, Light[] lights) {
         this.ambientColor = ambientColor == null ? new Vec3(0.1, 0.1, 0.1) : ambientColor;
         this.ambientIntensity = ambientIntensity;
@@ -74,17 +74,17 @@ public class PhongShader {
         this.previewPointLightsDiffuseOnly = pointLightsDiffuseOnly;
     }
 
-    /**
-     * Tady spočítám Blinn-Phong nasvícení v bodě povrchu.
-     *
-     * @param worldPos sem předám pozici povrchu
-     * @param worldNormal sem předám jednotkovou normálu povrchu
-     * @param viewDir sem předám jednotkový směr z povrchu ke kameře
-     * @param diffuse sem předám difuzní barvu materiálu
-     * @param specular sem předám spekulární barvu materiálu
-     * @param shininess sem předám exponent odlesku
-     * @return tím vrátím finální nasvícenou barvu jako zabalené ARGB
-     */
+ /**
+ * spočítá Blinn-Phong nasvícení v bodě povrchu.
+ *
+ * @param worldPos pozici povrchu
+ * @param worldNormal jednotkovou normálu povrchu
+ * @param viewDir jednotkový směr z povrchu ke kameře
+ * @param diffuse difuzní barvu materiálu
+ * @param specular spekulární barvu materiálu
+ * @param shininess exponent odlesku
+ * @return tím vrátí finální nasvícenou barvu jako zabalené ARGB
+ */
     public int shade(Vec3 worldPos, Vec3 worldNormal, Vec3 viewDir,
                      Vec3 diffuse, Vec3 specular, double shininess) {
         Vec3 n = worldNormal.normalize();
@@ -150,9 +150,9 @@ public class PhongShader {
         return 0xFF000000 | rgb;
     }
 
-    /**
-     * Tady držím Phong shading cestu bez dalších alokací pro software rasterizer.
-     */
+ /**
+ * Represents Phong shading cestu bez dalších alokací pro software rasterizer.
+ */
     public int shadeFast(
             float wx, float wy, float wz,
             float nx, float ny, float nz,
@@ -248,7 +248,7 @@ public class PhongShader {
             }
 
             double att = pointLightRefs[i].attenuation(dist)
-                    * pointLightRefs[i].angularAttenuation(wx, wy, wz);
+ * pointLightRefs[i].angularAttenuation(wx, wy, wz);
             if (att <= 1e-12) {
                 continue;
             }

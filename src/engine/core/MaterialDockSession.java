@@ -1190,7 +1190,7 @@ final class MaterialDockSession {
                 }
                 dialog.setFile(path.getFileName().toString());
             } catch (RuntimeException ignored) {
-                // Při neplatné cestě necháme dialog ve výchozím stavu.
+ // Při neplatné cestě necháe dialog ve výchozím stavu.
             }
         }
         dialog.setVisible(true);
@@ -2317,4 +2317,3 @@ final class PendingLink {
         return restoreToNodeId >= 0 && restoreToSocket != null && !restoreToSocket.isBlank();
     }
 }
-

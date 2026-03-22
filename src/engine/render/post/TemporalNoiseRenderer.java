@@ -10,16 +10,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Tady držím temporal noise jako čistý 2D postproces nad G-bufferem.
+ * Represents temporal noise jako čistý 2D postproces nad G-bufferem.
  * Tvar vzniká jen z integer posuvu stabilního 2D zrna mezi snímky.
  * Objekt může kombinovat osu X i Y zároveň, ale bez deformace vzoru.
  */
 public class TemporalNoiseRenderer implements Renderer {
 
-    /**
-     * Režimy zůstávají jen kvůli kompatibilitě volání.
-     * Finální obraz se po zjednodušení řídí vždy stejným modelem.
-     */
+ /**
+ * Režimy zůstávají jen kvůli kompatibilitě volání.
+ * Finální obraz se po zjednodušení řídí vždy stejným modelem.
+ */
     public enum NoiseMode {
         OBJECT_MASK,
         FACE_FLOW,
@@ -149,16 +149,16 @@ public class TemporalNoiseRenderer implements Renderer {
         this.analysisReuseCount = 0L;
         this.lastAnalysisCacheHit = false;
 
-        // Tady pro temporal mód potřebuju jen G-buffer a vlastní finální syntézu.
+ // pro temporal mód potřebuju jen G-buffer a vlastní finální syntézu.
         baseRasterRenderer.setParameter("unlitMode", true);
         baseRasterRenderer.setParameter("frustumCulling", true);
         baseRasterRenderer.setParameter("backfaceCulling", false);
     }
 
-    /**
-     * Zacvakne velikost zrna na podporovaný preset.
-     * Zachovávám jen 1x1, 2x2 a 4x4, aby zrno zůstalo předvídatelné.
-     */
+ /**
+ * Zacvakne velikost zrna na podporovaný preset.
+ * Zachovávám jen 1x1, 2x2 a 4x4, aby zrno zůstalo předvídatelné.
+ */
     public static int normalizeGrainCellSizePreset(int value) {
         if (value <= 1) {
             return 1;
@@ -169,9 +169,9 @@ public class TemporalNoiseRenderer implements Renderer {
         return 4;
     }
 
-    /**
-     * Tady vrátím další preset velikosti zrna v cyklu 1x1 -> 2x2 -> 4x4 -> 1x1.
-     */
+ /**
+ * Returns další preset velikosti zrna v cyklu 1x1 -> 2x2 -> 4x4 -> 1x1.
+ */
     public static int nextGrainCellSizePreset(int current) {
         int normalized = normalizeGrainCellSizePreset(current);
         if (normalized == 1) {
@@ -183,17 +183,17 @@ public class TemporalNoiseRenderer implements Renderer {
         return 1;
     }
 
-    /**
-     * Tady vrátím uživatelský popisek presetu velikosti zrna.
-     */
+ /**
+ * Returns uživatelský popisek presetu velikosti zrna.
+ */
     public static String grainCellSizePresetLabel(int value) {
         int normalized = normalizeGrainCellSizePreset(value);
         return normalized + "x" + normalized;
     }
 
-    /**
-     * Tady vrátím všechny dostupné popisky presetů velikosti zrna pro UI.
-     */
+ /**
+ * Returns všechny dostupné popisky presetů velikosti zrna pro UI.
+ */
     public static String[] grainCellSizePresetLabels() {
         String[] labels = new String[GRAIN_CELL_SIZE_PRESETS.length];
         for (int i = 0; i < GRAIN_CELL_SIZE_PRESETS.length; i++) {
@@ -202,9 +202,9 @@ public class TemporalNoiseRenderer implements Renderer {
         return labels;
     }
 
-    /**
-     * Tady převedu textový popisek z UI zpět na preset velikosti zrna.
-     */
+ /**
+ * převedu textový popisek z UI zpět na preset velikosti zrna.
+ */
     public static int grainCellSizePresetFromLabel(String label) {
         if (label == null) {
             return 2;
@@ -367,72 +367,72 @@ public class TemporalNoiseRenderer implements Renderer {
         return mode;
     }
 
-    /**
-     * Tady vrátím počet přestaveb semistatické analýzy od vytvoření rendereru.
-     */
+ /**
+ * Returns počet přestaveb semistatické analýzy od vytvoření rendereru.
+ */
     public long getAnalysisBuildCount() {
         return analysisBuildCount;
     }
 
-    /**
-     * Tady vrátím počet snímků, které znovu použily uloženou analýzu.
-     */
+ /**
+ * Returns počet snímků, které znovu použily uloženou analýzu.
+ */
     public long getAnalysisReuseCount() {
         return analysisReuseCount;
     }
 
-    /**
-     * Tady řeknu, jestli poslední vykreslení jen znovu použilo uloženou analýzu.
-     */
+ /**
+ * řeknu, jestli poslední vykreslení jen znovu použilo uloženou analýzu.
+ */
     public boolean wasLastAnalysisCacheHit() {
         return lastAnalysisCacheHit;
     }
 
-    /**
-     * Tady vrátím kopii osového směru X pro testy a diagnostiku.
-     */
+ /**
+ * Returns kopii osového směru X pro testy a diagnostiku.
+ */
     public float[] copyFlowXBuffer() {
         return flowX == null ? new float[0] : flowX.clone();
     }
 
-    /**
-     * Tady vrátím kopii osového směru Y pro testy a diagnostiku.
-     */
+ /**
+ * Returns kopii osového směru Y pro testy a diagnostiku.
+ */
     public float[] copyFlowYBuffer() {
         return flowY == null ? new float[0] : flowY.clone();
     }
 
-    /**
-     * Tady vrátím kopii rychlostí regionů v pixelech za sekundu.
-     */
+ /**
+ * Returns kopii rychlostí regionů v pixelech za sekundu.
+ */
     public float[] copySpeedBuffer() {
         return speedMap == null ? new float[0] : speedMap.clone();
     }
 
-    /**
-     * Tady vrátím kopii fázových posunů regionů.
-     */
+ /**
+ * Returns kopii fázových posunů regionů.
+ */
     public float[] copyPhaseBuffer() {
         return phaseMap == null ? new float[0] : phaseMap.clone();
     }
 
-    /**
-     * Tady vrátím kopii masky hran.
-     */
+ /**
+ * Returns kopii masky hran.
+ */
     public float[] copyEdgeMaskBuffer() {
         return edgeMask == null ? new float[0] : edgeMask.clone();
     }
 
-    /**
-     * Tady vrátím horní mez počtu náhodných vzorkovacích operací na pixel.
-     */
+ /**
+ * Returns horní mez počtu náhodných vzorkovacích operací na pixel.
+ */
     public int getFinalNoiseSamplesPerPixelUpperBound() {
         return 4;
     }
 
-    /**
-     * Tady vrátím celočíselný posun X, který renderer použije pro daný pixel a čas.
-     */
+ /**
+ * Returns celočíselný posun X, který renderer použije pro daný pixel a čas.
+ */
     public int computeShiftXAt(int index, double time) {
         if (flowX == null || speedMap == null || phaseMap == null || index < 0 || index >= flowX.length) {
             return 0;
@@ -440,9 +440,9 @@ public class TemporalNoiseRenderer implements Renderer {
         return unpackShiftX(computePackedShift(time, speedMap[index], phaseMap[index], rawFlowX[index], rawFlowY[index]));
     }
 
-    /**
-     * Tady vrátím celočíselný posun Y, který renderer použije pro daný pixel a čas.
-     */
+ /**
+ * Returns celočíselný posun Y, který renderer použije pro daný pixel a čas.
+ */
     public int computeShiftYAt(int index, double time) {
         if (flowY == null || speedMap == null || phaseMap == null || index < 0 || index >= flowY.length) {
             return 0;
@@ -450,10 +450,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return unpackShiftY(computePackedShift(time, speedMap[index], phaseMap[index], rawFlowX[index], rawFlowY[index]));
     }
 
-    /**
-     * Finální syntézou vždy vykreslím celou buňku zrna jednou hodnotou.
-     * Tím zůstává velikost zrna přesně stejná i na hranách a u hrubších presetů nevznikají subpixely.
-     */
+ /**
+ * Finální syntézou vždy vykreslím celou buňku zrna jednou hodnotou.
+ * Tím zůstává velikost zrna přesně stejná i na hranách a u hrubších presetů nevznikají subpixely.
+ */
     private void renderCell(int cellX,
                             int cellMaxX,
                             int cellY,
@@ -800,10 +800,10 @@ public class TemporalNoiseRenderer implements Renderer {
         }
     }
 
-    /**
-     * Společnou pohybovou buňku používám jen tehdy, když se v ní potkává
-     * buď stejná plocha, nebo hladký či coplanární soused téhož objektu.
-     */
+ /**
+ * Společnou pohybovou buňku používá jen tehdy, když se v ní potkává
+ * buď stejná plocha, nebo hladký či coplanární soused téhož objektu.
+ */
     private boolean cellRequiresPixelFallback(int cellX,
                                               int cellMaxX,
                                               int cellY,
@@ -867,10 +867,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return false;
     }
 
-    /**
-     * Smíšená buňka nesmí jedné ploše vnutit pohybový model sousední plochy.
-     * Na hranách proto padáme zpět na přesnější per-pixel výpočet.
-     */
+ /**
+ * Smíšená buňka nesmí jedné ploše vnutit pohybový model sousední plochy.
+ * Na hranách proto padáme zpět na přesnější per-pixel výpočet.
+ */
     private void fillMixedCellField(Camera camera,
                                     int cellX,
                                     int cellMaxX,
@@ -1029,10 +1029,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return params;
     }
 
-    /**
-     * Tady převedu spojitý regionální směr na stabilní pohyb po pevné mřížce.
-     * Tady výsledek sdílím pro celý pohybový region, aby se mi zrno nelámalo pixel po pixelu.
-     */
+ /**
+ * převedu spojitý regionální směr na stabilní pohyb po pevné mřížce.
+ * výsledek sdílím pro celý pohybový region, aby se mi zrno nelámalo pixel po pixelu.
+ */
     private MotionRegionParams buildMotionRegionParams(int objectId,
                                                        double regionNx,
                                                        double regionNy,
@@ -1134,11 +1134,11 @@ public class TemporalNoiseRenderer implements Renderer {
         return params;
     }
 
-    /**
-     * Když dvě různé plochy skončí na stejné ose pohybu,
-     * přidá se jim lehce odlišná rychlost odvozená z regionu.
-     * Tím držím bias deterministický a sdílený pro celý region, takže mi nerozbije velké sjednocené plochy.
-     */
+ /**
+ * Když dvě různé plochy skončí na stejné ose pohybu,
+ * přidá se jim lehce odlišná rychlost odvozená z regionu.
+ * Tím drží bias deterministický a sdílený pro celý region, takže mi nerozbije velké sjednocené plochy.
+ */
     private double computeRegionSpeedBias(int objectId,
                                           double regionNx,
                                           double regionNy,
@@ -1163,14 +1163,14 @@ public class TemporalNoiseRenderer implements Renderer {
                 ^ (((long) qsy & 0xFFL) << 56);
         double variant = hash01(key) * 2.0 - 1.0;
         double diversity = REGION_SPEED_DIVERSITY
-                * (0.55 + axisAmbiguity * 0.65 + (1.0 - orientationContrast) * 0.35);
+ * (0.55 + axisAmbiguity * 0.65 + (1.0 - orientationContrast) * 0.35);
         return variant * (maxSpeed - minSpeed) * diversity;
     }
 
-    /**
-     * Tady zapíšu hotové regionální parametry do celé buňky zrna.
-     * Díky tomu se mi pohybový model uvnitř buňky nerozpadá na menší ostrůvky.
-     */
+ /**
+ * zapíšu hotové regionální parametry do celé buňky zrna.
+ * Díky tomu se mi pohybový model uvnitř buňky nerozpadá na menší ostrůvky.
+ */
     private void fillCellField(int cellX,
                                int cellMaxX,
                                int cellY,
@@ -1214,10 +1214,10 @@ public class TemporalNoiseRenderer implements Renderer {
         }
     }
 
-    /**
-     * Tady vyhlazuju pohybové parametry mezi sousedními hladkými buňkami téhož objektu.
-     * Tím mi mizí zbytkové malé plošky na kulatých tvarech, ale ostré hrany nechávám oddělené.
-     */
+ /**
+ * vyhlazuju pohybové parametry mezi sousedními hladkými buňkami téhož objektu.
+ * Tím mi mizí zbytkové malé plošky na kulatých tvarech, ale ostré hrany nechávám oddělené.
+ */
     private void smoothCellMotionField(int width,
                                        int height,
                                        int[] objectId,
@@ -1439,10 +1439,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return representative;
     }
 
-    /**
-     * Tady chci, aby coplanární regiony měly i po všech pomocných hladkých úpravách stále jeden společný pohybový model.
-     * Touto pojistkou vracím velké rovinné stěny zpět na jednotný směr, rychlost i fázi.
-     */
+ /**
+ * chci, aby coplanární regiony měly i po všech pomocných hladkých úpravách stále jeden společný pohybový model.
+ * Touto pojistkou vracím velké rovinné stěny zpět na jednotný směr, rychlost i fázi.
+ */
     private void enforcePlanarRegionConsistency(Camera camera,
                                                 int width,
                                                 int height,
@@ -1508,10 +1508,10 @@ public class TemporalNoiseRenderer implements Renderer {
         }
     }
 
-    /**
-     * Tady po všech analytických úpravách znovu zarovnám čisté buňky zrna na jeden sdílený pohybový model.
-     * Tím odstraním zbytky sub-cell nekonzistence, ale konfliktní buňky nechám nedotčené.
-     */
+ /**
+ * po všech analytických úpravách znovu zarovnám čisté buňky zrna na jeden sdílený pohybový model.
+ * Tím odstraním zbytky sub-cell nekonzistence, ale konfliktní buňky nechá nedotčené.
+ */
     private void normalizeUniformCells(int width,
                                        int height,
                                        int[] objectId,
@@ -1561,10 +1561,10 @@ public class TemporalNoiseRenderer implements Renderer {
         }
     }
 
-    /**
-     * Tady chci vyhlazení použít jen na skutečně zakřivené hladké oblasti.
-     * Rovné plochy a ostré hrany tím pádem držím striktně na jejich původním pohybovém modelu.
-     */
+ /**
+ * chci vyhlazení použít jen na skutečně zakřivené hladké oblasti.
+ * Rovné plochy a ostré hrany tím pádem drží striktně na jejich původním pohybovém modelu.
+ */
     private boolean cellLooksCurved(int cellRow,
                                     int cellCol,
                                     int cellRows,
@@ -1874,10 +1874,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return stats;
     }
 
-    /**
-     * Fázi držím regionálně, ne trianglově.
-     * Tím proto držím stejné časování i na coplanární ploše složené z více trojúhelníků.
-     */
+ /**
+ * Fázi drží regionálně, ne trianglově.
+ * Tím proto drží stejné časování i na coplanární ploše složené z více trojúhelníků.
+ */
     private double computeRegionPhase(int objectId,
                                       int axisX,
                                       int axisY,
@@ -2001,10 +2001,10 @@ public class TemporalNoiseRenderer implements Renderer {
         };
     }
 
-    /**
-     * Tady čtu stabilní náhodné pole po celé buňce.
-     * Posun v čase mi vzniká jen celočíselným posunem indexu, ne deformací nebo překreslením zrna.
-     */
+ /**
+ * čtu stabilní náhodné pole po celé buňce.
+ * Posun v čase mi vzniká jen celočíselným posunem indexu, ne deformací nebo překreslením zrna.
+ */
     private double sampleNoiseSignal(int sampleX, int sampleY) {
         double a = random01(sampleX, sampleY, 0L, GLOBAL_SEED);
         double b = random01(sampleX + 17, sampleY - 11, 0L, MASK_SEED);
@@ -2019,10 +2019,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return Math.floorDiv(pixelCoordinate, Math.max(1, grainCellSize));
     }
 
-    /**
-     * Tady každé ose dávám vlastní diskrétní intenzitu pohybu.
-     * Tím mi zrno zůstává pevné, ale region může běžet po X i Y zároveň.
-     */
+ /**
+ * každé ose dávám vlastní diskrétní intenzitu pohybu.
+ * Tím mi zrno zůstává pevné, ale region může běžet po X i Y zároveň.
+ */
     private double quantizeAxisWeight(double value) {
         double clamped = clamp01(value);
         if (clamped < 0.10) {
@@ -2047,10 +2047,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return clamp(normalized, -1.0, 1.0);
     }
 
-    /**
-     * Tady obě osy používají společný digitální krok.
-     * Kombinovaný pohyb mi tak nevypadá jako dvě nezávislé sekvence nad sebou.
-     */
+ /**
+ * obě osy používají společný digitální krok.
+ * Kombinovaný pohyb mi tak nevypadá jako dvě nezávislé sekvence nad sebou.
+ */
     private long computePackedShift(double time,
                                     float speedPixelsPerSecond,
                                     float phaseOffsetRegion,
@@ -2083,10 +2083,10 @@ public class TemporalNoiseRenderer implements Renderer {
         return (int) packedShift;
     }
 
-    /**
-     * Tady držím vysoký kontrast, ale nenechám obraz spadnout jen do čisté binární mapy.
-     * Pět úrovní mi dává výrazný šum a zároveň lépe ukazuje posun regionů.
-     */
+ /**
+ * Represents vysoký kontrast, ale nenechá obraz spadnout jen do čisté binární mapy.
+ * Pět úrovní mi dává výrazný šum a zároveň lépe ukazuje posun regionů.
+ */
     private int quantizeSignalToGray(double signal) {
         double contrasted = clamp01(0.5 + (signal - 0.5) * 1.82);
         int levels = Math.max(2, Math.min(8, paletteLevels));

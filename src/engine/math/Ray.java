@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím paprsek určený počátkem a směrem.
+ * Represents paprsek určený počátkem a směrem.
  */
 public class Ray {
 

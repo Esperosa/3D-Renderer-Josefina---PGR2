@@ -59,7 +59,7 @@ import engine.ui.WrapLayout;
 import engine.util.RuntimeInstrumentation;
 
 /**
- * Tady držím hlavní AWT okno s canvasem, toolbarem a postranními panely.
+ * Represents hlavní AWT okno s canvasem, toolbarem a postranními panely.
  */
 public class Window {
 
@@ -114,13 +114,13 @@ public class Window {
     private int timelineResizeStartScreenY;
     private int timelineResizeStartHeight;
 
-    /**
-     * Tady okno vytvořím a rovnou ho zobrazím.
-     *
-     * @param title sem předám titulek okna
-     * @param width sem předám počáteční šířku v pixelech
-     * @param height sem předám počáteční výšku v pixelech
-     */
+ /**
+ * okno vytvoří a rovnou ho zobrazím.
+ *
+ * @param title titulek okna
+ * @param width počáteční šířku v pixelech
+ * @param height počáteční výšku v pixelech
+ */
     public Window(String title, int width, int height) {
         this(title, width, height, false);
     }
@@ -197,12 +197,12 @@ public class Window {
         contextMenu.addPopupMenuListener(new PopupMenuListener() {
             @Override
             public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-                // A tady nic navic nedelam, callback volam tesne pred show().
+ // Here nic navic nedelam, callback volam tesne pred show().
             }
 
             @Override
             public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                // A tady schvalne nic nedelam, potvrzene akce resi jejich vlastni callback.
+ // Here schvalne nic nedelam, potvrzene akce resi jejich vlastni callback.
             }
 
             @Override
@@ -290,7 +290,7 @@ public class Window {
                 taskbar.setIconImage(icon);
             }
         } catch (UnsupportedOperationException | SecurityException ex) {
-            // A tady tise ignoruju platformy, ktere nepovoli integraci ikony do taskbaru.
+ // Here tise ignoruju platformy, ktere nepovoli integraci ikony do taskbaru.
         }
     }
 
@@ -299,7 +299,7 @@ public class Window {
             try {
                 return ImageIO.read(new File(APP_ICON_PNG_PATH));
             } catch (IOException ex) {
-                // A tady prechazim na ICO asset nize, kdyz nacteni PNG selze.
+ // Here prechazim na ICO asset nize, kdyz nacteni PNG selze.
             }
         }
         if (FileUtil.exists(APP_ICON_ICO_PATH)) {
@@ -308,11 +308,11 @@ public class Window {
         return null;
     }
 
-    /**
-     * Tady přenesu int[] barevný buffer do okna.
-     *
-     * @param pixels sem předám pole pixelů ARGB o délce width * height
-     */
+ /**
+ * přenesu int[] barevný buffer do okna.
+ *
+ * @param pixels pole pixelů ARGB o délce width * height
+ */
     public void blit(int[] pixels) {
         blit(pixels, width, height);
     }
@@ -395,10 +395,10 @@ public class Window {
         RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.WINDOW_PRESENT, presentStage);
     }
 
-    /**
-     * Tady buffer strategy vytvořím jen tehdy, když má canvas opravdu validní peer.
-     * Tím zabráním pádu při startu, minimalizaci nebo zavírání okna.
-     */
+ /**
+ * buffer strategy vytvoří jen tehdy, když má canvas opravdu validní peer.
+ * Tím zabráním pádu při startu, minimalizaci nebo zavírání okna.
+ */
     private BufferStrategy ensureBufferStrategy() {
         if (canvas == null || !canvas.isDisplayable() || canvas.getWidth() <= 0 || canvas.getHeight() <= 0) {
             return null;
@@ -415,7 +415,7 @@ public class Window {
         }
     }
 
-    /** @return vrátím kreslicí canvas pro připojení input listenerů */
+ /** @return vrátí kreslicí canvas pro připojení input listenerů */
     public Canvas getCanvas() {
         return canvas;
     }
@@ -457,22 +457,22 @@ public class Window {
         return fullscreen;
     }
 
-    /** @return vrátím aktuální šířku okna */
+ /** @return vrátí aktuální šířku okna */
     public int getWidth() {
         return Math.max(1, canvas.getWidth());
     }
 
-    /** @return vrátím aktuální výšku okna */
+ /** @return vrátí aktuální výšku okna */
     public int getHeight() {
         return Math.max(1, canvas.getHeight());
     }
 
-    /**
-     * Tady zpracovávám resize okna a znovu alokuju backBuffer.
-     *
-     * @param w sem předám novou šířku
-     * @param h sem předám novou výšku
-     */
+ /**
+ * Processes resize okna a znovu alokuju backBuffer.
+ *
+ * @param w novou šířku
+ * @param h novou výšku
+ */
     public void resize(int w, int h) {
         width = Math.max(1, w);
         height = Math.max(1, h);
@@ -482,7 +482,7 @@ public class Window {
         syncResponsiveLayout();
     }
 
-    /** Tady uvolním AWT prostředky. */
+ /** uvolním AWT prostředky. */
     public void dispose() {
         closeRequested = true;
         exitFullscreenIfNeeded();
@@ -992,7 +992,7 @@ public class Window {
                 fullscreenDevice.setFullScreenWindow(null);
             }
         } catch (RuntimeException ignored) {
-            // A tady platformni fullscreen fallback nechavam tise odeznit.
+ // Here platformni fullscreen fallback nechavam tise odeznit.
         }
     }
 

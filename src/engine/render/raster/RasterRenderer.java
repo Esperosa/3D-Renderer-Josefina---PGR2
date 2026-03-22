@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Tady držím software rasterizer s volitelným unlit a Phong shadingem.
+ * Represents software rasterizer s volitelným unlit a Phong shadingem.
  */
 public class RasterRenderer implements Renderer {
 
@@ -931,7 +931,7 @@ public class RasterRenderer implements Renderer {
         poly.add(b);
         poly.add(c);
 
-        // Canonical clip-space planes: -w <= x,y,z <= w
+ // Canonical clip-space planes: -w <= x,y,z <= w
         poly = clipAgainstPlane(poly, v -> v.clip.x + v.clip.w - CLIP_EPS); // left
         poly = clipAgainstPlane(poly, v -> v.clip.w - v.clip.x - CLIP_EPS); // right
         poly = clipAgainstPlane(poly, v -> v.clip.y + v.clip.w - CLIP_EPS); // bottom
@@ -1057,14 +1057,14 @@ public class RasterRenderer implements Renderer {
             int gz = (int) Math.floor(wz / cell);
             boolean even = ((gx + gz) & 1) == 0;
             if (even) {
-                // White tiles: mirror-like glossy look.
+ // White tiles: mirror-like glossy look.
                 baseR = 0.97;
                 baseG = 0.97;
                 baseB = 0.97;
                 roughness = 0.0;
                 metallic = 0.0;
             } else {
-                // Dark tiles: 50% metallic + 50% roughness.
+ // Dark tiles: 50% metallic + 50% roughness.
                 baseR = 0.06;
                 baseG = 0.06;
                 baseB = 0.06;
@@ -1148,7 +1148,7 @@ public class RasterRenderer implements Renderer {
         }
 
         if (materialProfile == MaterialProfile.DITHER) {
-            // Dither benefits from stronger diffuse separation and tamer glossy glass highlights.
+ // Dither benefits from stronger diffuse separation and tamer glossy glass highlights.
             roughness = clamp01(roughness * 1.18 + 0.05);
             metallic = clamp01(metallic * 0.65);
             transmission = clamp01(transmission * 0.55);

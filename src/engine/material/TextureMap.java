@@ -3,7 +3,7 @@ package engine.material;
 import engine.render.Texture;
 
 /**
- * Tady držím texturový slot s výběrem UV sady a transformačními parametry ve stylu glTF.
+ * Represents texturový slot s výběrem UV sady a transformačními parametry ve stylu glTF.
  */
 public final class TextureMap {
 

@@ -3,7 +3,7 @@ package engine.scene;
 import engine.math.Vec3;
 
 /**
- * Tady držím polohové světlo s útlumem podle vzdálenosti.
+ * Represents polohové světlo s útlumem podle vzdálenosti.
  */
 public class PointLight extends Light {
 
@@ -20,7 +20,7 @@ public class PointLight extends Light {
         this.quadratic = 0.032;
     }
 
-    // Tady přepisuju chování světla.
+ // přepisuju chování světla.
     @Override
     public Vec3 directionFrom(Vec3 surfacePoint) {
         return position.sub(surfacePoint).normalize();
@@ -31,7 +31,7 @@ public class PointLight extends Light {
         return 1.0 / (constant + linear * distance + quadratic * distance * distance);
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Vec3 getPosition() {
         return position;
     }
@@ -58,10 +58,10 @@ public class PointLight extends Light {
         return quadratic;
     }
 
-    /**
-     * Tady držím doplňkový úhlový útlum pro kuželová a plošnému světlu podobná odvození.
-     * Základní bodové světlo nechávám všesměrové.
-     */
+ /**
+ * Represents doplňkový úhlový útlum pro kuželová a plošnému světlu podobná odvození.
+ * Základní bodové světlo nechávám všesměrové.
+ */
     public double angularAttenuation(double surfaceX, double surfaceY, double surfaceZ) {
         return 1.0;
     }

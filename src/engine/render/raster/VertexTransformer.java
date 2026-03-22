@@ -6,7 +6,7 @@ import engine.math.Vec3;
 import engine.math.Vec4;
 
 /**
- * Tady převádím vrcholy meshe z objektového prostoru do clip prostoru.
+ * Converts vrcholy meshe z objektového prostoru do clip prostoru.
  * Pracuju nad plochými float poli, abych co nejvíc omezil alokace.
  */
 public class VertexTransformer {
@@ -26,18 +26,18 @@ public class VertexTransformer {
         this.worldNormals = new float[safe * 3];
     }
 
-    /**
-     * Tady transformuju vrcholy jedné entity.
-     *
-     * @param positions sem předám pozice v objektovém prostoru jako prokládané x,y,z
-     * @param normals sem předám normály v objektovém prostoru jako prokládané x,y,z
-     * @param vertexCount sem předám počet vrcholů
-     * @param modelMatrix sem předám modelovou matici entity ve světovém prostoru
-     * @param vpMatrix sem předám view * projection matici
-     * @param normalMatrix sem předám horní levou 3x3 inverse-transpose část modelové matice
-     * @param screenW sem předám šířku viewportu
-     * @param screenH sem předám výšku viewportu
-     */
+ /**
+ * transformuju vrcholy jedné entity.
+ *
+ * @param positions pozice v objektovém prostoru jako prokládané x,y,z
+ * @param normals normály v objektovém prostoru jako prokládané x,y,z
+ * @param vertexCount počet vrcholů
+ * @param modelMatrix modelovou matici entity ve světovém prostoru
+ * @param vpMatrix view * projection matici
+ * @param normalMatrix horní levou 3x3 inverse-transpose část modelové matice
+ * @param screenW šířku viewportu
+ * @param screenH výšku viewportu
+ */
     public void transform(float[] positions, float[] normals, int vertexCount,
                           Mat4 modelMatrix, Mat4 vpMatrix, Mat4 normalMatrix,
                           int screenW, int screenH) {

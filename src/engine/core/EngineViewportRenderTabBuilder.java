@@ -13,7 +13,7 @@ import engine.util.ThreadPool;
 import engine.util.UiBuilder;
 
 /**
- * Tady stavím panel pro živé nastavení viewport rendererů.
+ * stavím panel pro živé nastavení viewport rendererů.
  */
 final class EngineViewportRenderTabBuilder {
 

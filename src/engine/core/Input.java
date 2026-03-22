@@ -13,7 +13,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Tady spravuju nízkoúrovňový stav klávesnice a myši pro viewport.
+ * spravuje nízkoúrovňový stav klávesnice a myši pro viewport.
  */
 public class Input {
 
@@ -41,9 +41,9 @@ public class Input {
     private final Set<Character> pendingChars = new HashSet<>();
     private final Set<Character> frameChars = new HashSet<>();
 
-    /**
-     * Tady připojím AWT listenery k cílové komponentě.
-     */
+ /**
+ * připojím AWT listenery k cílové komponentě.
+ */
     public void attach(Component component) {
         component.setFocusable(true);
         component.addFocusListener(new FocusAdapter() {
@@ -111,9 +111,9 @@ public class Input {
         component.addMouseWheelListener((MouseWheelEvent e) -> scrollDelta += e.getWheelRotation());
     }
 
-    /**
-     * Tady jednou za snímek zpracovávám stav vstupu.
-     */
+ /**
+ * jednou za snímek zpracovává stav vstupu.
+ */
     public void poll() {
         for (int i = 0; i < KEY_COUNT; i++) {
             keyPressed[i] = keyDown[i] && !prevKeyDown[i];
@@ -136,32 +136,32 @@ public class Input {
         pendingChars.clear();
     }
 
-    /** @return vrátím true, když je klávesa právě držená */
+ /** @return vrátí true, když je klávesa právě držená */
     public boolean isKeyDown(int keyCode) {
         return keyCode >= 0 && keyCode < KEY_COUNT && keyDown[keyCode];
     }
 
-    /** @return vrátím true jen ve framu, kdy klávesu poprvé stisknu */
+ /** @return vrátí true jen ve framu, kdy klávesu poprvé stisknu */
     public boolean isKeyPressed(int keyCode) {
         return keyCode >= 0 && keyCode < KEY_COUNT && keyPressed[keyCode];
     }
 
-    /** @return vrátím true jen ve framu, kdy klávesu uvolním */
+ /** @return vrátí true jen ve framu, kdy klávesu uvolním */
     public boolean isKeyReleased(int keyCode) {
         return keyCode >= 0 && keyCode < KEY_COUNT && keyReleased[keyCode];
     }
 
-    /** @return vrátím true, když je tlačítko myši právě držené */
+ /** @return vrátí true, když je tlačítko myši právě držené */
     public boolean isMouseButtonDown(int button) {
         return button >= 0 && button < MOUSE_BUTTONS && mouseButtons[button];
     }
 
-    /** @return vrátím true jen ve framu, kdy tlačítko myši stisknu */
+ /** @return vrátí true jen ve framu, kdy tlačítko myši stisknu */
     public boolean isMouseButtonPressed(int button) {
         return button >= 0 && button < MOUSE_BUTTONS && mousePressed[button];
     }
 
-    /** @return vrátím true jen ve framu, kdy tlačítko myši uvolním */
+ /** @return vrátí true jen ve framu, kdy tlačítko myši uvolním */
     public boolean isMouseButtonReleased(int button) {
         return button >= 0 && button < MOUSE_BUTTONS && mouseReleased[button];
     }
@@ -186,17 +186,17 @@ public class Input {
         return mouseY;
     }
 
-    /** @return vrátím horizontální pohyb myši od minulého framu */
+ /** @return vrátí horizontální pohyb myši od minulého framu */
     public int getMouseDX() {
         return mouseDX;
     }
 
-    /** @return vrátím vertikální pohyb myši od minulého framu */
+ /** @return vrátí vertikální pohyb myši od minulého framu */
     public int getMouseDY() {
         return mouseDY;
     }
 
-    /** @return vrátím změnu kolečka myši v aktuálním framu */
+ /** @return vrátí změnu kolečka myši v aktuálním framu */
     public int getScrollDelta() {
         return frameScrollDelta;
     }

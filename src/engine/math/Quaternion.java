@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím jednotkový quaternion pro plynulou 3D rotaci bez zámku os.
+ * Represents jednotkový quaternion pro plynulou 3D rotaci bez zámku os.
  */
 public class Quaternion {
 
@@ -18,7 +18,7 @@ public class Quaternion {
         this.w = w;
     }
 
-    // Tady držím základní operace.
+ // Represents základní operace.
     public Quaternion multiply(Quaternion q) {
         return new Quaternion(
                 w * q.x + x * q.w + y * q.z - z * q.y,
@@ -44,7 +44,7 @@ public class Quaternion {
         return Math.sqrt(x * x + y * y + z * z + w * w);
     }
 
-    // Tady řeším převody.
+ // Handles převody.
     public Mat4 toMat4() {
         Quaternion q = normalize();
         double xx = q.x * q.x;
@@ -105,7 +105,7 @@ public class Quaternion {
         return new Vec3(pitch, yaw, roll);
     }
 
-    // Tady řeším interpolaci.
+ // Handles interpolaci.
     public static Quaternion slerp(Quaternion a, Quaternion b, double t) {
         Quaternion qa = a.normalize();
         Quaternion qb = b.normalize();
@@ -141,7 +141,7 @@ public class Quaternion {
         );
     }
 
-    // Tady držím pomocné utility.
+ // Represents pomocné utility.
     public Vec3 rotateVector(Vec3 v) {
         Quaternion p = new Quaternion(v.x, v.y, v.z, 0.0);
         Quaternion out = multiply(p).multiply(conjugate());

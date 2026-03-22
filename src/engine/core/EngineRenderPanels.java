@@ -3,7 +3,7 @@ package engine.core;
 import javax.swing.JPanel;
 
 /**
- * Tady držím tenkou vstupní vrstvu pro stavbu panelů vykreslení.
+ * Represents tenkou vstupní vrstvu pro stavbu panelů vykreslení.
  */
 final class EngineRenderPanels {
 

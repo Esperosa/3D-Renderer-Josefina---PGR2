@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím bounding sphere danou středem a poloměrem.
+ * Represents bounding sphere danou středem a poloměrem.
  * Používám ji jako lehký bounding volume pro rychlé vyřazovací testy.
  */
 public class BoundingSphere {
@@ -14,7 +14,7 @@ public class BoundingSphere {
         this.radius = Math.max(0.0, radius);
     }
 
-    // Tady držím testy průniku a obsahu.
+ // Represents testy průniku a obsahu.
     public boolean contains(Vec3 point) {
         return point.sub(center).lengthSquared() <= radius * radius;
     }
@@ -45,7 +45,7 @@ public class BoundingSphere {
         return Double.MAX_VALUE;
     }
 
-    // Tady řeším konstrukci a převody.
+ // Handles konstrukci a převody.
     public static BoundingSphere fromAABB(AABB aabb) {
         Vec3 center = aabb.center();
         double radius = aabb.getMax().sub(center).length();

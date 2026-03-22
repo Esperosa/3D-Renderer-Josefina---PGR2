@@ -1,7 +1,7 @@
 package engine.core;
 
 /**
- * Tady sleduju čas s vysokým rozlišením pro snímky i logiku pevných kroků.
+ * sleduju čas s vysokým rozlišením pro snímky i logiku pevných kroků.
  */
 public class Time {
 
@@ -27,9 +27,9 @@ public class Time {
         this.accumulator = 0.0;
     }
 
-    /**
-     * Tady jednou za snímek aktualizuju delta čas a doplním akumulátor pevných kroků.
-     */
+ /**
+ * jednou za snímek aktualizuje delta čas a doplním akumulátor pevných kroků.
+ */
     public void tick() {
         long now = System.nanoTime();
         if (lastFrameNanos < 0L) {
@@ -52,17 +52,17 @@ public class Time {
         frameCount++;
     }
 
-    /** @return vrátím čas od minulého snímku v sekundách */
+ /** @return vrátí čas od minulého snímku v sekundách */
     public double getDeltaTime() {
         return deltaTime;
     }
 
-    /** @return vrátím celkový uplynulý čas od startu enginu v sekundách */
+ /** @return vrátí celkový uplynulý čas od startu enginu v sekundách */
     public double getElapsedTime() {
         return elapsedTime;
     }
 
-    /** @return vrátím pevný fyzikální krok v sekundách */
+ /** @return vrátí pevný fyzikální krok v sekundách */
     public double getFixedTimeStep() {
         return fixedTimeStep;
     }
@@ -71,11 +71,11 @@ public class Time {
         this.fixedTimeStep = Math.max(1e-4, fixedTimeStep);
     }
 
-    /**
-     * Tady spotřebuju jeden fixed timestep z akumulátoru.
-     *
-     * @return vrátím true, když mám k dispozici další pevný krok
-     */
+ /**
+ * spotřebuju jeden fixed timestep z akumulátoru.
+ *
+ * @return vrátí true, když mám k dispozici další pevný krok
+ */
     public boolean consumeFixedStep() {
         if (accumulator + 1e-12 >= fixedTimeStep) {
             accumulator -= fixedTimeStep;
@@ -84,7 +84,7 @@ public class Time {
         return false;
     }
 
-    /** @return vrátím celkový počet vykreslených snímků */
+ /** @return vrátí celkový počet vykreslených snímků */
     public long getFrameCount() {
         return frameCount;
     }

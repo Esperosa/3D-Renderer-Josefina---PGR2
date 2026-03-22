@@ -4,7 +4,7 @@ import engine.math.Vec3;
 import engine.scene.Entity;
 
 /**
- * Tady držím runtime konfiguraci jednoho spray/splash emitoru navázaného na scénovou entitu.
+ * Represents runtime konfiguraci jednoho spray/splash emitoru navázaného na scénovou entitu.
  */
 public final class WaterEmitter {
 

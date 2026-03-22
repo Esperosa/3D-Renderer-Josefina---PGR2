@@ -33,7 +33,7 @@ import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
 
 /**
- * Tady řídím finální output rendering mimo realtime viewport.
+ * řídím finální output rendering mimo realtime viewport.
  */
 public class OutputRenderController {
 
@@ -738,7 +738,7 @@ public class OutputRenderController {
             try {
                 Files.deleteIfExists(out);
             } catch (IOException ignored) {
-                // Tady chybu při úklidu po zrušení renderu záměrně ignoruju.
+ // Cleanup errors after cancel are intentionally ignored.
             }
             return null;
         }
@@ -788,7 +788,7 @@ public class OutputRenderController {
             try {
                 Files.deleteIfExists(out);
             } catch (IOException cleanupIgnored) {
-                // Tady chybu při úklidu po selhání AVI záměrně ignoruju.
+ // Cleanup errors after AVI failure are intentionally ignored.
             }
             throw ex;
         }
@@ -796,7 +796,7 @@ public class OutputRenderController {
             try {
                 Files.deleteIfExists(out);
             } catch (IOException ignored) {
-                // Tady chybu při úklidu po zrušení renderu záměrně ignoruju.
+ // Cleanup errors after cancel are intentionally ignored.
             }
             return null;
         }

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Tady procedurálně vytvářím běžné primitivní meshe.
+ * procedurálně vytvářím běžné primitivní meshe.
  */
 public final class MeshGenerator {
     private static final double DEFAULT_AUTO_SMOOTH_ANGLE_DEGREES = 30.0;
@@ -19,17 +19,17 @@ public final class MeshGenerator {
     public static Mesh cube(double size) {
         float s = (float) (size * 0.5);
         float[] positions = new float[]{
-                // Tady skládám přední stěnu.
+ // Builds přední stěnu.
                 -s, -s, s,  s, -s, s,  s, s, s,  -s, s, s,
-                // Tady skládám zadní stěnu.
+ // Builds zadní stěnu.
                 s, -s, -s,  -s, -s, -s,  -s, s, -s,  s, s, -s,
-                // Tady skládám levou stěnu.
+ // Builds levou stěnu.
                 -s, -s, -s,  -s, -s, s,  -s, s, s,  -s, s, -s,
-                // Tady skládám pravou stěnu.
+ // Builds pravou stěnu.
                 s, -s, s,  s, -s, -s,  s, s, -s,  s, s, s,
-                // Tady skládám horní stěnu.
+ // Builds horní stěnu.
                 -s, s, s,  s, s, s,  s, s, -s,  -s, s, -s,
-                // Tady skládám spodní stěnu.
+ // Builds spodní stěnu.
                 -s, -s, -s,  s, -s, -s,  s, -s, s,  -s, -s, s
         };
         float[] normals = new float[]{

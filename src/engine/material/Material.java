@@ -3,7 +3,7 @@ package engine.material;
 import engine.math.Vec3;
 
 /**
- * Tady držím základní materiál se společnými vlastnostmi pro různé způsoby vykreslení.
+ * Represents základní materiál se společnými vlastnostmi pro různé způsoby vykreslení.
  */
 public class Material {
 
@@ -64,7 +64,7 @@ public class Material {
         this.doubleSided = false;
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public String getName() {
         return name;
     }

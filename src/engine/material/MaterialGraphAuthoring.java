@@ -239,10 +239,10 @@ public final class MaterialGraphAuthoring {
         return new MappingBinding(true, 0, 0.0, 0.0, 1.0, 1.0, 0.0);
     }
 
-    /**
-     * Tady používám stejné ASCII klíče socketů jako v nejteplejší cestě vykreslení.
-     * Vlastní normalizací si držím konzistentní chování a nevolám převod na malá písmena závislý na jazykovém prostředí.
-     */
+ /**
+ * Uses stejné ASCII klíče socketů jako v nejteplejší cestě vykreslení.
+ * Vlastní normalizací si drží konzistentní chování a nevolám převod na malá písmena závislý na jazykovém prostředí.
+ */
     private static String normalizeSocketKey(String value, String fallback) {
         if (value == null) {
             return fallback;

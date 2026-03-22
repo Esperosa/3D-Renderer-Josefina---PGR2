@@ -3,7 +3,7 @@ package engine.geometry;
 import java.util.Arrays;
 
 /**
- * Tady převádím polygonální plochy na trojúhelníky.
+ * Converts polygonální plochy na trojúhelníky.
  */
 public class Triangulator {
 

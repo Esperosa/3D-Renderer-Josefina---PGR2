@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Tady držím experimentální scaffold pro budoucí galaxy simulátor.
+ * Represents experimentální scaffold pro budoucí galaxy simulátor.
  * Zatím v něm jen sleduju kotevní entity galaxy systému a záměrně netvrdím,
  * že už umím orbitální nebo N-body chování.
  */
@@ -51,6 +51,6 @@ public final class GalaxySimulation {
 
     public void update(Scene scene, double dtSeconds, double elapsedSeconds) {
         syncScene(scene);
-        // Tady záměrně končím jen u scaffoldingu, protože ještě nemám orbitální solver ani vzorkovaná galaxy tělesa.
+ // záměrně končím jen u scaffoldingu, protože ještě nemám orbitální solver ani vzorkovaná galaxy tělesa.
     }
 }

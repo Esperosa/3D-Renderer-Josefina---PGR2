@@ -8,7 +8,7 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
 /**
- * Tady držím jednoduchý bitmapový font s pevnou šířkou pro ASCII dithering.
+ * Represents jednoduchý bitmapový font s pevnou šířkou pro ASCII dithering.
  */
 public class BitFont {
 
@@ -58,12 +58,12 @@ public class BitFont {
         return normalized.toString();
     }
 
-    /**
-     * Tady vrátím bitmapu glyfu pro zadaný znak.
-     *
-     * @param c sem předám ASCII znak v rozsahu 32 až 126
-     * @return vrátím masku boolean[charHeight][charWidth], kde true znamená popředí
-     */
+ /**
+ * Returns bitmapu glyfu pro zadaný znak.
+ *
+ * @param c ASCII znak v rozsahu 32 až 126
+ * @return vrátí masku boolean[charHeight][charWidth], kde true znamená popředí
+ */
     public boolean[][] getGlyph(char c) {
         if (c < ASCII_START || c > ASCII_END) {
             c = ' ';
@@ -71,17 +71,17 @@ public class BitFont {
         return glyphs[c - ASCII_START];
     }
 
-    /**
-     * Tady vyrastruju znak do vybrané oblasti pixelového bufferu.
-     *
-     * @param pixels sem předám barevný buffer framebufferu
-     * @param stride sem předám šířku bufferu v pixelech
-     * @param startX sem předám levý horní roh cílové buňky na ose X
-     * @param startY sem předám levý horní roh cílové buňky na ose Y
-     * @param c sem předám znak k vykreslení
-     * @param fgColor sem předám ARGB barvu popředí
-     * @param bgColor sem předám ARGB barvu pozadí
-     */
+ /**
+ * vyrastruje znak do vybrané oblasti pixelového bufferu.
+ *
+ * @param pixels barevný buffer framebufferu
+ * @param stride šířku bufferu v pixelech
+ * @param startX levý horní roh cílové buňky na ose X
+ * @param startY levý horní roh cílové buňky na ose Y
+ * @param c znak k vykreslení
+ * @param fgColor ARGB barvu popředí
+ * @param bgColor ARGB barvu pozadí
+ */
     public void drawChar(int[] pixels, int stride, int startX, int startY,
                          char c, int fgColor, int bgColor) {
         if (pixels == null || stride <= 0) {

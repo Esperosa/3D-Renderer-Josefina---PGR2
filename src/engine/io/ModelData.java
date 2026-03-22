@@ -5,7 +5,7 @@ import engine.geometry.Mesh;
 import java.util.Arrays;
 
 /**
- * Tady držím mezikontejner pro naparsovaná modelová data před sestavením meshe.
+ * Represents mezikontejner pro naparsovaná modelová data před sestavením meshe.
  * Používám ho tam, kde si načítač potřebuje data nasbírat přes více průchodů.
  */
 public class ModelData {
@@ -39,11 +39,11 @@ public class ModelData {
         refreshCounts();
     }
 
-    /**
-     * Tady převedu dokončená data na instanci meshe.
-     *
-     * @return tím vrátím nový mesh s pozicemi, normálami, indexy a spočítanými bounds
-     */
+ /**
+ * převedu dokončená data na instanci meshe.
+ *
+ * @return tím vrátí nový mesh s pozicemi, normálami, indexy a spočítanými bounds
+ */
     public Mesh toMesh() {
         if (positions == null || positions.length == 0 || positions.length % 3 != 0) {
             throw new IllegalStateException("ModelData.positions must be non-empty and xyz-interleaved");

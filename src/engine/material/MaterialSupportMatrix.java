@@ -1,8 +1,8 @@
 package engine.material;
 
 /**
- * Tady držím centralizovanou poctivou support matici pro materiálové uzly napříč Raster, Ray a Path renderery.
- * Záměrně ji držím konzervativní, aby mi sloužila pro UI souhrny místo rozházených textů podpory.
+ * Represents centralizovanou poctivou support matici pro materiálové uzly napříč Raster, Ray a Path renderery.
+ * Záměrně ji drží konzervativní, aby mi sloužila pro UI souhrny místo rozházených textů podpory.
  */
 public final class MaterialSupportMatrix {
 

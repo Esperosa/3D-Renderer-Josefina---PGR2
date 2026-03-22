@@ -9,7 +9,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Tady držím scénu se všemi objekty, světly a stavem renderovatelného světa.
+ * Represents scénu se všemi objekty, světly a stavem renderovatelného světa.
  */
 public class Scene {
 
@@ -32,7 +32,7 @@ public class Scene {
     private long spatialVersion = 1L;
     private long meshEntityVersion = 1L;
 
-    // Tady spravuju entity.
+ // spravuje entity.
     public void addEntity(Entity e) {
         if (e == null) {
             return;
@@ -59,7 +59,7 @@ public class Scene {
         return Collections.unmodifiableList(entities);
     }
 
-    // Tady spravuju světla.
+ // spravuje světla.
     public void addLight(Light l) {
         if (l == null) {
             return;
@@ -78,7 +78,7 @@ public class Scene {
         return Collections.unmodifiableList(lights);
     }
 
-    // Tady řeším dotazy nad scénou.
+ // Handles dotazy nad scénou.
     public Entity findByName(String name) {
         for (Entity entity : entities) {
             RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.ENTITIES_VISITED, 1L);
@@ -104,7 +104,7 @@ public class Scene {
         return visibleMeshEntitiesView;
     }
 
-    // Tady držím základní stav scény.
+ // Represents základní stav scény.
     public Vec3 getAmbientColor() {
         return ambientColor;
     }
@@ -207,7 +207,7 @@ public class Scene {
         return meshEntityVersion;
     }
 
-    // Tady aktualizuju odvozený stav scény.
+ // aktualizuje odvozený stav scény.
     public void update(double dt) {
         for (Entity entity : entities) {
             RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.ENTITIES_VISITED, 1L);

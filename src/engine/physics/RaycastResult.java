@@ -3,7 +3,7 @@ package engine.physics;
 import engine.math.Vec3;
 
 /**
- * Tady držím výsledek fyzikálního raycast dotazu.
+ * Represents výsledek fyzikálního raycast dotazu.
  */
 public class RaycastResult {
 

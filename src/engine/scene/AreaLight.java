@@ -4,7 +4,7 @@ import engine.math.MathUtil;
 import engine.math.Vec3;
 
 /**
- * Tady držím jednoduché plošnému světlu podobné světlo vhodné pro software renderer.
+ * Represents jednoduché plošnému světlu podobné světlo vhodné pro software renderer.
  * Implementuju ho jako poziční světlo se směrovým a úhlovým útlumem.
  */
 public class AreaLight extends PointLight {

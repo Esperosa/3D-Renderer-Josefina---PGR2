@@ -7,7 +7,7 @@ import engine.math.Plane;
 import engine.math.Vec3;
 
 /**
- * Tady držím šestirovinný view frustum vytažený z view-projection matice.
+ * Represents šestirovinný view frustum vytažený z view-projection matice.
  */
 public class Frustum {
 
@@ -26,35 +26,35 @@ public class Frustum {
         }
     }
 
-    /**
-     * Tady vytáhnu roviny frusta z kombinované view-projection matice.
-     *
-     * @param vp sem předám kombinovanou view-projection matici
-     */
+ /**
+ * Extracts roviny frusta z kombinované view-projection matice.
+ *
+ * @param vp kombinovanou view-projection matici
+ */
     public void extractFromMatrix(Mat4 vp) {
         if (vp == null) {
             return;
         }
-        // Tady skládám levou rovinu jako row3 + row0.
+ // Builds levou rovinu jako row3 + row0.
         planes[LEFT] = planeFromRows(vp, 3, 0, 1.0);
-        // Tady skládám pravou rovinu jako row3 - row0.
+ // Builds pravou rovinu jako row3 - row0.
         planes[RIGHT] = planeFromRows(vp, 3, 0, -1.0);
-        // Tady skládám spodní rovinu jako row3 + row1.
+ // Builds spodní rovinu jako row3 + row1.
         planes[BOTTOM] = planeFromRows(vp, 3, 1, 1.0);
-        // Tady skládám horní rovinu jako row3 - row1.
+ // Builds horní rovinu jako row3 - row1.
         planes[TOP] = planeFromRows(vp, 3, 1, -1.0);
-        // Tady skládám near rovinu jako row3 + row2.
+ // Builds near rovinu jako row3 + row2.
         planes[NEAR] = planeFromRows(vp, 3, 2, 1.0);
-        // Tady skládám far rovinu jako row3 - row2.
+ // Builds far rovinu jako row3 - row2.
         planes[FAR] = planeFromRows(vp, 3, 2, -1.0);
     }
 
-    /**
-     * Tady otestuju AABB proti frustu.
-     *
-     * @param aabb sem předám box zarovnaný podle os ve světovém prostoru
-     * @return vrátím true, když box aspoň částečně leží ve frustu
-     */
+ /**
+ * Tests AABB proti frustu.
+ *
+ * @param aabb box zarovnaný podle os ve světovém prostoru
+ * @return vrátí true, když box aspoň částečně leží ve frustu
+ */
     public boolean intersects(AABB aabb) {
         if (aabb == null) {
             return true;
@@ -79,12 +79,12 @@ public class Frustum {
         return true;
     }
 
-    /**
-     * Tady otestuju ohraničující kouli proti frustu.
-     *
-     * @param sphere sem předám ohraničující kouli ve světovém prostoru
-     * @return vrátím true, když koule aspoň částečně leží ve frustu
-     */
+ /**
+ * Tests ohraničující kouli proti frustu.
+ *
+ * @param sphere ohraničující kouli ve světovém prostoru
+ * @return vrátí true, když koule aspoň částečně leží ve frustu
+ */
     public boolean intersects(BoundingSphere sphere) {
         if (sphere == null) {
             return true;

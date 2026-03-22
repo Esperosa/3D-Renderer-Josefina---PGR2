@@ -11,9 +11,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Tady audituju surové materiálové vlastnosti glTF a GLB před převodem načítačem.
+ * audituju surové materiálové vlastnosti glTF a GLB před převodem načítačem.
  * Spustím to takto:
- *   java -cp <classpath> engine.tools.GltfFeatureAudit <file.glb>
+ * java -cp <classpath> engine.tools.GltfFeatureAudit <file.glb>
  */
 public final class GltfFeatureAudit {
 

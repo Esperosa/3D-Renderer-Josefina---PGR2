@@ -1,7 +1,7 @@
 package engine.core.history;
 
 /**
- * Tady definuju základní editorovou operaci zapisovanou do historie.
+ * Defines základní editorovou operaci zapisovanou do historie.
  */
 public interface EditorCommand {
 

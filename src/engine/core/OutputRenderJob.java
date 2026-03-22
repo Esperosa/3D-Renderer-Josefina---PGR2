@@ -1,7 +1,7 @@
 package engine.core;
 
 /**
- * Tady držím kompletní parametry jedné výstupní vykreslovací úlohy.
+ * Represents kompletní parametry jedné výstupní vykreslovací úlohy.
  */
 final class OutputRenderJob {
     OutputRenderRequestType requestType;

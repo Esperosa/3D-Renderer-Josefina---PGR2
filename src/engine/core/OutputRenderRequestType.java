@@ -1,7 +1,7 @@
 package engine.core;
 
 /**
- * Tady rozliším typ výstupního požadavku na vykreslení.
+ * Distinguishes typ výstupního požadavku na vykreslení.
  */
 enum OutputRenderRequestType {
     STILL,

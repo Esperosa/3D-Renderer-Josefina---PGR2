@@ -46,7 +46,7 @@ public final class HardwareTelemetrySampler {
                 processCpuTimeNanos = osBean.getProcessCpuTime();
             }
         } catch (RuntimeException ignored) {
-            // Best-effort telemetry only.
+ // Best-effort telemetry only.
         }
 
         return new CpuSample(

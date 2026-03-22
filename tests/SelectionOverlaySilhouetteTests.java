@@ -50,7 +50,7 @@ public final class SelectionOverlaySilhouetteTests {
         renderer.render(scene, camera, framebuffer, 0.0);
 
         int[] before = Arrays.copyOf(framebuffer.getColorBuffer(), framebuffer.getColorBuffer().length);
-        // Use new renderer-agnostic two-phase approach
+ // Use new renderer-agnostic two-phase approach
         SelectionOverlayUtil.computeSelectionCoveragePass(sphere, camera, width, height);
         SelectionOverlayUtil.drawCachedSelectionOutline(framebuffer);
         int[] after = framebuffer.getColorBuffer();
@@ -116,7 +116,7 @@ public final class SelectionOverlaySilhouetteTests {
         renderer.render(scene, camera, framebuffer, 0.0);
 
         int[] before = Arrays.copyOf(framebuffer.getColorBuffer(), framebuffer.getColorBuffer().length);
-        // Use new renderer-agnostic two-phase approach
+ // Use new renderer-agnostic two-phase approach
         SelectionOverlayUtil.computeSelectionCoveragePass(sphere, camera, width, height);
         SelectionOverlayUtil.drawCachedSelectionOutline(framebuffer);
         int[] after = framebuffer.getColorBuffer();

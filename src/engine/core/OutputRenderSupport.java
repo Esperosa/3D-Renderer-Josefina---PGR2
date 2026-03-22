@@ -5,7 +5,7 @@ import engine.ui.UiStrings;
 import java.util.Locale;
 
 /**
- * Tady držím sdílené pomocné metody pro výstupní postup.
+ * Represents sdílené pomocné metody pro výstupní postup.
  */
 final class OutputRenderSupport {
 

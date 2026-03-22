@@ -56,7 +56,7 @@ final class EngineLifecycleController {
         try {
             Thread.currentThread().setPriority(Math.max(Thread.MIN_PRIORITY + 1, Thread.NORM_PRIORITY - 1));
         } catch (SecurityException ignored) {
-            // A tady nechavam vychozi prioritu vlakna, kdyz VM nepovoli jeji zmenu.
+ // Here nechavam vychozi prioritu vlakna, kdyz VM nepovoli jeji zmenu.
         }
 
         StartupLoadingScreen loadingScreen = StartupLoadingScreen.show(Engine.WINDOW_TITLE);
@@ -607,7 +607,7 @@ final class EngineLifecycleController {
             engine.renderModeSwitchRevealStartNanos = 0L;
             engine.renderModeSwitchSampleBaseline = currentAccumulatedSamplesForMode(engine, mode);
 
-            // A tady hned resetuju progresivni historii, aby prepnuti modu startovalo z cisteho stavu.
+ // Here hned resetuju progresivni historii, aby prepnuti modu startovalo z cisteho stavu.
             if (engine.rayTracerRenderer != null) {
                 engine.rayTracerRenderer.setParameter("reset", true);
             }
@@ -615,7 +615,7 @@ final class EngineLifecycleController {
                 engine.pathTracerRenderer.setParameter("reset", true);
             }
 
-            // A tady hned po kliku zobrazuju cerny overlay s nazvem modu jeste pred rekonfiguraci rendereru.
+ // Here hned po kliku zobrazuju cerny overlay s nazvem modu jeste pred rekonfiguraci rendereru.
             if (engine.window != null) {
                 engine.window.presentRenderModeSwitchOverlayNow(engine.renderModeSwitchTargetLabel, 0.08);
             }
@@ -715,7 +715,7 @@ final class EngineLifecycleController {
         if (raw >= baseline) {
             return Math.max(0L, raw - baseline);
         }
-        // A tady pocitam s tim, ze reset rendereru muze shodit citac pod baseline a raw uz pak reprezentuje nove samples po prepnuti.
+ // Here počítá s tim, ze reset rendereru muze shodit citac pod baseline a raw uz pak reprezentuje nove samples po prepnuti.
         return raw;
     }
 

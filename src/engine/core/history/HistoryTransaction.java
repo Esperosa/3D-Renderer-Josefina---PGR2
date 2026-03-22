@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Tady držím rozpracovanou transakci historie, do které sbírám více příkazů.
+ * Represents rozpracovanou transakci historie, do které sbírám více příkazů.
  */
 public final class HistoryTransaction {
     private final String label;

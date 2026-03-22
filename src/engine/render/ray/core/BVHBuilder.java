@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Tady stavÃ­m BVH z trojÃºhelnÃ­kovÃ½ch dat a zÃ¡roveÅˆ v nÃ­ implementuju prÅ¯chod paprsku.
- * Pro rozhodovÃ¡nÃ­ o rozdÄ›lenÃ­ pouÅ¾Ã­vÃ¡m heuristiku podle povrchu obÃ¡lek.
+ * Builds BVH from triangle data and performs ray traversal/intersection queries.
+ * Node splitting uses a surface-area-based heuristic.
  */
 public class BVHBuilder implements AccelerationStructure {
 
@@ -229,7 +229,7 @@ public class BVHBuilder implements AccelerationStructure {
         return false;
     }
 
-    // Tady drÅ¾Ã­m internÃ­ pomocnÃ© metody.
+ // Internal helpers.
     private BVHNode buildRecursive(int start, int end, int depth) {
         if (start >= end) {
             return null;
@@ -436,4 +436,3 @@ public class BVHBuilder implements AccelerationStructure {
         this.maxLeafSize = Math.max(1, maxLeafSize);
     }
 }
-

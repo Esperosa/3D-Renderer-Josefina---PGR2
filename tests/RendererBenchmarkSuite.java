@@ -296,7 +296,7 @@ final class RendererBenchmarkSuite {
         try {
             renderer.setParameter("shutdown", true);
         } catch (RuntimeException ignored) {
-            // Some renderers do not use an explicit shutdown flag.
+ // Some renderers do not use an explicit shutdown flag.
         }
     }
 
@@ -1601,7 +1601,7 @@ final class RendererBenchmarkSuite {
                         }
                     }
                 } catch (IOException ignored) {
-                    // Fall back to os.arch when cpu info is unavailable.
+ // Fall back to os.arch when cpu info is unavailable.
                 }
             }
             return System.getProperty("os.arch", "unknown");

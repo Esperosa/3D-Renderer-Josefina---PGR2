@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Tady držím lehký JSON parser pro metadata bez externích knihoven.
+ * Represents lehký JSON parser pro metadata bez externích knihoven.
  */
 public final class SimpleJsonParser {
 

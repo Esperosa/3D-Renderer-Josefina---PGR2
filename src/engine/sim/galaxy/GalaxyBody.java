@@ -3,7 +3,7 @@ package engine.sim.galaxy;
 import engine.math.Vec3;
 
 /**
- * Tady držím experimentální datový scaffold pro budoucí reprezentaci galaxy tělesa.
+ * Represents experimentální datový scaffold pro budoucí reprezentaci galaxy tělesa.
  */
 public final class GalaxyBody {
 

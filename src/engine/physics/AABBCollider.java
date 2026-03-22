@@ -4,7 +4,7 @@ import engine.math.AABB;
 import engine.math.Vec3;
 
 /**
- * Tady držím axis-aligned box kolizní tvar.
+ * Represents axis-aligned box kolizní tvar.
  */
 public class AABBCollider extends Collider {
 

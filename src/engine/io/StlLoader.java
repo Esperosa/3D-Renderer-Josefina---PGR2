@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Tady načítám STL soubory v binární i textové ASCII podobě.
+ * Loads STL soubory v binární i textové ASCII podobě.
  */
 public class StlLoader {
 
@@ -80,7 +80,7 @@ public class StlLoader {
             float z2 = readF32LE(bytes, offset + 8);
             offset += 12;
 
-            offset += 2; // Tady přeskočím dvoubajtový atributový blok STL trojúhelníku.
+            offset += 2; // Skips dvoubajtový atributový blok STL trojúhelníku.
 
             Vec3 normal = new Vec3(nx, ny, nz);
             if (normal.lengthSquared() < 1e-14) {

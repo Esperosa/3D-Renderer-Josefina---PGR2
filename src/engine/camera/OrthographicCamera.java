@@ -4,7 +4,7 @@ import engine.math.Mat4;
 import engine.math.Vec3;
 
 /**
- * Tady držím ortografickou kameru s nastavitelným projekčním objemem.
+ * Represents ortografickou kameru s nastavitelným projekčním objemem.
  */
 public class OrthographicCamera extends Camera {
 
@@ -22,7 +22,7 @@ public class OrthographicCamera extends Camera {
         this.projDirty = true;
     }
 
-    // Tady řeším projekční matici.
+ // Handles projekční matici.
     @Override
     public Mat4 getProjectionMatrix() {
         if (projDirty) {
@@ -37,7 +37,7 @@ public class OrthographicCamera extends Camera {
         projDirty = false;
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public void setExtents(double left, double right, double bottom, double top) {
         this.left = left;
         this.rightExtent = right;

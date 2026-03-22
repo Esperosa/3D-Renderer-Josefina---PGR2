@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Tady držím deterministickou simulaci spray a splash částic běžící na procesoru pro entity vodního emitoru.
+ * Represents deterministickou simulaci spray a splash částic běžící na procesoru pro entity vodního emitoru.
  * Záměrně z ní nedělám objemový fluid solver. Modeluju v ní směrový kapalinový spray,
  * nárazy do podlahy a jednoduché proxy kolize se scénovou geometrií.
  */

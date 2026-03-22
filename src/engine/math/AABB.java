@@ -1,7 +1,7 @@
 package engine.math;
 
 /**
- * Tady držím axis-aligned bounding box určený minimem a maximem.
+ * Represents axis-aligned bounding box určený minimem a maximem.
  */
 public class AABB {
 
@@ -13,7 +13,7 @@ public class AABB {
         this.max = max;
     }
 
-    // Tady řeším základní dotazy nad boxem.
+ // Handles základní dotazy nad boxem.
     public Vec3 center() {
         return min.add(max).mul(0.5);
     }
@@ -38,7 +38,7 @@ public class AABB {
         return 2;
     }
 
-    // Tady řeším testy průniku a zásahu.
+ // Handles testy průniku a zásahu.
     public boolean contains(Vec3 point) {
         return point.x >= min.x && point.x <= max.x
                 && point.y >= min.y && point.y <= max.y
@@ -76,7 +76,7 @@ public class AABB {
         return Double.MAX_VALUE;
     }
 
-    // Tady skládám nové bounding boxy.
+ // Builds nové bounding boxy.
     public static AABB merge(AABB a, AABB b) {
         return new AABB(
                 Vec3.min(a.min, b.min),

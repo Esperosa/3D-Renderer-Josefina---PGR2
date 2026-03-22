@@ -5,13 +5,13 @@ import engine.math.BoundingSphere;
 import engine.math.Vec3;
 
 /**
- * Tady držím trojúhelníkovou mesh ve flat polích kvůli rychlému průchodu v inner loopu.
+ * Represents trojúhelníkovou mesh ve flat polích kvůli rychlému průchodu v inner loopu.
  */
 public class Mesh {
 
     private final String name;
 
-    // Tady držím hlavní vertex data v SOA rozložení kvůli výkonu.
+ // Represents hlavní vertex data v SOA rozložení kvůli výkonu.
     private final float[] positions;
     private float[] normals;
     private float[] uvs;
@@ -20,15 +20,15 @@ public class Mesh {
     private float[] tangents;
     private final int vertexCount;
 
-    // Tady držím indexová data.
+ // Represents indexová data.
     private final int[] indices;
     private final int triangleCount;
 
-    // Tady držím předpočítané bounding volumes.
+ // Represents předpočítané bounding volumes.
     private AABB aabb;
     private BoundingSphere bounds;
 
-    // Tady řeším konstrukci meshe.
+ // Handles konstrukci meshe.
     public Mesh(String name, float[] positions, float[] normals, int[] indices) {
         if (positions == null || positions.length % 3 != 0) {
             throw new IllegalArgumentException("positions must be non-null and x/y/z interleaved");
@@ -65,7 +65,7 @@ public class Mesh {
         this.tangents = tangents;
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Vec3 getPosition(int vertexIndex) {
         int base = vertexIndex * 3;
         return new Vec3(positions[base], positions[base + 1], positions[base + 2]);
@@ -131,7 +131,7 @@ public class Mesh {
         return indices;
     }
 
-    // Tady provádím odvozené výpočty nad meshem.
+ // provádím odvozené výpočty nad meshem.
     public final void computeNormals() {
         if (normals == null || normals.length != positions.length) {
             normals = new float[positions.length];

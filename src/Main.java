@@ -2,7 +2,7 @@ import engine.core.Engine;
 import engine.core.PackageSmokeVerifier;
 
 /**
- * Tady spouštím celý 3D render engine.
+ *tuto spouštím celý 3D render engine.
  */
 public class Main {
 

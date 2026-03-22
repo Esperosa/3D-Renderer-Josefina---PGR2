@@ -9,7 +9,7 @@ import engine.util.ScreenProjectionUtil;
 import java.util.Arrays;
 
 /**
- * Tady držím kompozitor v obrazovém prostoru pro spray a splash částice ze simulace vody.
+ * Represents kompozitor v obrazovém prostoru pro spray a splash částice ze simulace vody.
  * Skládám si v něm tloušťku a barevný nádech a pak výsledek vystíním jako poloprůhledný kapalinový overlay.
  */
 public final class WaterParticleRenderer {

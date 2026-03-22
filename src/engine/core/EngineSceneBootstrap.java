@@ -294,7 +294,7 @@ final class EngineSceneBootstrap {
                 }
             }
         } catch (RuntimeException ignored) {
-            // Tady spadnu do náhradní větve se scanem textur.
+ // spadnu do náhradní větve se scanem textur.
         }
 
         for (Path mtlPath : mtlCandidates) {
@@ -314,11 +314,11 @@ final class EngineSceneBootstrap {
                     }
                 }
             } catch (RuntimeException ignored) {
-                // Tady přeskočím rozbitý MTL soubor a pokračuju dál.
+ // Skips rozbitý MTL soubor a pokračuju dál.
             }
         }
 
-        // Tady jako náhradní větev projdu OBJ složku a zkusím v ní najít běžné názvy obrázků.
+ // jako náhradní větev projdu OBJ složku a zkusím v ní najít běžné názvy obrázků.
         String[] preferred = {"albedo", "diffuse", "basecolor", "color", "skin", "tex"};
         File[] files = dir.toFile().listFiles();
         if (files == null) {

@@ -6,7 +6,7 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Tady držím jednoduchou neměnnou 2D texturu v ARGB8 formátu.
+ * Represents jednoduchou neměnnou 2D texturu v ARGB8 formátu.
  */
 public class Texture {
 

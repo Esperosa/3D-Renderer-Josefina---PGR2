@@ -6,7 +6,7 @@ import engine.math.Vec3;
 import java.util.Objects;
 
 /**
- * Tady držím jeden vertex se všemi běžnými atributy pro stavbu meshe.
+ * Represents jeden vertex se všemi běžnými atributy pro stavbu meshe.
  */
 public class Vertex {
 
@@ -45,7 +45,7 @@ public class Vertex {
         this.faceId = faceId;
     }
 
-    // Tady řeším interpolaci vertexů.
+ // Handles interpolaci vertexů.
     public static Vertex lerp(Vertex a, Vertex b, double t) {
         if (a == null && b == null) {
             return null;

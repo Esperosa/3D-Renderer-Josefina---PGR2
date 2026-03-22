@@ -16,7 +16,7 @@ import java.awt.Font;
 import java.io.File;
 
 /**
- * Tady stavím workflow panel pro finální výstup.
+ * stavím workflow panel pro finální výstup.
  */
 final class EngineOutputTabBuilder {
 

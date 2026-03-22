@@ -4,7 +4,7 @@ import engine.math.MathUtil;
 import engine.math.Vec3;
 
 /**
- * Tady vyhodnocuju povrchové větve shaderu materiálového grafu.
+ * vyhodnocuju povrchové větve shaderu materiálového grafu.
  */
 final class MaterialGraphSurfaceEvaluator {
 

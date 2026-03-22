@@ -11,7 +11,7 @@ import engine.scene.Scene;
 import java.util.List;
 
 /**
- * Tady držím render context s konstantami sdílenými v rámci jednoho snímku.
+ * Represents render context s konstantami sdílenými v rámci jednoho snímku.
  */
 public class RenderContext {
 

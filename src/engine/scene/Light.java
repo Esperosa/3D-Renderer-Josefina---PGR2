@@ -3,7 +3,7 @@ package engine.scene;
 import engine.math.Vec3;
 
 /**
- * Tady definuju základní třídu pro světelné zdroje.
+ * Defines základní třídu pro světelné zdroje.
  */
 public abstract class Light {
 
@@ -17,7 +17,7 @@ public abstract class Light {
         this.enabled = true;
     }
 
-    // Tady držím přístupové metody.
+ // Represents přístupové metody.
     public Vec3 getColor() {
         return color;
     }
@@ -42,19 +42,19 @@ public abstract class Light {
         this.enabled = e;
     }
 
-    /**
-     * Tady spočítám směr ke světlu ze zadaného bodu na povrchu.
-     *
-     * @param surfacePoint sem předám bod na povrchu ve světovém prostoru
-     * @return vrátím jednotkový směr ke světlu
-     */
+ /**
+ * spočítá směr ke světlu ze zadaného bodu na povrchu.
+ *
+ * @param surfacePoint bod na povrchu ve světovém prostoru
+ * @return vrátí jednotkový směr ke světlu
+ */
     public abstract Vec3 directionFrom(Vec3 surfacePoint);
 
-    /**
-     * Tady spočítám útlum pro zadanou vzdálenost.
-     *
-     * @param distance sem předám vzdálenost od povrchu ke světlu
-     * @return vrátím faktor útlumu v rozsahu 0 až 1
-     */
+ /**
+ * spočítá útlum pro zadanou vzdálenost.
+ *
+ * @param distance vzdálenost od povrchu ke světlu
+ * @return vrátí faktor útlumu v rozsahu 0 až 1
+ */
     public abstract double attenuation(double distance);
 }

@@ -8,7 +8,7 @@ import engine.math.Vec3;
 import engine.scene.Entity;
 
 /**
- * Tady držím scénovou entitu, která zároveň slouží jako viditelný značkovač spray emitoru.
+ * Represents scénovou entitu, která zároveň slouží jako viditelný značkovač spray emitoru.
  * Lokální záporná osa Y mi určuje výchozí směr spray proudu.
  */
 public final class WaterEmitterEntity extends Entity {

@@ -9,7 +9,7 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
 /**
- * Tady držím variantu FlowLayoutu, která správně vrací výšku po zalomení řádků.
+ * Represents variantu FlowLayoutu, která správně vrací výšku po zalomení řádků.
  */
 public class WrapLayout extends FlowLayout {
 

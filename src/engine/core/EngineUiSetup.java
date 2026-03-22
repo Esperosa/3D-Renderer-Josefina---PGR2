@@ -5,7 +5,7 @@ import engine.ui.UiStrings;
 import javax.swing.JPanel;
 
 /**
- * Tady držím sdílenou přípravu editorových UI panelů a menu.
+ * Represents sdílenou přípravu editorových UI panelů a menu.
  */
 final class EngineUiSetup {
 

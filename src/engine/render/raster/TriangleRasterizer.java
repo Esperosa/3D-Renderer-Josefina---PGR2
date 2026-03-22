@@ -4,7 +4,7 @@ import engine.render.FrameBuffer;
 import engine.util.RuntimeInstrumentation;
 
 /**
- * Tady převádím trojúhelníky na pixely přes barycentrickou rasterizaci.
+ * Converts trojúhelníky na pixely přes barycentrickou rasterizaci.
  * Řeším si v ní depth test, interpolaci atributů i finální výstup fragmentu.
  */
 public class TriangleRasterizer {
@@ -16,18 +16,18 @@ public class TriangleRasterizer {
     private final float[] worldTangent = new float[3];
     private final float[] interpolated = new float[20];
 
-    /**
-     * Tady vyrastruju jeden trojúhelník v obraze s perspektivně správnou interpolací všech vertex atributů.
-     *
-     * @param fb sem předám cílový framebuffer
-     * @param sx sem předám obrazové souřadnice x pro 3 vrcholy
-     * @param sy sem předám obrazové souřadnice y pro 3 vrcholy
-     * @param sz sem předám obrazovou hloubku pro 3 vrcholy kvůli Z-bufferu
-     * @param sw sem předám hodnotu 1/clip-w pro 3 vrcholy kvůli perspektivně správné korekci
-     * @param attrs sem předám prokládané atributy po vrcholech, třeba normály, UV, barvy a world pozice
-     *              Každé float[] má 3 položky, tedy jednu pro každý vrchol a komponentu atributu.
-     * @param shader sem předám zpětné volání, kterým si spočítám finální barvu pixelu z interpolovaných atributů
-     */
+ /**
+ * vyrastruje jeden trojúhelník v obraze s perspektivně správnou interpolací všech vertex atributů.
+ *
+ * @param fb cílový framebuffer
+ * @param sx obrazové souřadnice x pro 3 vrcholy
+ * @param sy obrazové souřadnice y pro 3 vrcholy
+ * @param sz obrazovou hloubku pro 3 vrcholy kvůli Z-bufferu
+ * @param sw hodnotu 1/clip-w pro 3 vrcholy kvůli perspektivně správné korekci
+ * @param attrs prokládané atributy po vrcholech, třeba normály, UV, barvy a world pozice
+ * Každé float[] má 3 položky, tedy jednu pro každý vrchol a komponentu atributu.
+ * @param shader zpětné volání, kterým si spočítá finální barvu pixelu z interpolovaných atributů
+ */
     public void rasterize(FrameBuffer fb,
                           float[] sx, float[] sy, float[] sz, float[] sw,
                           float[][] attrs, FragmentShader shader) {
