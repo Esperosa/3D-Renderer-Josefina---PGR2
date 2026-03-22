@@ -1,26 +1,26 @@
-﻿# RenderovÃ¡nÃ­
+# Renderovani
 
-Tento dokument je aktuÃ¡lnÃ­ technickÃ½ popis rendererÅ¯ podle souÄasnÃ© implementace v kÃ³du.
+Tento dokument je aktualni technicky popis rendereru podle soucasne implementace v kodu.
 
-## AktuÃ¡lnÃ­ pÅ™ehled render reÅ¾imÅ¯
+## Aktualni prehled render rezimu
 
-ReÅ¾imy odpovÃ­dajÃ­ enumu `RenderMode`:
+Rezimy odpovidaji enumu RenderMode:
 
-| ReÅ¾im | TÅ™Ã­da/pipeline | Typ pouÅ¾itÃ­ |
+| Rezim | Trida/pipeline | Typ pouziti |
 | --- | --- | --- |
-| `MODEL` | `RasterRenderer` (`modelPreviewMode`) | extrÃ©mnÄ› lehkÃ½ navigaÄnÃ­ nÃ¡hled |
-| `BASIC` | `RasterRenderer` (`unlit/flat` profil) | rychlÃ½ technickÃ½ nÃ¡hled bez plnÃ© svÄ›telnÃ© odezvy |
-| `PHONG` | `RasterRenderer` + `PhongShader` | hlavnÃ­ realtime viewport reÅ¾im |
-| `WIREFRAME` | `WireframeRenderer` | topologie, siluety, skrytÃ© hrany |
-| `DITHERING` | `DitherRenderer` (BLUE_NOISE/PATTERN/ASCII) | stylizovanÃ½ post proces |
-| `TEMPORAL_NOISE` | `TemporalNoiseRenderer` | regionÃ¡lnÄ› Å™Ã­zenÃ½ ÄasovÃ½ Å¡um |
-| `HEX_MOSAIC` | `HexMosaicRenderer` | bunÄ›ÄnÃ¡ stylizace do hex mÅ™Ã­Å¾ky |
-| `RAY_TRACING` | `RayTracerRenderer` | kvalitnÄ›jÅ¡Ã­ offline carrier tracing |
-| `PATH_TRACING` | `PathTracerRenderer` | referenÄnÃ­ Monte Carlo vÃ½stup |
+| MODEL | RasterRenderer (modelPreviewMode) | extremne lehky navigacni nahled |
+| BASIC | RasterRenderer (unlit/flat profil) | rychly technicky nahled bez plne svetelne odezvy |
+| PHONG | RasterRenderer + PhongShader | hlavni realtime viewport rezim |
+| WIREFRAME | WireframeRenderer | topologie, siluety, skryte hrany |
+| DITHERING | DitherRenderer (BLUE_NOISE/PATTERN/ASCII) | stylizovany post proces |
+| TEMPORAL_NOISE | TemporalNoiseRenderer | regionalne rizeny casovy sum |
+| HEX_MOSAIC | HexMosaicRenderer | bunecna stylizace do hex mrizky |
+| RAY_TRACING | RayTracerRenderer | kvalitnejsi offline carrier tracing |
+| PATH_TRACING | PathTracerRenderer | referencni Monte Carlo vystup |
 
-## MatematickÃ½ zÃ¡klad spoleÄnÃ½ rendererÅ¯m
+## Matematicky zaklad spolecny rendererum
 
-### ProstorovÃ© transformace
+### Prostorove transformace
 
 $$
 \mathbf{p}_{world} = M\,\begin{bmatrix}x\\y\\z\\1\end{bmatrix},\qquad
@@ -36,7 +36,7 @@ x_{screen}=\left(\frac{x_{ndc}}{2}+\frac{1}{2}\right)(W-1),\quad
 y_{screen}=\left(1-\left(\frac{y_{ndc}}{2}+\frac{1}{2}\right)\right)(H-1)
 $$
 
-NormÃ¡la se pÅ™evÃ¡dÃ­ pÅ™es inverse-transpose ÄÃ¡st modelovÃ© matice.
+Normala se prevadi pres inverse-transpose cast modelove matice.
 
 ### Paprsek (ray/path)
 
@@ -44,19 +44,19 @@ $$
 \mathbf{r}(t)=\mathbf{o}+t\mathbf{d}
 $$
 
-## Raster vÄ›tev (`MODEL`, `BASIC`, `PHONG`)
+## Raster vetev (MODEL, BASIC, PHONG)
 
-### VÃ½poÄetnÃ­ logika
+### Vypocetni logika
 
 1. Frustum culling entity.
-2. PÅ™evod vrcholÅ¯ do clip/NDC/screen prostoru.
-3. Rasterizace trojÃºhelnÃ­kÅ¯ po dlaÅ¾dicÃ­ch.
+2. Prevod vrcholu do clip/NDC/screen prostoru.
+3. Rasterizace trojuhelniku po dlazdicich.
 4. Z-buffer test.
-5. Fragment shading podle aktivnÃ­ho profilu.
+5. Fragment shading podle aktivniho profilu.
 
-### SvÄ›telnÃ½ model `PHONG`
+### Svetelny model PHONG
 
-V `PhongShader` se pouÅ¾Ã­vÃ¡ ambient + Lambert + Blinn-Phong:
+V PhongShader se pouziva ambient + Lambert + Blinn-Phong:
 
 $$
 L = L_{ambient} + \sum_{lights}\left(L_d + L_s\right)
@@ -71,25 +71,23 @@ $$
 L_s \propto \max(0,\mathbf{n}\cdot\mathbf{h})^{shininess}
 $$
 
-Pro bodovÃ¡ svÄ›tla se navÃ­c nÃ¡sobÃ­ vzdÃ¡lenostnÃ­ a ÃºhlovÃ© zeslabenÃ­ (`attenuation`, `angularAttenuation`).
+Pro bodova svetla se navic nasobi vzdalenostni a uhlove zeslabeni.
 
-### ProÄ je takto navrÅ¾enÃ½
+### Proc je takto navrzeny
 
-- Je stabilnÃ­ a rychlÃ½ pro editor.
-- PouÅ¾Ã­vÃ¡ sdÃ­lenou evaluaci materiÃ¡lu, takÅ¾e pÅ™echod na ray/path drÅ¾Ã­ stejnÃ½ autorskÃ½ zdroj.
-- Je explicitnÄ› preview renderer, ne fyzikÃ¡lnÄ› referenÄnÃ­ integrÃ¡tor.
+- Je stabilni a rychly pro editor.
+- Pouziva sdilenou evaluaci materialu, takze prechod na ray/path drzi stejny autorsky zdroj.
+- Je to preview renderer, ne fyzikalne referencni integrator.
 
-## `WIREFRAME` renderer
+## WIREFRAME renderer
 
-### VÃ½poÄetnÃ­ logika
+### Vypocetni logika
 
-- Hrany se kreslÃ­ z trojÃºhelnÃ­kÅ¯ po projekci do screen prostoru.
-- VolitelnÄ› bÄ›Å¾Ã­ depth test (`depthHiddenLines`).
-- Jas hrany se moduluje vzdÃ¡lenostÃ­ a siluetou.
+- Hrany se kresli z trojuhelniku po projekci do screen prostoru.
+- Volitelne bezi depth test (depthHiddenLines).
+- Jas hrany se moduluje vzdalenosti a siluetou.
 
 ### Matematika
-
-V implementaci endpoint barvy:
 
 $$
 t = clamp01\left(inverseLerp(d_{near}, d_{far}, d)\right)
@@ -108,19 +106,19 @@ $$
 \mathbf{c}_{edge}=\mathbf{base}\cdot brightness\cdot emphasis
 $$
 
-### ProÄ je takto navrÅ¾enÃ½
+### Proc je takto navrzeny
 
-- ÄŒitelnÃ¡ topologie bez potÅ™eby plnÃ©ho shadingu.
-- Silueta zvÃ½raznÃ­ tvar i na hustÃ½ch modelech.
-- PÅ™eruÅ¡ovanÃ© hrany usnadnÃ­ technickÃ© debug pohledy.
+- Citelna topologie bez potreby plneho shadingu.
+- Silueta zvyrazni tvar i na hustych modelech.
+- Prerusovane hrany usnadni technicke debug pohledy.
 
-## `DITHERING` renderer (BLUE_NOISE / PATTERN / ASCII)
+## DITHERING renderer (BLUE_NOISE / PATTERN / ASCII)
 
-### VÃ½poÄetnÃ­ logika
+### Vypocetni logika
 
-1. ZÃ¡kladnÃ­ obraz pÅ™ipravÃ­ internÃ­ `RasterRenderer`.
-2. PÅ™ipravÃ­ se luminance a adaptivnÃ­ kontrast.
-3. Podle stylu se provede kvantizace pÅ™es threshold mapu nebo ASCII matching.
+1. Zakladni obraz pripravi interni RasterRenderer.
+2. Pripravi se luminance a adaptivni kontrast.
+3. Podle stylu se provede kvantizace pres threshold mapu nebo ASCII matching.
 
 ### Matematika
 
@@ -130,7 +128,7 @@ $$
 Y = 0.2126R + 0.7152G + 0.0722B
 $$
 
-Kvantizace do `N` tÃ³nÅ¯ (obecnÃ½ tvar):
+Kvantizace do N tonu:
 
 $$
 q = \frac{round\left(clamp(Y+\tau,0,1)(N-1)\right)}{N-1}
@@ -138,28 +136,28 @@ $$
 
 kde $\tau$ je threshold z blue-noise nebo Bayer mapy.
 
-ASCII reÅ¾im vybÃ­rÃ¡ glyph s minimÃ¡lnÃ­ chybou mezi blokem a bitmapou znaku:
+ASCII rezim vybira glyph s minimalni chybou mezi blokem a bitmapou znaku:
 
 $$
 g^* = \arg\min_g \|B - G_g\|_2^2
 $$
 
-### ProÄ je takto navrÅ¾enÃ½
+### Proc je takto navrzeny
 
-- Blue-noise/pattern dÃ¡vajÃ­ rychlou stylizaci bez tÄ›Å¾kÃ© geometrie.
-- ASCII porovnÃ¡vÃ¡ skuteÄnÃ½ blok proti glyph bitmapÃ¡m, takÅ¾e vÃ½stup nenÃ­ jen prahovÃ¡nÃ­ textu.
-- SdÃ­lenÃ½ kontrastnÃ­ pipeline drÅ¾Ã­ konzistentnÃ­ vzhled napÅ™Ã­Ä styly.
+- Blue-noise/pattern davaji rychlou stylizaci bez tezke geometrie.
+- ASCII porovnava skutecny blok proti glyph bitmapam.
+- Sdileny kontrastni pipeline drzi konzistentni vzhled napric styly.
 
-## `TEMPORAL_NOISE` renderer
+## TEMPORAL_NOISE renderer
 
-### VÃ½poÄetnÃ­ logika
+### Vypocetni logika
 
-1. Z G-bufferu (`objectId`, `faceId`, `depth`, `normal`, `worldPos`) se vytvoÅ™Ã­ regionÃ¡lnÃ­ motion parametry.
-2. Pro region se spoÄÃ­tÃ¡ osovÃ½ smÄ›r, rychlost a fÃ¡ze.
-3. FinÃ¡lnÃ­ obraz pouÅ¾Ã­vÃ¡ integer posuv stabilnÃ­ho 2D zrna po bunÄ›ÄnÃ© mÅ™Ã­Å¾ce.
-4. Hrany se blendujÃ­ pÅ™es `edgeMask`, ne pÅ™es globÃ¡lnÃ­ blur.
+1. Z G-bufferu (objectId, faceId, depth, normal, worldPos) se vytvori regionalni motion parametry.
+2. Pro region se spocita osovy smer, rychlost a faze.
+3. Finalni obraz pouziva integer posuv stabilniho 2D zrna po bunecne mrizce.
+4. Hrany se blenduji pres edgeMask, ne pres globalni blur.
 
-### Matematika (podle implementaÄnÃ­ch vztahÅ¯)
+### Matematika
 
 $$
 grazing = 1 - facing
@@ -183,34 +181,34 @@ $$
 signal = 0.72\,a + 0.28\,b
 $$
 
-Signal se kvantizuje do palety (`paletteLevels`) a mapuje na grayscale interval.
+Signal se kvantizuje do palety paletteLevels a mapuje na grayscale interval.
 
-### ProÄ je takto navrÅ¾enÃ½
+### Proc je takto navrzeny
 
-- Je levnÄ›jÅ¡Ã­ neÅ¾ ray/path, protoÅ¾e re-useuje hotovÃ½ raster G-buffer.
-- Integer posuv drÅ¾Ã­ zrno stabilnÃ­ bez subpixel deformacÃ­.
-- RegionÃ¡lnÃ­ parametry zmenÅ¡ujÃ­ shimmering a rozpady na hranÃ¡ch.
+- Je levnejsi nez ray/path, protoze re-useuje hotovy raster G-buffer.
+- Integer posuv drzi zrno stabilni bez subpixel deformaci.
+- Regionalni parametry zmensuji shimmering a rozpady na hranach.
 
-## `HEX_MOSAIC` renderer
+## HEX_MOSAIC renderer
 
-### VÃ½poÄetnÃ­ logika
+### Vypocetni logika
 
 1. Vezme raster base frame.
-2. RozdÄ›lÃ­ pixely do hex bunÄ›k (axial koordinÃ¡ty).
-3. V kaÅ¾dÃ© buÅˆce akumuluje barvu + hloubku.
-4. Kvantizuje luminanci, vrÃ¡tÃ­ barvu se stejnou energiÃ­.
-5. PÅ™idÃ¡ outline/edge styl a volitelnÃ½ wow mÃ³d (`classic`, `prism`, `neon`).
+2. Rozdeli pixely do hex bunek (axial koordinaty).
+3. V kazde bunce akumuluje barvu + hloubku.
+4. Kvantizuje luminanci, vrati barvu se stejnou energii.
+5. Prida outline/edge styl a volitelny wow mod (classic, prism, neon).
 
 ### Matematika
 
-PÅ™evod pixelu do axial souÅ™adnic:
+Prevod pixelu do axial souradnic:
 
 $$
 q = \frac{\frac{\sqrt{3}}{3}x - \frac{1}{3}y}{r},\qquad
 r_a = \frac{\frac{2}{3}y}{r}
 $$
 
-Luminance buÅˆky:
+Luminance bunky:
 
 $$
 Y = 0.2126R + 0.7152G + 0.0722B
@@ -222,33 +220,33 @@ $$
 Y_q = \frac{round(clamp(Y,0,1)(L-1))}{L-1}
 $$
 
-ZachovÃ¡nÃ­ pomÄ›ru barev pÅ™es gain:
+Zachovani pomeru barev pres gain:
 
 $$
 gain = \frac{Y_q}{Y + \varepsilon},\qquad
 \mathbf{c}_{out}=clamp(\mathbf{c}_{avg}\cdot gain)
 $$
 
-Hex edge sÃ­la mÃ¡ v kÃ³du explicitnÃ­ nÃ¡bÄ›h od `edgeStart = 0.86`.
+Hex edge sila ma v kodu explicitni nabeh od edgeStart = 0.86.
 
-### ProÄ je takto navrÅ¾enÃ½
+### Proc je takto navrzeny
 
-- BunÄ›ÄnÃ¡ akumulace dÃ¡vÃ¡ ÄitelnÃ½ styl i pÅ™i pohybu kamery.
-- Kvantizace pÅ™es luminanci drÅ¾Ã­ konzistentnÃ­ kontrast.
-- Depth-aware hrany zvÃ½raznÃ­ strukturu bez nutnosti sloÅ¾itÃ½ch segmentaÄnÃ­ch passÅ¯.
+- Bunecna akumulace dava citelny styl i pri pohybu kamery.
+- Kvantizace pres luminanci drzi konzistentni kontrast.
+- Depth-aware hrany zvyrazni strukturu bez slozitych segmentacnich passu.
 
-## `RAY_TRACING` renderer
+## RAY_TRACING renderer
 
-### VÃ½poÄetnÃ­ logika
+### Vypocetni logika
 
-- BVH akcelerace prÅ¯seÄÃ­kÅ¯.
-- PÅ™Ã­mÃ© svÄ›tlo pÅ™es directional/point/area/emissive/environment vÄ›tve.
-- SekundÃ¡rnÃ­ paprsek pokraÄuje dominantnÃ­ vÄ›tvÃ­ (odraz/pÅ™enos) do `maxDepth`.
-- DÅ¯raz na stabilnÃ­ offline preview s menÅ¡Ã­ stochastickou variabilitou.
+- BVH akcelerace pruseciku.
+- Prime svetlo pres directional/point/area/emissive/environment vetve.
+- Sekundarni paprsek pokracuje dominantni vetvi (odraz/prenos) do maxDepth.
+- Duraz na stabilni offline preview s mensi stochastickou variabilitou.
 
 ### Matematika
 
-LokÃ¡lnÃ­ BRDF ÄÃ¡st pouÅ¾Ã­vÃ¡ Lambert + GGX + Fresnel/clearcoat/sheen:
+Lokalni BRDF cast pouziva Lambert + GGX + Fresnel/clearcoat/sheen:
 
 $$
 L_o = L_d + L_{ggx}\cdot F + L_{clearcoat}\cdot F_c + L_{sheen}
@@ -260,32 +258,32 @@ $$
 F(\cos\theta)=F_0 + (1-F_0)(1-\cos\theta)^5
 $$
 
-Akumulace sekundÃ¡rnÃ­ vÄ›tve:
+Akumulace sekundarni vetve:
 
 $$
 L \leftarrow L + T\odot L_{local},\qquad
 T \leftarrow T\odot w_{secondary}
 $$
 
-### ProÄ je takto navrÅ¾enÃ½
+### Proc je takto navrzeny
 
-- Oproti path traceru je mÃ©nÄ› nÃ¡hodnÃ½ a rychlejÅ¡Ã­ v interaktivnÃ­m preview.
-- UdrÅ¾uje kvalitnÃ­ interpretaci reflektivnÃ­ch/transmisivnÃ­ch materiÃ¡lÅ¯.
-- Carrier profil dovoluje Å¡kÃ¡lovat kvalitu pÅ™i pohybu bez ÃºplnÃ©ho vypnutÃ­ klÃ­ÄovÃ½ch jevÅ¯.
+- Oproti path traceru je mene nahodny a rychlejsi v interaktivnim preview.
+- Drzi kvalitni interpretaci reflektivnich/transmisivnich materialu.
+- Carrier profil umozni skalovat kvalitu pri pohybu bez vypnuti klicovych jevu.
 
-## `PATH_TRACING` renderer
+## PATH_TRACING renderer
 
-### VÃ½poÄetnÃ­ logika
+### Vypocetni logika
 
-1. Monte Carlo integrace po bounce krocÃ­ch do `maxBounces`.
-2. VÄ›tvenÃ­ mezi transmission/specular/diffuse/clearcoat podle pravdÄ›podobnostÃ­.
-3. Throughput se kompenzuje pÅ™es branch ratio.
-4. PÅ™Ã­mÃ© svÄ›tlo + environment/emissive sampling.
-5. Russian roulette od vyÅ¡Å¡Ã­ch bounce ÃºrovnÃ­.
+1. Monte Carlo integrace po bounce krocich do maxBounces.
+2. Vetveni mezi transmission/specular/diffuse/clearcoat podle pravdepodobnosti.
+3. Throughput se kompenzuje pres branch ratio.
+4. Prime svetlo + environment/emissive sampling.
+5. Russian roulette od vyssich bounce urovni.
 
 ### Matematika
 
-PravdÄ›podobnosti vÄ›tvÃ­ (konceptuÃ¡lnÄ›):
+Pravdepodobnosti vetvi (konceptualne):
 
 $$
 p_t = transmissionProbability,\quad
@@ -299,13 +297,13 @@ $$
 \mathbf{T}_{k+1}=\mathbf{T}_k \odot \frac{\mathbf{w}_{branch}}{p_{branch}}
 $$
 
-PÅ™Ã­mÃ½ pÅ™Ã­spÄ›vek:
+Primy prispevek:
 
 $$
 \mathbf{L} \leftarrow \mathbf{L} + \mathbf{T}\odot \mathbf{L}_{direct}
 $$
 
-Russian roulette (v implementaci od `bounce >= 2`):
+Russian roulette (v implementaci od bounce >= 2):
 
 $$
 rr = clamp(\max(T_r,T_g,T_b),\ 0.05,\ 0.98)
@@ -316,27 +314,25 @@ $$
 \mathbf{T} \leftarrow \frac{\mathbf{T}}{rr}
 $$
 
-### ProÄ je takto navrÅ¾enÃ½
+### Proc je takto navrzeny
 
-- Je to referenÄnÃ­ mÃ³d pro vÄ›rnÄ›jÅ¡Ã­ svÄ›telnou odezvu.
-- Branch-PDF kompenzace drÅ¾Ã­ estimator blÃ­Å¾ fyzikÃ¡lnÄ› sprÃ¡vnÃ© integraci.
-- Russian roulette zkracuje dlouhÃ© drÃ¡hy bez systematickÃ©ho biasu.
+- Je to referencni mod pro vernejsi svetelnou odezvu.
+- Branch-PDF kompenzace drzi estimator bliz fyzikalne spravne integraci.
+- Russian roulette zkracuje dlouhe drahy bez systematickeho biasu.
 
-## PÅ™esnost vs. vÃ½kon: praktickÃ© rozhodnutÃ­
+## Presnost vs. vykon: prakticke rozhodnuti
 
-| ReÅ¾im | FyzikÃ¡lnÃ­ vÄ›rnost | ÄŒasovÃ¡ cena | TypickÃ½ ÃºÄel |
+| Rezim | Fyzikalni vernost | Casova cena | Typicky ucel |
 | --- | --- | --- | --- |
-| `MODEL`, `BASIC` | nÃ­zkÃ¡ | velmi nÃ­zkÃ¡ | navigace, blokovÃ¡nÃ­ scÃ©ny |
-| `PHONG` | stÅ™ednÃ­ | nÃ­zkÃ¡ | bÄ›Å¾nÃ¡ prÃ¡ce ve viewportu |
-| `WIREFRAME` | nerelevantnÃ­ (diagnostickÃ½) | nÃ­zkÃ¡ | topologie a silueta |
-| `DITHERING`, `TEMPORAL_NOISE`, `HEX_MOSAIC` | stylizovanÃ¡, ne-fyzikÃ¡lnÃ­ | stÅ™ednÃ­ | vÃ½tvarnÃ½ look |
-| `RAY_TRACING` | vyÅ¡Å¡Ã­ | vysokÃ¡ | kvalitnÃ­ offline preview |
-| `PATH_TRACING` | nejvyÅ¡Å¡Ã­ v projektu | nejvyÅ¡Å¡Ã­ | finÃ¡lnÃ­ referenÄnÃ­ vÃ½stup |
+| MODEL, BASIC | nizka | velmi nizka | navigace, blokovani sceny |
+| PHONG | stredni | nizka | bezna prace ve viewportu |
+| WIREFRAME | nerelevantni (diagnosticky) | nizka | topologie a silueta |
+| DITHERING, TEMPORAL_NOISE, HEX_MOSAIC | stylizovana, ne-fyzikalni | stredni | vytvarny look |
+| RAY_TRACING | vyssi | vysoka | kvalitni offline preview |
+| PATH_TRACING | nejvyssi v projektu | nejvyssi | finalni referencni vystup |
 
-## ShrnutÃ­
+## Shrnuti
 
-- â€žPÅ™ehled renderÅ¯â€œ je zde aktualizovanÃ½ na vÅ¡echny souÄasnÃ© reÅ¾imy.
-- Dokument obsahuje samostatnou matematickou sekci a vzorce pro kaÅ¾dÃ½ renderer.
-- U kaÅ¾dÃ©ho rendereru je explicitnÄ› popsanÃ¡ logika i dÅ¯vod nÃ¡vrhu (proÄ je implementovanÃ½ prÃ¡vÄ› takto).
-
-
+- Prehled rendereru je aktualizovany na vsechny soucasne rezimy.
+- Dokument obsahuje samostatnou matematickou sekci a vzorce pro kazdy renderer.
+- U kazdeho rendereru je explicitne popsana logika i duvod navrhu.
