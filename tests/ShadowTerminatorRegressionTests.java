@@ -28,13 +28,13 @@ public final class ShadowTerminatorRegressionTests {
         assertPathKeepsLighting(scene, camera);
         assertShadowOriginPushesPastPlane(
                 "engine.render.ray.RayTracerRenderer",
-                "engine.render.ray.RayTracerRenderer$Hit",
-                "engine.render.ray.RayTracerRenderer$SurfaceState",
-                "engine.render.ray.RayTracerRenderer$TraceContext");
+            "engine.render.ray.RayHit",
+            "engine.render.ray.RaySurfaceState",
+            "engine.render.ray.RayTraceContext");
         assertShadowOriginPushesPastPlane(
                 "engine.render.ray.PathTracerRenderer",
-                "engine.render.ray.PathTracerRenderer$Hit",
-                "engine.render.ray.PathTracerRenderer$SurfaceState",
+            "engine.render.ray.Hit",
+            "engine.render.ray.SurfaceState",
                 "engine.render.ray.PathTracerRenderer$TraceContext");
 
         System.out.println("ShadowTerminatorRegressionTests: ALL TESTS PASSED");

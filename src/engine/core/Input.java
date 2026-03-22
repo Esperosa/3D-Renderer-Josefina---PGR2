@@ -210,6 +210,13 @@ public class Input {
         this.mouseDY = dy;
     }
 
+    public void setKeyDownStateForTesting(int keyCode, boolean down) {
+        if (keyCode < 0 || keyCode >= KEY_COUNT) {
+            return;
+        }
+        keyDown[keyCode] = down;
+    }
+
     private void clearState() {
         for (int i = 0; i < KEY_COUNT; i++) {
             keyDown[i] = false;

@@ -48,7 +48,7 @@ final class EngineScenePanels {
         UiTheme.styleScrollPane(outlinerScroll, UiTheme.PANEL_INSET);
         outlinerSection.add(outlinerScroll);
         outlinerSection.add(Box.createRigidArea(new Dimension(0, 6)));
-        outlinerSection.add(UiBuilder.helperText("Rychlé přidání a výběr hlavních položek scény."));
+        outlinerSection.add(UiBuilder.helperText(UiStrings.Scene.QUICK_ADD_HINT));
 
         JPanel outlinerQuickAdd = createButtonGrid();
         for (String type : EngineSceneActions.basicPrimitiveTypes()) {
@@ -73,7 +73,7 @@ final class EngineScenePanels {
         addSection.add(engine.sectionTitle(UiStrings.Scene.BASIC_OBJECTS));
         JPanel basicGrid = createButtonGrid();
         for (String type : EngineSceneActions.basicPrimitiveTypes()) {
-            basicGrid.add(engine.actionButton("Přidat " + EngineSceneActions.primitiveLabel(type),
+            basicGrid.add(engine.actionButton(UiStrings.ContextMenu.ADD_PREFIX + EngineSceneActions.primitiveLabel(type),
                     () -> engine.addPrimitive(type)));
         }
         addSection.add(basicGrid);
@@ -81,44 +81,44 @@ final class EngineScenePanels {
         addSection.add(engine.sectionTitle(UiStrings.Scene.FEATURED_OBJECTS));
         JPanel featuredGrid = createButtonGrid();
         for (String type : EngineSceneActions.featuredPrimitiveTypes()) {
-            featuredGrid.add(engine.actionButton("Přidat " + EngineSceneActions.primitiveLabel(type),
+            featuredGrid.add(engine.actionButton(UiStrings.ContextMenu.ADD_PREFIX + EngineSceneActions.primitiveLabel(type),
                     () -> engine.addPrimitive(type)));
         }
         addSection.add(featuredGrid);
         addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_2)));
-        addSection.add(engine.actionButton("Importovat model / scénu...", engine::importModelOrSceneFromDialog));
+        addSection.add(engine.actionButton(UiStrings.ContextMenu.IMPORT_MODEL_SCENE, engine::importModelOrSceneFromDialog));
         addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
         addSection.add(engine.sectionTitle(UiStrings.Scene.LIGHTS));
-        addSection.add(engine.actionButton("Přidat bodové světlo", engine::addPointLight));
+        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_POINT_LIGHT, engine::addPointLight));
         addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton("Přidat plošné světlo", engine::addAreaLight));
+        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_AREA_LIGHT, engine::addAreaLight));
         addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton("Přidat kuželové světlo", engine::addConeLight));
+        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_CONE_LIGHT, engine::addConeLight));
         addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
         addSection.add(engine.sectionTitle(UiStrings.Scene.FORCE_FIELDS));
-        addSection.add(engine.actionButton("Přidat vektorovou sílu", engine::addVectorForceField));
+        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_VECTOR_FORCE, engine::addVectorForceField));
         addSection.add(Box.createRigidArea(new Dimension(0, 4)));
         addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_POINT_ATTRACTOR, () -> engine.addPointForceField(true)));
         addSection.add(Box.createRigidArea(new Dimension(0, 4)));
         addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_POINT_REPULSOR, () -> engine.addPointForceField(false)));
         addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton("Přidat turbulenci", engine::addTurbulenceForceField));
+        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_TURBULENCE, engine::addTurbulenceForceField));
         addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
         addSection.add(engine.sectionTitle(UiStrings.Scene.SIMULATION));
         addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_WATER_EMITTER, engine::addWaterEmitter));
 
         JPanel selectionSection = engine.addCollapsibleSection(sceneTab, UiStrings.Scene.SELECTION, false);
-        selectionSection.add(engine.actionButton("Vybrat předchozí", () -> engine.selectRelative(-1)));
+        selectionSection.add(engine.actionButton(UiStrings.Scene.SELECT_PREVIOUS, () -> engine.selectRelative(-1)));
         selectionSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        selectionSection.add(engine.actionButton("Vybrat další", () -> engine.selectRelative(1)));
+        selectionSection.add(engine.actionButton(UiStrings.Scene.SELECT_NEXT, () -> engine.selectRelative(1)));
         selectionSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        selectionSection.add(engine.actionButton("Zaměřit výběr (F)", () -> {
+        selectionSection.add(engine.actionButton(UiStrings.Scene.FOCUS_SELECTION, () -> {
             if (engine.selectedEntity != null) {
                 engine.cameraController.frameTarget(engine.selectedEntity.getTransform().getPosition());
             }
         }));
         selectionSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        selectionSection.add(engine.actionButton("Zrušit výběr", () -> engine.clearSelection("Výběr zrušen.")));
+        selectionSection.add(engine.actionButton(UiStrings.Scene.CLEAR_SELECTION, () -> engine.clearSelection(UiStrings.Scene.SELECTION_CLEARED_MSG)));
 
         return sceneTab;
     }
@@ -142,8 +142,8 @@ final class EngineScenePanels {
         worldTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
 
         JPanel worldSection = engine.addCollapsibleSection(worldTab, UiStrings.World.LIGHT, true);
-        engine.addColorPickerRow(worldSection, "Ambientní barva", engine.worldLightColor, color -> {
-            engine.applySceneEdit("Změna barvy prostředí", () -> {
+        engine.addColorPickerRow(worldSection, UiStrings.World.AMBIENT_COLOR, engine.worldLightColor, color -> {
+            engine.applySceneEdit(UiStrings.World.HISTORY_CHANGE_AMBIENT_COLOR, () -> {
                 engine.worldLightColor = new Vec3(
                         Math.max(0.0, Math.min(1.0, color.x)),
                         Math.max(0.0, Math.min(1.0, color.y)),
@@ -152,14 +152,14 @@ final class EngineScenePanels {
                 engine.applyWorldLightSettings();
             });
         });
-        engine.addNumericRow(worldSection, "Síla", engine.formatTransformValue(engine.worldLightStrength), text -> {
-            engine.applySceneEdit("Změna síly prostředí", () -> {
+        engine.addNumericRow(worldSection, UiStrings.World.STRENGTH, engine.formatTransformValue(engine.worldLightStrength), text -> {
+            engine.applySceneEdit(UiStrings.World.HISTORY_CHANGE_STRENGTH, () -> {
                 engine.worldLightStrength = Math.max(0.0, Math.min(8.0, engine.parseOrFallback(text, engine.worldLightStrength)));
                 engine.applyWorldLightSettings();
             });
         });
-        engine.addColorPickerRow(worldSection, "Pozadí", engine.worldBackgroundColor, color -> {
-            engine.applySceneEdit("Změna barvy pozadí", () -> {
+        engine.addColorPickerRow(worldSection, UiStrings.World.BACKGROUND, engine.worldBackgroundColor, color -> {
+            engine.applySceneEdit(UiStrings.World.HISTORY_CHANGE_BACKGROUND_COLOR, () -> {
                 engine.worldBackgroundColor = new Vec3(
                         Math.max(0.0, Math.min(1.0, color.x)),
                         Math.max(0.0, Math.min(1.0, color.y)),
@@ -168,18 +168,34 @@ final class EngineScenePanels {
                 engine.applyWorldLightSettings();
             });
         });
-        engine.addComboRow(worldSection, "Předvolba",
-                new String[]{
-                        UiStrings.World.PRESET_STUDIO,
-                        UiStrings.World.PRESET_SUNSET,
-                        UiStrings.World.PRESET_NIGHT,
-                        UiStrings.World.PRESET_CONTRAST
-                },
+        engine.addNumericRow(worldSection, UiStrings.World.ENVIRONMENT_YAW, engine.formatTransformValue(engine.worldEnvironmentYawDegrees), text -> {
+            engine.applySceneEdit(UiStrings.World.HISTORY_CHANGE_ENV_YAW, () -> {
+                double next = engine.parseOrFallback(text, engine.worldEnvironmentYawDegrees);
+                engine.worldEnvironmentYawDegrees = clampAngleDegrees(next, -360.0, 360.0);
+                engine.applyWorldLightSettings();
+            });
+        });
+        engine.addNumericRow(worldSection, UiStrings.World.ENVIRONMENT_PITCH, engine.formatTransformValue(engine.worldEnvironmentPitchDegrees), text -> {
+            engine.applySceneEdit(UiStrings.World.HISTORY_CHANGE_ENV_PITCH, () -> {
+                double next = engine.parseOrFallback(text, engine.worldEnvironmentPitchDegrees);
+                engine.worldEnvironmentPitchDegrees = clampAngleDegrees(next, -90.0, 90.0);
+                engine.applyWorldLightSettings();
+            });
+        });
+        engine.addComboRow(worldSection, UiStrings.World.PRESET,
+                WorldPresetCatalog.labels(),
                 UiStrings.worldPresetLabel(engine.worldPresetKey),
                 value -> engine.applyWorldPreset(UiStrings.worldPresetKey(value)));
-        engine.addBooleanRow(worldSection, "Animovat světlo prostředí", engine.worldLightAnimationEnabled, value ->
-                engine.applySceneEdit("Přepnutí animace prostředí", () -> engine.worldLightAnimationEnabled = value));
+        engine.addBooleanRow(worldSection, UiStrings.World.ANIMATE_WORLD_LIGHT, engine.worldLightAnimationEnabled, value ->
+                engine.applySceneEdit(UiStrings.World.HISTORY_TOGGLE_ANIMATION, () -> engine.worldLightAnimationEnabled = value));
         return worldTab;
+    }
+
+    private static double clampAngleDegrees(double value, double min, double max) {
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
+        return Math.max(min, Math.min(max, value));
     }
 
     static JPanel buildInputTab(Engine engine) {
@@ -189,11 +205,11 @@ final class EngineScenePanels {
         inputTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
 
         JPanel navSection = engine.addCollapsibleSection(inputTab, UiStrings.View.NAVIGATION, true);
-        navSection.add(engine.actionButton("FPS režim (Q)", () -> engine.setNavigationPreset(Engine.NavigationPreset.FPS)));
+        navSection.add(engine.actionButton(UiStrings.View.FPS_MODE, () -> engine.setNavigationPreset(Engine.NavigationPreset.FPS)));
         navSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        navSection.add(engine.actionButton("Blender režim (E)", () -> engine.setNavigationPreset(Engine.NavigationPreset.BLENDER)));
+        navSection.add(engine.actionButton(UiStrings.View.BLENDER_MODE, () -> engine.setNavigationPreset(Engine.NavigationPreset.BLENDER)));
         navSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        navSection.add(engine.actionButton("Zachytit / uvolnit kurzor", () -> {
+        navSection.add(engine.actionButton(UiStrings.View.TOGGLE_CURSOR_CAPTURE, () -> {
             if (engine.mouseCaptured) {
                 engine.releaseMouseCapture();
             } else {
@@ -201,24 +217,24 @@ final class EngineScenePanels {
             }
         }));
         navSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        navSection.add(engine.actionButton("Přepnout režim kamery (Tab)", engine::cycleCameraMode));
+        navSection.add(engine.actionButton(UiStrings.View.CYCLE_CAMERA_MODE, engine::cycleCameraMode));
         navSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        navSection.add(engine.actionButton("Persp / ortho (F4)", engine::toggleProjectionCamera));
+        navSection.add(engine.actionButton(UiStrings.View.TOGGLE_PROJECTION, engine::toggleProjectionCamera));
 
         JPanel speedSection = engine.addCollapsibleSection(inputTab, UiStrings.View.MOTION, false);
-        engine.addNumericRow(speedSection, "Rychlost pohybu", engine.formatTransformValue(engine.cameraController.getMoveSpeed()), text -> {
+        engine.addNumericRow(speedSection, UiStrings.View.MOVE_SPEED, engine.formatTransformValue(engine.cameraController.getMoveSpeed()), text -> {
             double next = Math.max(0.1, engine.parseOrFallback(text, engine.cameraController.getMoveSpeed()));
             engine.cameraController.setMoveSpeed(next);
         });
-        engine.addNumericRow(speedSection, "Citlivost rozhlížení", engine.formatTransformValue(engine.cameraController.getRotateSpeed()), text -> {
+        engine.addNumericRow(speedSection, UiStrings.View.ROTATE_SENSITIVITY, engine.formatTransformValue(engine.cameraController.getRotateSpeed()), text -> {
             double next = Math.max(1e-5, engine.parseOrFallback(text, engine.cameraController.getRotateSpeed()));
             engine.cameraController.setRotateSpeed(next);
         });
-        engine.addBooleanRow(speedSection, "Přehrávání animace", engine.animationPlaybackEnabled, value -> {
+        engine.addBooleanRow(speedSection, UiStrings.View.ANIMATION_PLAYBACK, engine.animationPlaybackEnabled, value -> {
             engine.animationPlaybackEnabled = value;
             engine.refreshUiIndicators();
         });
-        engine.addBooleanRow(speedSection, "Fyzika", engine.physicsEnabled, value -> {
+        engine.addBooleanRow(speedSection, UiStrings.View.PHYSICS, engine.physicsEnabled, value -> {
             engine.physicsEnabled = value;
             engine.refreshUiIndicators();
         });
@@ -236,32 +252,32 @@ final class EngineScenePanels {
         objectTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
 
         JPanel objectTransform = engine.addCollapsibleSection(objectTab, UiStrings.Object.TRANSFORM, true);
-        objectTransform.add(engine.sectionTitle("Pozice"));
+        objectTransform.add(engine.sectionTitle(UiStrings.Object.POSITION));
         engine.posXField = engine.addTransformField(objectTransform, "X");
         engine.posYField = engine.addTransformField(objectTransform, "Y");
         engine.posZField = engine.addTransformField(objectTransform, "Z");
         objectTransform.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        objectTransform.add(engine.sectionTitle("Rotace (stupně)"));
+        objectTransform.add(engine.sectionTitle(UiStrings.Object.ROTATION));
         engine.rotXField = engine.addTransformField(objectTransform, "X");
         engine.rotYField = engine.addTransformField(objectTransform, "Y");
         engine.rotZField = engine.addTransformField(objectTransform, "Z");
         objectTransform.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        objectTransform.add(engine.sectionTitle("Měřítko"));
+        objectTransform.add(engine.sectionTitle(UiStrings.Object.SCALE));
         engine.scaleXField = engine.addTransformField(objectTransform, "X");
         engine.scaleYField = engine.addTransformField(objectTransform, "Y");
         engine.scaleZField = engine.addTransformField(objectTransform, "Z");
         objectTransform.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        objectTransform.add(engine.actionButton("Použít transformaci", engine::applyObjectInspectorValues));
+        objectTransform.add(engine.actionButton(UiStrings.Object.APPLY_TRANSFORM, engine::applyObjectInspectorValues));
 
         JPanel objectOps = engine.addCollapsibleSection(objectTab, UiStrings.Object.OPERATIONS, false);
-        objectOps.add(engine.actionButton("Zaměřit výběr", () -> {
+        objectOps.add(engine.actionButton(UiStrings.Object.FOCUS_SELECTION_ACTION, () -> {
             if (engine.selectedEntity != null) {
                 engine.cameraController.frameTarget(engine.selectedEntity.getTransform().getPosition());
                 engine.camera.lookAt(engine.selectedEntity.getTransform().getPosition());
             }
         }));
         objectOps.add(Box.createRigidArea(new Dimension(0, 4)));
-        objectOps.add(engine.actionButton("Uvolnit fokus", () -> {
+        objectOps.add(engine.actionButton(UiStrings.Object.RELEASE_FOCUS, () -> {
             engine.objectFocusMode = false;
             engine.draggingSelectedObject = false;
             engine.transformMode = Engine.TransformMode.NONE;
@@ -269,9 +285,9 @@ final class EngineScenePanels {
             engine.gizmoDragActive = false;
         }));
         objectOps.add(Box.createRigidArea(new Dimension(0, 4)));
-        objectOps.add(engine.actionButton("Přidat release klíč", engine::addTimelineReleaseKeyForSelection));
+        objectOps.add(engine.actionButton(UiStrings.Object.ADD_RELEASE_KEY, engine::addTimelineReleaseKeyForSelection));
         objectOps.add(Box.createRigidArea(new Dimension(0, 4)));
-        objectOps.add(engine.actionButton("Smazat release klíč", engine::removeTimelineReleaseKeyForSelection));
+        objectOps.add(engine.actionButton(UiStrings.Object.REMOVE_RELEASE_KEY, engine::removeTimelineReleaseKeyForSelection));
         return objectTab;
     }
 

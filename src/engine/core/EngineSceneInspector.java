@@ -1,5 +1,10 @@
 package engine.core;
 
+import java.awt.Dimension;
+
+import javax.swing.Box;
+
+import engine.material.Material;
 import engine.material.MaterialGraphAuthoring;
 import engine.material.MaterialGraphEvaluator;
 import engine.material.MaterialNodeGraph;
@@ -13,13 +18,10 @@ import engine.scene.DirectionalLight;
 import engine.scene.Entity;
 import engine.scene.Light;
 import engine.scene.PointLight;
-import engine.ui.UiStrings;
 import engine.sim.water.WaterEmitter;
 import engine.sim.water.WaterEmitterEntity;
+import engine.ui.UiStrings;
 import engine.util.UiBuilder;
-
-import java.awt.Dimension;
-import javax.swing.Box;
 
 final class EngineSceneInspector {
 
@@ -329,7 +331,33 @@ final class EngineSceneInspector {
             engine.applySceneEdit("Změna statického objektu", () -> entity.setStatic(value));
         });
 
-        PhongMaterial material = ensurePhongMaterial(entity);
+        Material currentMaterial = entity.getMaterial();
+        if (!(currentMaterial instanceof PhongMaterial)) {
+            String currentType = currentMaterial == null
+                    ? "Žádný"
+                    : currentMaterial.getClass().getSimpleName();
+            engine.sceneDetailsPanel.add(Box.createRigidArea(new Dimension(0, 6)));
+            engine.sceneDetailsPanel.add(engine.sectionTitle("Materiál: " + currentType));
+            engine.sceneDetailsPanel.add(UiBuilder.helperText(
+                    "Pouhý výběr už materiál nemění. Pro detailní Phong inspektor je potřeba explicitní převod."));
+            engine.sceneDetailsPanel.add(engine.actionButton("Převést na Phong materiál", () -> {
+                engine.applySceneEdit("Převod materiálu na Phong", () -> {
+                    Material source = entity.getMaterial();
+                    Vec3 base = source != null ? source.getBaseColor() : new Vec3(0.7, 0.7, 0.7);
+                    PhongMaterial converted = new PhongMaterial(base, 32.0);
+                    if (source != null) {
+                        converted.copyFrom(source);
+                    }
+                    converted.getOrCreateNodeGraph();
+                    MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(converted);
+                    entity.setMaterial(converted);
+                });
+                engine.rebuildMaterialDock();
+                rebuildSceneDetailsPanel(engine);
+            }));
+            return;
+        }
+        PhongMaterial material = (PhongMaterial) currentMaterial;
         engine.sceneDetailsPanel.add(Box.createRigidArea(new Dimension(0, 6)));
         engine.sceneDetailsPanel.add(engine.sectionTitle("Materiál: " + material.getName()));
         engine.addComboRow(
@@ -664,19 +692,6 @@ final class EngineSceneInspector {
 
     private static double clamp01(double v) {
         return Math.max(0.0, Math.min(1.0, v));
-    }
-
-    private static PhongMaterial ensurePhongMaterial(Entity entity) {
-        if (entity.getMaterial() instanceof PhongMaterial) {
-            return (PhongMaterial) entity.getMaterial();
-        }
-        Vec3 base = entity.getMaterial() != null ? entity.getMaterial().getBaseColor() : new Vec3(0.7, 0.7, 0.7);
-        PhongMaterial mat = new PhongMaterial(base, 32.0);
-        if (entity.getMaterial() != null) {
-            mat.copyFrom(entity.getMaterial());
-        }
-        entity.setMaterial(mat);
-        return mat;
     }
 
     private static WaterEmitter resolveWaterEmitter(Entity entity) {

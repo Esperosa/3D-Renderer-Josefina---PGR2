@@ -31,6 +31,7 @@ public class Material {
     private double roughness;
     private double metallic;
     private double transmission;
+    private double dispersion;
     private Vec3 emissionColor;
     private double emissionStrength;
     private Vec3 mediumColor;
@@ -53,6 +54,7 @@ public class Material {
         this.roughness = 0.55;
         this.metallic = 0.0;
         this.transmission = 0.0;
+        this.dispersion = 0.0;
         this.emissionColor = Vec3.ZERO;
         this.emissionStrength = 0.0;
         this.mediumColor = new Vec3(0.85, 0.9, 1.0);
@@ -141,6 +143,14 @@ public class Material {
         this.transmission = Math.max(0.0, Math.min(1.0, transmission));
     }
 
+    public double getDispersion() {
+        return dispersion;
+    }
+
+    public void setDispersion(double dispersion) {
+        this.dispersion = Math.max(0.0, Math.min(1.0, dispersion));
+    }
+
     public Vec3 getEmissionColor() {
         return emissionColor;
     }
@@ -222,6 +232,7 @@ public class Material {
         setRoughness(source.getRoughness());
         setMetallic(source.getMetallic());
         setTransmission(source.getTransmission());
+        setDispersion(source.getDispersion());
         setEmissionColor(source.getEmissionColor());
         setEmissionStrength(source.getEmissionStrength());
         setMediumColor(source.getMediumColor());

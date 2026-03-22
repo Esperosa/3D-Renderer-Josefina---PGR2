@@ -1,6 +1,7 @@
 package engine.render.raster;
 
 import engine.render.FrameBuffer;
+import engine.util.RuntimeInstrumentation;
 
 /**
  * Tady převádím trojúhelníky na pixely přes barycentrickou rasterizaci.
@@ -65,35 +66,56 @@ public class TriangleRasterizer {
             return;
         }
 
+        final boolean measure = RuntimeInstrumentation.isEnabled();
+        final int sampleMask = 127;
+        final long sampleScale = sampleMask + 1L;
+        long rasterFillNs = 0L;
+        long depthNs = 0L;
+        long framebufferWriteNs = 0L;
         int attrCount = attrs == null ? 0 : Math.min(attrs.length, interpolated.length);
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
+                boolean sample = measure && (((y * width + x) & sampleMask) == 0);
+                long rasterStart = sample ? System.nanoTime() : 0L;
                 float px = x + 0.5f;
                 float py = y + 0.5f;
 
                 float w0 = edgeFunction(sx[1], sy[1], sx[2], sy[2], px, py);
                 float w1 = edgeFunction(sx[2], sy[2], sx[0], sy[0], px, py);
                 float w2 = edgeFunction(sx[0], sy[0], sx[1], sy[1], px, py);
+                if (sample) {
+                    rasterFillNs += (System.nanoTime() - rasterStart) * sampleScale;
+                }
 
                 if (!((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0))) {
                     continue;
                 }
 
+                long depthStart = sample ? System.nanoTime() : 0L;
                 float l0 = w0 / area;
                 float l1 = w1 / area;
                 float l2 = w2 / area;
                 float depth = l0 * sz[0] + l1 * sz[1] + l2 * sz[2];
                 if (depth < 0.0f || depth > 1.0f) {
+                    if (sample) {
+                        depthNs += (System.nanoTime() - depthStart) * sampleScale;
+                    }
                     continue;
                 }
                 int idx = y * width + x;
                 if (depth >= depthBuffer[idx]) {
+                    if (sample) {
+                        depthNs += (System.nanoTime() - depthStart) * sampleScale;
+                    }
                     continue;
                 }
 
                 if (attrCount > 0) {
                     float denom = l0 * sw[0] + l1 * sw[1] + l2 * sw[2];
                     if (Math.abs(denom) < 1e-7f) {
+                        if (sample) {
+                            depthNs += (System.nanoTime() - depthStart) * sampleScale;
+                        }
                         continue;
                     }
                     for (int i = 0; i < attrCount; i++) {
@@ -101,6 +123,9 @@ public class TriangleRasterizer {
                                 + l1 * attrs[i][1] * sw[1]
                                 + l2 * attrs[i][2] * sw[2]) / denom;
                     }
+                }
+                if (sample) {
+                    depthNs += (System.nanoTime() - depthStart) * sampleScale;
                 }
 
                 worldPos[0] = attrCount > 0 ? interpolated[0] : 0.0f;
@@ -137,6 +162,7 @@ public class TriangleRasterizer {
                 if (((argb >>> 24) & 0xFF) == 0) {
                     continue;
                 }
+                long writeStart = sample ? System.nanoTime() : 0L;
                 depthBuffer[idx] = depth;
                 colorBuffer[idx] = argb;
 
@@ -172,7 +198,15 @@ public class TriangleRasterizer {
                     worldPosBuffer[vBase + 1] = worldPos[1];
                     worldPosBuffer[vBase + 2] = worldPos[2];
                 }
+                if (sample) {
+                    framebufferWriteNs += (System.nanoTime() - writeStart) * sampleScale;
+                }
             }
+        }
+        if (measure) {
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_BASE_RASTER_FILL_NS, rasterFillNs);
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_BASE_DEPTH_TEST_NS, depthNs);
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_BASE_FRAMEBUFFER_WRITE_NS, framebufferWriteNs);
         }
     }
 

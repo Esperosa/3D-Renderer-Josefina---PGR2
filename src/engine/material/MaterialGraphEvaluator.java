@@ -146,6 +146,7 @@ public final class MaterialGraphEvaluator {
         public double metallic;
         public double specularFactor;
         public double refractiveIndex;
+        public double dispersion;
         public double transmission;
         public final Vec3 emissionColor = new Vec3();
         public double emissionStrength;
@@ -169,6 +170,7 @@ public final class MaterialGraphEvaluator {
                 metallic = 0.0;
                 specularFactor = 1.0;
                 refractiveIndex = 1.0;
+                dispersion = 0.0;
                 transmission = 0.0;
                 emissionColor.zero();
                 emissionStrength = 0.0;
@@ -188,6 +190,7 @@ public final class MaterialGraphEvaluator {
             metallic = material.getMetallic();
             specularFactor = material.getSpecularFactor();
             refractiveIndex = material.getRefractiveIndex();
+            dispersion = material.getDispersion();
             transmission = material.getTransmission();
             emissionColor.set(material.getEmissionColor());
             emissionStrength = material.getEmissionStrength();
@@ -217,6 +220,7 @@ public final class MaterialGraphEvaluator {
         double metallic;
         double specularFactor;
         double refractiveIndex;
+        double dispersion;
         double transmission;
         double opacity;
         final Vec3 emissionColor = new Vec3();
@@ -373,6 +377,7 @@ public final class MaterialGraphEvaluator {
                 out.metallic = surface.metallic;
                 out.specularFactor = surface.specularFactor;
                 out.refractiveIndex = surface.refractiveIndex;
+                out.dispersion = surface.dispersion;
                 out.transmission = surface.transmission;
                 out.opacity = surface.opacity;
                 out.emissionColor.set(surface.emissionColor);
@@ -421,6 +426,7 @@ public final class MaterialGraphEvaluator {
         out.roughness = MathUtil.clamp01(out.roughness);
         out.metallic = MathUtil.clamp01(out.metallic);
         out.transmission = MathUtil.clamp01(out.transmission);
+        out.dispersion = MathUtil.clamp01(out.dispersion);
         out.clearcoatFactor = MathUtil.clamp01(out.clearcoatFactor);
         out.clearcoatRoughness = MathUtil.clamp01(out.clearcoatRoughness);
         out.sheenRoughness = MathUtil.clamp01(out.sheenRoughness);

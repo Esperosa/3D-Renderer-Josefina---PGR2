@@ -1,18 +1,19 @@
 package engine.core;
 
-import engine.math.Vec3;
-import engine.util.UiBuilder;
-
 import java.awt.Component;
-import java.awt.KeyboardFocusManager;
 import java.awt.KeyEventDispatcher;
+import java.awt.KeyboardFocusManager;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+
 import javax.swing.Action;
 import javax.swing.JComponent;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+
+import engine.math.Vec3;
+import engine.util.UiBuilder;
 
 final class EditorShortcutRouter implements KeyEventDispatcher {
     private final Engine engine;
@@ -66,6 +67,10 @@ final class EditorShortcutRouter implements KeyEventDispatcher {
 
         EditorFocusContext context = EditorFocusContext.resolve(focusOwner, engine);
         if (context == EditorFocusContext.TEXT_INPUT) {
+            if (EditorActionId.CANCEL.equals(actionId)) {
+                engine.focusCanvas();
+                return cancelTransientEditorAction(engine);
+            }
             return handleTextInputShortcut(focusOwner, actionId);
         }
 
@@ -104,14 +109,23 @@ final class EditorShortcutRouter implements KeyEventDispatcher {
     }
 
     private boolean belongsToEditorWindow(Component focusOwner) {
-        if (focusOwner == null || engine == null || engine.window == null) {
+        if (engine == null || engine.window == null) {
             return false;
+        }
+        Window editorWindow = engine.window.getFrame();
+        KeyboardFocusManager kfm = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        Window activeWindow = kfm.getActiveWindow();
+        Window focusedWindow = kfm.getFocusedWindow();
+        if (focusOwner == null) {
+            return activeWindow == editorWindow || focusedWindow == editorWindow;
         }
         if (focusOwner == engine.window.getCanvas()) {
             return true;
         }
         Window owner = SwingUtilities.getWindowAncestor(focusOwner);
-        return owner == engine.window.getFrame();
+        return owner == editorWindow
+                || activeWindow == editorWindow
+                || focusedWindow == editorWindow;
     }
 
     private static boolean handleTextInputShortcut(Component focusOwner, String actionId) {
@@ -143,6 +157,15 @@ final class EditorShortcutRouter implements KeyEventDispatcher {
         if (engine == null) {
             return false;
         }
+        long now = System.nanoTime();
+        if (now <= engine.escapeExitArmedUntilNanos) {
+            engine.escapeExitArmedUntilNanos = 0L;
+            if (engine.window != null) {
+                engine.window.requestClose();
+                return true;
+            }
+            return false;
+        }
         if (engine.mouseCaptured) {
             engine.releaseMouseCapture();
             return true;
@@ -168,7 +191,9 @@ final class EditorShortcutRouter implements KeyEventDispatcher {
             engine.gizmoDragActive = false;
             return true;
         }
-        return false;
+        engine.escapeExitArmedUntilNanos = now + 2_200_000_000L;
+        System.out.println("ESC armed: press Escape again to exit.");
+        return true;
     }
 
     private static boolean frameCurrentSelection(Engine engine) {

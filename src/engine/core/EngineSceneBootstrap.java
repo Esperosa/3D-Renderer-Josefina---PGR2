@@ -14,7 +14,6 @@ import engine.physics.RigidBody;
 import engine.render.Texture;
 import engine.scene.DirectionalLight;
 import engine.scene.Entity;
-import engine.scene.PointLight;
 import engine.scene.Scene;
 
 import java.io.File;
@@ -26,6 +25,8 @@ import java.util.List;
 final class EngineSceneBootstrap {
     static final String STARTUP_MODEL_PATH = "assets/models/StartModel.glb";
     static final String STARTUP_MODEL_DISPLAY_NAME = "Josefína";
+    private static final double STARTUP_FILMIC_WORLD_STRENGTH = 1.10;
+    private static final double STARTUP_FILMIC_ENV_EXPOSURE_BOOST = 1.12;
 
     private EngineSceneBootstrap() {
     }
@@ -69,6 +70,8 @@ final class EngineSceneBootstrap {
         Mesh floorMesh = MeshGenerator.plane(floorSize, floorSize, 16, 16);
         PhongMaterial floorMaterial = new PhongMaterial(new Vec3(0.50, 0.52, 0.55), 6.0);
         floorMaterial.setSpecularColor(new Vec3(0.07, 0.07, 0.07));
+        floorMaterial.setRoughness(0.02);
+        floorMaterial.setMetallic(1.0);
         floorMaterial.setName("floor-grid");
         engine.floorEntity = new Entity("floor", floorMesh, floorMaterial);
         engine.floorEntity.getTransform().setPosition(new Vec3(0.0, floorY, 0.0));
@@ -86,45 +89,31 @@ final class EngineSceneBootstrap {
         defaultScene.addEntity(engine.outputCameraEntity);
 
         engine.sunLight = new DirectionalLight(
-                new Vec3(-0.25, -1.0, -0.2),
-                new Vec3(1.0, 0.97, 0.92),
-                1.35
+                new Vec3(-0.34, -1.0, -0.18),
+                new Vec3(1.0, 0.95, 0.88),
+                2.18
         );
         engine.fillLight = new DirectionalLight(
-                new Vec3(0.35, -0.45, 0.82),
-                new Vec3(0.52, 0.60, 0.78),
-                0.42
+            new Vec3(0.22, -1.0, 0.34),
+            new Vec3(0.90, 0.95, 1.0),
+            1.52
         );
-        engine.warmWorldLight = new PointLight(
-                new Vec3(2.8, 2.3, 2.2),
-                new Vec3(1.0, 0.82, 0.62),
-                0.55
-        );
-        engine.warmWorldLight.setAttenuation(1.0, 0.05, 0.012);
-        engine.coolWorldLight = new PointLight(
-                new Vec3(-2.6, 2.0, -2.7),
-                new Vec3(0.54, 0.68, 1.0),
-                0.48
-        );
-        engine.coolWorldLight.setAttenuation(1.0, 0.06, 0.018);
+        engine.warmWorldLight = null;
+        engine.coolWorldLight = null;
 
         defaultScene.addLight(engine.sunLight);
         defaultScene.addLight(engine.fillLight);
-        defaultScene.addLight(engine.warmWorldLight);
-        defaultScene.addLight(engine.coolWorldLight);
         EngineWorldManager.registerLightName(engine, engine.sunLight, "Sun");
-        EngineWorldManager.registerLightName(engine, engine.fillLight, "Fill");
-        EngineWorldManager.registerLightName(engine, engine.warmWorldLight, "Warm Point");
-        EngineWorldManager.registerLightName(engine, engine.coolWorldLight, "Cool Point");
-        engine.worldLightColor = new Vec3(0.18, 0.20, 0.24);
-        engine.worldBackgroundColor = new Vec3(0.06, 0.08, 0.11);
-        engine.worldPresetKey = "Studio Neutral";
-        engine.worldSunBaseIntensity = 1.35;
-        engine.worldFillBaseIntensity = 0.42;
-        engine.worldWarmBaseIntensity = 0.55;
-        engine.worldCoolBaseIntensity = 0.48;
-        engine.worldLightStrength = 1.0;
-        engine.worldLightAppliedStrength = 1.0;
+        EngineWorldManager.registerLightName(engine, engine.fillLight, "Top Sun");
+        EngineWorldManager.applyPresetState(engine, WorldPresetCatalog.defaultPreset());
+        WorldEnvironmentLibrary.EnvironmentBinding binding = WorldEnvironmentLibrary.resolveForPreset(engine.worldPresetKey);
+        if (binding != null) {
+            defaultScene.setEnvironmentMapKey(binding.assetKey);
+            defaultScene.setEnvironmentMap(binding.map);
+            defaultScene.setEnvironmentExposure(binding.exposure * STARTUP_FILMIC_ENV_EXPOSURE_BOOST);
+        }
+        engine.worldLightStrength = Math.max(engine.worldLightStrength, STARTUP_FILMIC_WORLD_STRENGTH);
+        engine.worldLightAppliedStrength = engine.worldLightStrength;
         defaultScene.setAmbientColor(engine.worldLightColor.mul(engine.worldLightStrength));
         defaultScene.setEnvironmentStrength(engine.worldLightStrength);
         defaultScene.setBackgroundColor(engine.worldBackgroundColor);
@@ -193,6 +182,7 @@ final class EngineSceneBootstrap {
                 PhongMaterial material = entry.getMaterial() != null
                         ? entry.getMaterial().copy()
                         : createBootstrapMaterial(entry.getName(), index);
+                configureStartupGlassMaterial(material);
                 String name = index == 0
                         ? STARTUP_MODEL_DISPLAY_NAME
                         : sanitizeBootstrapName(entry.getName(), index);
@@ -265,16 +255,21 @@ final class EngineSceneBootstrap {
         return clean.isBlank() ? "start-model-" + index : clean;
     }
 
-    static String findObjInDirectory(Engine engine, String dirPath) {
-        File dir = new File(dirPath);
-        if (!dir.exists() || !dir.isDirectory()) {
-            return null;
+    private static void configureStartupGlassMaterial(PhongMaterial material) {
+        if (material == null) {
+            return;
         }
-        File[] objs = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".obj"));
-        if (objs == null || objs.length == 0) {
-            return null;
-        }
-        return objs[0].getAbsolutePath();
+        boolean hasDiffuseTexture = material.hasDiffuseTexture();
+        material.setTransmission(hasDiffuseTexture ? 0.41 : 0.52);
+        material.setRefractiveIndex(1.42);
+        material.setRoughness(hasDiffuseTexture ? 0.032 : 0.028);
+        material.setMetallic(0.0);
+        material.setReflectivity(0.24);
+        material.setSpecularColor(new Vec3(1.0, 1.0, 1.0));
+        material.setSpecularFactor(1.0);
+        material.setMediumColor(hasDiffuseTexture ? new Vec3(0.90, 0.95, 0.99) : new Vec3(0.94, 0.98, 1.0));
+        material.setDensity(hasDiffuseTexture ? 0.014 : 0.032);
+        material.setThickness(hasDiffuseTexture ? 0.028 : 0.042);
     }
 
     static String findDiffuseTextureForObj(Engine engine, String objPath) {

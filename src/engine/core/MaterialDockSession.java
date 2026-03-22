@@ -783,6 +783,11 @@ final class MaterialDockSession {
             node.setNumber("ior", Math.max(1.0, engine.parseOrFallback(text, node.getNumber("ior", material.getRefractiveIndex()))));
             markStructureChanged();
         });
+        addRangedValueRow("Dispersion", node.getNumber("dispersion", material.getDispersion()), 0.0, 1.0, value -> {
+            EngineMaterialDock.markCustom(material);
+            node.setNumber("dispersion", value);
+            markStructureChanged();
+        });
         addRangedValueRow("Transmission", node.getNumber("transmission", material.getTransmission()), 0.0, 1.0, value -> {
             EngineMaterialDock.markCustom(material);
             node.setNumber("transmission", value);
@@ -842,6 +847,11 @@ final class MaterialDockSession {
         engine.addNumericRow(inspectorPanel, "IOR", engine.formatTransformValue(node.getNumber("ior", 1.45)), text -> {
             EngineMaterialDock.markCustom(material);
             node.setNumber("ior", Math.max(1.0, engine.parseOrFallback(text, node.getNumber("ior", 1.45))));
+            markStructureChanged();
+        });
+        addRangedValueRow("Dispersion", node.getNumber("dispersion", material.getDispersion()), 0.0, 1.0, value -> {
+            EngineMaterialDock.markCustom(material);
+            node.setNumber("dispersion", value);
             markStructureChanged();
         });
         addRangedValueRow("Opacity", node.getNumber("opacity", 1.0), 0.0, 1.0, value -> {

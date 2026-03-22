@@ -1,5 +1,9 @@
 package engine.core;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 import engine.math.Mat4;
 import engine.math.Vec3;
 import engine.render.FrameBuffer;
@@ -8,15 +12,16 @@ import engine.scene.ConeLight;
 import engine.scene.DirectionalLight;
 import engine.scene.Light;
 import engine.scene.PointLight;
-import engine.ui.UiStrings;
 import engine.util.OverlayDrawUtil;
 import engine.util.SceneOverlayIconDrawer;
 import engine.util.ScreenProjectionUtil;
 
-import java.util.ArrayList;
-import java.util.List;
-
 final class EngineViewportOverlay {
+    private static long cachedSceneStatsVersion = Long.MIN_VALUE;
+    private static int cachedSceneObjectCount = 0;
+    private static long cachedSceneTriangleCount = 0L;
+    private static long cachedSceneVertexCount = 0L;
+
     private EngineViewportOverlay() {
     }
 
@@ -69,9 +74,6 @@ final class EngineViewportOverlay {
         }
         drawOutputCameraWireOverlay(engine, fb);
         if (engine.editorOverlayEnabled) {
-            if (engine.mouseCaptured) {
-                drawCrosshair(fb, 0xFFE0E7F4, 0xFF0A111A);
-            }
             drawSceneItemWireIcons(engine, fb);
             if (engine.selectionSupportsTransform()
                     && engine.navigationPreset == Engine.NavigationPreset.BLENDER
@@ -235,10 +237,6 @@ final class EngineViewportOverlay {
         OverlayDrawUtil.drawDashedRect(pixels, w, h, x0, y0, x1, y1, 0xFF68C9FF, 0xFFFFA84E, 8, 4);
     }
 
-    private static void drawCrosshair(FrameBuffer fb, int color, int shadowColor) {
-        OverlayDrawUtil.drawCrosshair(fb.getColorBuffer(), fb.getWidth(), fb.getHeight(), color, shadowColor);
-    }
-
     private static void syncWorldAxisWidget(Engine engine, boolean visible) {
         if (engine == null || engine.window == null) {
             return;
@@ -262,7 +260,8 @@ final class EngineViewportOverlay {
         int h = fb.getHeight();
         int[] pixels = fb.getColorBuffer();
         Mat4 vp = engine.camera.getProjectionMatrix().multiply(engine.camera.getViewMatrix());
-        List<Engine.OverlayIcon> icons = collectOverlayIcons(engine, vp, w, h, true);
+        double iconPixelScale = overlayPixelScaleFromCanvas(engine, w, h);
+        List<Engine.OverlayIcon> icons = collectOverlayIcons(engine, vp, w, h, true, iconPixelScale);
         if (icons.isEmpty()) {
             return;
         }
@@ -272,15 +271,15 @@ final class EngineViewportOverlay {
                 continue;
             }
             if (icon.ref.type == Engine.SceneItemType.LIGHT) {
-                drawLightIcon(engine, pixels, w, h, vp, icon);
+                drawLightIcon(engine, pixels, w, h, vp, icon, iconPixelScale);
             } else if (icon.ref.type == Engine.SceneItemType.FORCE_FIELD) {
-                drawForceIcon(engine, pixels, w, h, icon);
+                drawForceIcon(engine, pixels, w, h, icon, iconPixelScale);
             }
         }
     }
 
     static List<Engine.OverlayIcon> collectOverlayIcons(
-            Engine engine, Mat4 vp, int width, int height, boolean onlyViewEnabled) {
+            Engine engine, Mat4 vp, int width, int height, boolean onlyViewEnabled, double iconPixelScale) {
         List<Engine.OverlayIcon> icons = new ArrayList<>();
         if (engine.scene == null || vp == null) {
             return icons;
@@ -307,7 +306,7 @@ final class EngineViewportOverlay {
                 continue;
             }
 
-            Engine.OverlayIcon icon = projectOverlayIcon(worldPos, vp, width, height, radius);
+            Engine.OverlayIcon icon = projectOverlayIcon(worldPos, vp, width, height, radius, iconPixelScale);
             if (icon == null) {
                 continue;
             }
@@ -341,7 +340,7 @@ final class EngineViewportOverlay {
                     radius = 10;
                     break;
             }
-            Engine.OverlayIcon icon = projectOverlayIcon(field.position, vp, width, height, radius);
+            Engine.OverlayIcon icon = projectOverlayIcon(field.position, vp, width, height, radius, iconPixelScale);
             if (icon == null) {
                 continue;
             }
@@ -354,7 +353,8 @@ final class EngineViewportOverlay {
         return icons;
     }
 
-    static Engine.OverlayIcon projectOverlayIcon(Vec3 worldPos, Mat4 vp, int width, int height, int radius) {
+    static Engine.OverlayIcon projectOverlayIcon(Vec3 worldPos, Mat4 vp, int width, int height, int radius,
+                                                 double iconPixelScale) {
         if (worldPos == null) {
             return null;
         }
@@ -366,7 +366,7 @@ final class EngineViewportOverlay {
         Engine.OverlayIcon icon = new Engine.OverlayIcon();
         icon.x = out[0];
         icon.y = out[1];
-        icon.radius = Math.max(6, radius);
+        icon.radius = Math.max(3, scaledPixels(iconPixelScale, radius));
         icon.depth = depth[0];
         return icon;
     }
@@ -382,16 +382,18 @@ final class EngineViewportOverlay {
         return base.add(engine.camera.getRight().mul(xOffset)).add(engine.camera.getUp().mul(yOffset));
     }
 
-    static void drawLightIcon(Engine engine, int[] pixels, int w, int h, Mat4 vp, Engine.OverlayIcon icon) {
+    static void drawLightIcon(Engine engine, int[] pixels, int w, int h, Mat4 vp,
+                              Engine.OverlayIcon icon, double iconPixelScale) {
         Light light = icon.ref.light;
         if (light == null) {
             return;
         }
         SceneOverlayIconDrawer.drawLightIcon(
-                pixels, w, h, vp, light, light == engine.selectedLight, icon.x, icon.y, icon.radius, engine.camera);
+                pixels, w, h, vp, light, light == engine.selectedLight, icon.x, icon.y, icon.radius,
+                engine.camera, iconPixelScale);
     }
 
-    static void drawForceIcon(Engine engine, int[] pixels, int w, int h, Engine.OverlayIcon icon) {
+    static void drawForceIcon(Engine engine, int[] pixels, int w, int h, Engine.OverlayIcon icon, double iconPixelScale) {
         Engine.ForceField field = icon.ref.forceField;
         if (field == null) {
             return;
@@ -403,17 +405,17 @@ final class EngineViewportOverlay {
         switch (field.type) {
             case VECTOR: {
                 SceneOverlayIconDrawer.drawVectorForceIcon(
-                        pixels, w, h, cx, cy, r, field.direction, selected, engine.camera);
+                        pixels, w, h, cx, cy, r, field.direction, selected, engine.camera, iconPixelScale);
                 break;
             }
             case POINT: {
                 SceneOverlayIconDrawer.drawPointForceIcon(
-                        pixels, w, h, cx, cy, r, field.attract, selected);
+                        pixels, w, h, cx, cy, r, field.attract, selected, iconPixelScale);
                 break;
             }
             case TURBULENCE:
             default: {
-                SceneOverlayIconDrawer.drawTurbulenceForceIcon(pixels, w, h, cx, cy, r, selected);
+                SceneOverlayIconDrawer.drawTurbulenceForceIcon(pixels, w, h, cx, cy, r, selected, iconPixelScale);
                 break;
             }
         }
@@ -428,7 +430,9 @@ final class EngineViewportOverlay {
         int w = engine.frameBuffer.getWidth();
         int h = engine.frameBuffer.getHeight();
         Mat4 vp = engine.camera.getProjectionMatrix().multiply(engine.camera.getViewMatrix());
-        List<Engine.OverlayIcon> icons = collectOverlayIcons(engine, vp, w, h, true);
+        double iconPixelScale = overlayPixelScaleFromCanvas(engine, w, h);
+        int pickPadding = Math.max(2, scaledPixels(iconPixelScale, 4));
+        List<Engine.OverlayIcon> icons = collectOverlayIcons(engine, vp, w, h, true, iconPixelScale);
 
         Engine.OverlayIcon best = null;
         double bestScore = Double.POSITIVE_INFINITY;
@@ -438,7 +442,7 @@ final class EngineViewportOverlay {
             }
             int dx = fx - icon.x;
             int dy = fy - icon.y;
-            int r = icon.radius + 4;
+            int r = icon.radius + pickPadding;
             int distSq = dx * dx + dy * dy;
             if (distSq > r * r) {
                 continue;
@@ -459,10 +463,20 @@ final class EngineViewportOverlay {
         int w = fb.getWidth();
         int h = fb.getHeight();
         int[] pixels = fb.getColorBuffer();
-        Engine.GizmoScreenData gizmo = computeGizmoScreenData(engine, w, h);
+        double gizmoPixelScale = overlayPixelScaleFromCanvas(engine, w, h);
+        Engine.GizmoScreenData gizmo = computeGizmoScreenData(engine, w, h, gizmoPixelScale);
         if (gizmo == null || !gizmo.valid || gizmo.axes == null) {
             return;
         }
+        int arrowHeadSize = Math.max(4, scaledPixels(gizmoPixelScale, 8.0));
+        int axisSquareHalf = Math.max(2, scaledPixels(gizmoPixelScale, 4.0));
+        int axisSquareSize = axisSquareHalf * 2 + 1;
+        int rotateHandleRadius = Math.max(2, scaledPixels(gizmoPixelScale, 5.0));
+        int rotateHandleHighlightRadius = Math.max(3, scaledPixels(gizmoPixelScale, 7.0));
+        int centerSquareHalf = Math.max(2, scaledPixels(gizmoPixelScale, 4.0));
+        int centerSquareSize = centerSquareHalf * 2 + 1;
+        int centerDotHalf = Math.max(1, scaledPixels(gizmoPixelScale, 1.0));
+        int centerDotSize = centerDotHalf * 2 + 1;
 
         boolean uniformScaleActive = engine.transformMode == Engine.TransformMode.SCALE
                 && engine.axisConstraint == Engine.AxisConstraint.NONE;
@@ -482,20 +496,26 @@ final class EngineViewportOverlay {
             OverlayDrawUtil.drawCircleOutline(pixels, w, h, gizmo.centerX, gizmo.centerY, axis.rotateRadius, ringColor);
             OverlayDrawUtil.drawLine(pixels, w, h, gizmo.centerX, gizmo.centerY, axis.endX, axis.endY, lineColor);
             OverlayDrawUtil.drawArrowHead(
-                    pixels, w, h, gizmo.centerX, gizmo.centerY, axis.moveX, axis.moveY, arrowColor, 8.0);
-            OverlayDrawUtil.drawSquareBorder(pixels, w, h, axis.scaleX - 4, axis.scaleY - 4, 9, 9, scaleColor);
-            OverlayDrawUtil.drawCircleOutline(pixels, w, h, axis.rotateX, axis.rotateY, 5, rotateColor);
+                    pixels, w, h, gizmo.centerX, gizmo.centerY, axis.moveX, axis.moveY, arrowColor, arrowHeadSize);
+                OverlayDrawUtil.drawSquareBorder(
+                    pixels, w, h, axis.scaleX - axisSquareHalf, axis.scaleY - axisSquareHalf,
+                    axisSquareSize, axisSquareSize, scaleColor);
+                OverlayDrawUtil.drawCircleOutline(pixels, w, h, axis.rotateX, axis.rotateY, rotateHandleRadius, rotateColor);
             if (axisActive) {
-                OverlayDrawUtil.drawCircleOutline(pixels, w, h, axis.rotateX, axis.rotateY, 7, 0xFFEAF2FF);
+                OverlayDrawUtil.drawCircleOutline(
+                    pixels, w, h, axis.rotateX, axis.rotateY, rotateHandleHighlightRadius, 0xFFEAF2FF);
             }
         }
         int centerScaleColor = uniformScaleActive ? 0xFFFFE08A : 0xFFF1D37B;
         OverlayDrawUtil.drawSquareBorder(
-                pixels, w, h, gizmo.centerX - 4, gizmo.centerY - 4, 9, 9, centerScaleColor);
-        OverlayDrawUtil.drawSquare(pixels, w, h, gizmo.centerX - 1, gizmo.centerY - 1, 3, 3, 0xFFEAF2FF);
+                pixels, w, h, gizmo.centerX - centerSquareHalf, gizmo.centerY - centerSquareHalf,
+                centerSquareSize, centerSquareSize, centerScaleColor);
+            OverlayDrawUtil.drawSquare(
+                pixels, w, h, gizmo.centerX - centerDotHalf, gizmo.centerY - centerDotHalf,
+                centerDotSize, centerDotSize, 0xFFEAF2FF);
     }
 
-    static Engine.GizmoScreenData computeGizmoScreenData(Engine engine, int width, int height) {
+            static Engine.GizmoScreenData computeGizmoScreenData(Engine engine, int width, int height, double gizmoPixelScale) {
         if (!engine.selectionSupportsTransform() || engine.camera == null) {
             return null;
         }
@@ -518,11 +538,11 @@ final class EngineViewportOverlay {
         out.centerY = c[1];
 
         fillGizmoAxis(engine, out, 0, Engine.AxisConstraint.X, 0xFFE25454,
-                center.add(new Vec3(axisLen, 0.0, 0.0)), vp, width, height);
+        center.add(new Vec3(axisLen, 0.0, 0.0)), vp, width, height, gizmoPixelScale);
         fillGizmoAxis(engine, out, 1, Engine.AxisConstraint.Y, 0xFF66D66F,
-                center.add(new Vec3(0.0, axisLen, 0.0)), vp, width, height);
+        center.add(new Vec3(0.0, axisLen, 0.0)), vp, width, height, gizmoPixelScale);
         fillGizmoAxis(engine, out, 2, Engine.AxisConstraint.Z, 0xFF67A9FF,
-                center.add(new Vec3(0.0, 0.0, axisLen)), vp, width, height);
+        center.add(new Vec3(0.0, 0.0, axisLen)), vp, width, height, gizmoPixelScale);
         return out;
     }
 
@@ -535,7 +555,8 @@ final class EngineViewportOverlay {
             Vec3 worldEnd,
             Mat4 vp,
             int width,
-            int height) {
+            int height,
+            double gizmoPixelScale) {
         Engine.GizmoAxisData data = new Engine.GizmoAxisData();
         data.axis = axis;
         data.color = color;
@@ -559,9 +580,12 @@ final class EngineViewportOverlay {
         data.endY = end[1];
         data.moveX = end[0];
         data.moveY = end[1];
-        data.scaleX = (int) Math.round(gizmo.centerX + ux * (len + 12.0));
-        data.scaleY = (int) Math.round(gizmo.centerY + uy * (len + 12.0));
-        data.rotateRadius = (int) Math.max(14, Math.round(len * (0.72 + 0.10 * slot) + 8.0));
+    double scaleHandleOffset = Math.max(4.0, scaledPixels(gizmoPixelScale, 12.0));
+    double rotateBaseOffset = Math.max(3.0, scaledPixels(gizmoPixelScale, 8.0));
+    int rotateMinRadius = Math.max(6, scaledPixels(gizmoPixelScale, 14.0));
+    data.scaleX = (int) Math.round(gizmo.centerX + ux * (len + scaleHandleOffset));
+    data.scaleY = (int) Math.round(gizmo.centerY + uy * (len + scaleHandleOffset));
+    data.rotateRadius = (int) Math.max(rotateMinRadius, Math.round(len * (0.72 + 0.10 * slot) + rotateBaseOffset));
         data.rotateX = (int) Math.round(gizmo.centerX + ux * data.rotateRadius);
         data.rotateY = (int) Math.round(gizmo.centerY + uy * data.rotateRadius);
         data.valid = true;
@@ -582,18 +606,23 @@ final class EngineViewportOverlay {
                 || engine.frameBuffer == null) {
             return false;
         }
+        double gizmoPixelScale = overlayPixelScaleFromCanvas(
+            engine, engine.frameBuffer.getWidth(), engine.frameBuffer.getHeight());
         Engine.GizmoScreenData gizmo = computeGizmoScreenData(
-                engine, engine.frameBuffer.getWidth(), engine.frameBuffer.getHeight());
+            engine, engine.frameBuffer.getWidth(), engine.frameBuffer.getHeight(), gizmoPixelScale);
         if (gizmo == null || !gizmo.valid || gizmo.axes == null) {
             return false;
         }
 
         int fx = canvasToFramebufferX(engine, mouseX);
         int fy = canvasToFramebufferY(engine, mouseY);
-        final int moveRadiusSq = 8 * 8;
-        final int scaleRadiusSq = 9 * 9;
-        final int centerUniformScaleRadiusSq = 8 * 8;
-        final int rotateBand = 4;
+        final int moveRadius = Math.max(4, scaledPixels(gizmoPixelScale, 8.0));
+        final int scaleRadius = Math.max(4, scaledPixels(gizmoPixelScale, 9.0));
+        final int centerUniformScaleRadius = Math.max(4, scaledPixels(gizmoPixelScale, 8.0));
+        final int moveRadiusSq = moveRadius * moveRadius;
+        final int scaleRadiusSq = scaleRadius * scaleRadius;
+        final int centerUniformScaleRadiusSq = centerUniformScaleRadius * centerUniformScaleRadius;
+        final int rotateBand = Math.max(2, scaledPixels(gizmoPixelScale, 4.0));
 
         if (distanceSq(fx, fy, gizmo.centerX, gizmo.centerY) <= centerUniformScaleRadiusSq) {
             startGizmoTransform(engine, Engine.TransformMode.SCALE, Engine.AxisConstraint.NONE);
@@ -677,6 +706,30 @@ final class EngineViewportOverlay {
         return Math.min(fh - 1, y);
     }
 
+    static double overlayPixelScaleFromCanvas(Engine engine, int framebufferWidth, int framebufferHeight) {
+        if (engine == null || engine.window == null || engine.window.getCanvas() == null) {
+            return 1.0;
+        }
+        int canvasWidth = Math.max(1, engine.window.getCanvas().getWidth());
+        int canvasHeight = Math.max(1, engine.window.getCanvas().getHeight());
+        int fbWidth = Math.max(1, framebufferWidth);
+        int fbHeight = Math.max(1, framebufferHeight);
+        double sx = (double) fbWidth / (double) canvasWidth;
+        double sy = (double) fbHeight / (double) canvasHeight;
+        double scale = Math.min(sx, sy);
+        if (!Double.isFinite(scale)) {
+            return 1.0;
+        }
+        return Math.max(0.1, scale);
+    }
+
+    static int scaledPixels(double scale, double pixels) {
+        if (!Double.isFinite(scale) || !Double.isFinite(pixels)) {
+            return (int) Math.max(1, Math.round(Math.max(1.0, pixels)));
+        }
+        return (int) Math.max(1, Math.round(Math.max(1.0, pixels * scale)));
+    }
+
     static int distanceSq(int x0, int y0, int x1, int y1) {
         return OverlayDrawUtil.distanceSq(x0, y0, x1, y1);
     }
@@ -726,72 +779,105 @@ final class EngineViewportOverlay {
         return Math.hypot(px - cx, py - cy);
     }
 
-    static String[] buildDebugHudLines(Engine engine, double elapsedSeconds) {
-        String modeName = engine.activeMode != null ? UiStrings.renderModeLabel(engine.activeMode) : "Žádný";
-        String viewportModeName = engine.viewportDisplayedMode != null
-                ? UiStrings.renderModeLabel(engine.viewportDisplayedMode)
-                : modeName;
+    static String[] buildDebugHudLines(Engine engine) {
         String camMode = engine.cameraController != null ? engine.cameraController.getMode().toString() : "Žádná";
         String navMode = engine.navigationPreset != null ? engine.navigationPreset.toString() : "FPS";
         String projection = engine.orthographicProjection ? "Orto" : "Persp";
         Vec3 pos = engine.camera != null ? engine.camera.getPosition() : Vec3.ZERO;
-        String selectedName;
-        if (engine.selectedEntity != null) {
-            selectedName = engine.selectedEntity.getName();
-        } else if (engine.selectedLight != null) {
-            selectedName = "Světlo: " + engine.getLightName(engine.selectedLight);
-        } else if (engine.selectedForceField != null) {
-            selectedName = "Síla: " + engine.selectedForceField.name;
-        } else {
-            selectedName = "-";
-        }
-        String perf;
-        if (engine.activeMode == RenderMode.PATH_TRACING) {
-            perf = "PT spp " + engine.pathTracerRenderer.getAccumulatedSamples();
-        } else if (engine.activeMode == RenderMode.RAY_TRACING) {
-            perf = "RT spp " + engine.rayTracerRenderer.getAccumulatedSamples();
-        } else if (engine.activeMode == RenderMode.HEX_MOSAIC) {
-            perf = engine.hexMosaicRenderer.getName();
-        } else {
-            perf = "MT " + (engine.parallelRasterEnabled ? UiStrings.Common.YES : UiStrings.Common.NO) + " x" + engine.parallelWorkerCount;
-        }
-        String undo = engine.getUndoActionLabel();
-        String redo = engine.getRedoActionLabel();
+        String viewMode = engine.viewportDisplayedMode != null ? engine.viewportDisplayedMode.name() : "UNKNOWN";
 
-        return new String[]{
-                "REŽIM: " + modeName
-                        + (engine.viewportNavigationPreviewActive ? "  VIEW " + viewportModeName + " [FALLBACK]" : "")
-                        + (!engine.viewportNavigationPreviewActive && engine.interactiveRenderScaleActive
-                        ? "  [ADAPTIVE]" : ""),
-                String.format("FPS: %.1f  MS: %.2f", engine.hudFps, engine.hudFrameTimeMs),
-                "NAV: " + navMode + "  KAM: " + camMode + "  " + projection,
-                String.format("POZ: %.2f %.2f %.2f", pos.x, pos.y, pos.z),
-                "VÝBĚR: " + selectedName,
-                "OBJEKTY: " + engine.scene.getAllMeshEntities().size() + "  FYZ: "
-                        + (engine.physicsEnabled ? UiStrings.Common.YES : UiStrings.Common.NO),
-                "ANIMACE: " + (engine.animationPlaybackEnabled ? "PŘEHRÁVÁNÍ" : "PAUZA"),
-                "ČAS: " + (engine.timelineEnabled ? UiStrings.Common.YES : UiStrings.Common.NO)
-                        + "  F " + engine.timelineCurrentFrame
-                        + " [" + engine.timelineStartFrame + ".." + engine.timelineEndFrame + "]"
-                        + "  KLÍČE " + engine.sceneTimeline.totalKeyCount(),
-                "MĚŘÍTKO: " + String.format("%.2f", engine.effectiveRenderScale())
-                        + (engine.interactiveRenderScaleActive ? " [INT]" : "")
-                        + (engine.progressiveViewportEnabled ? String.format("  TARGET %.0f", engine.viewportTargetFps) : "")
-                        + (engine.viewportCriticalPreviewActive ? "  FALLBACK " + engine.viewportNavigationFallbackMode : "")
-                        + (engine.viewDistanceCullingEnabled ? "  RANGE " + String.format("%.0f", engine.viewDistanceLimit) : "")
-                        + (engine.sceneImportController.isBusy() ? "  IMPORT" : "")
-                        + "  " + perf,
-                "VÝSTUP: " + engine.outputRenderController.settings().width
-                        + "x" + engine.outputRenderController.settings().height
-                        + " " + UiStrings.renderModeLabel(engine.outputRenderController.settings().mode)
-                        + (engine.outputRenderController.isRenderInProgress() ? " [RENDER]" : "")
-                        + (isViewingThroughOutputCamera(engine) ? " (kamera)" : ""),
-                "HISTORIE: Ctrl+Z "
-                        + (undo.isBlank() ? "[nic]" : "[" + undo + "]")
-                        + "  Ctrl+Shift+Z "
-                        + (redo.isBlank() ? "[nic]" : "[" + redo + "]"),
-                "ČAS BĚHU: " + String.format("%.1f", elapsedSeconds) + "s"
-        };
+        long meshVersion = engine.scene != null ? engine.scene.getMeshEntityVersion() : 0L;
+        if (meshVersion != cachedSceneStatsVersion) {
+            cachedSceneStatsVersion = meshVersion;
+            cachedSceneObjectCount = 0;
+            cachedSceneTriangleCount = 0L;
+            cachedSceneVertexCount = 0L;
+            if (engine.scene != null) {
+                List<engine.scene.Entity> meshEntities = engine.scene.getAllMeshEntities();
+                cachedSceneObjectCount = meshEntities.size();
+                for (engine.scene.Entity entity : meshEntities) {
+                    if (entity == null || entity.getMesh() == null) {
+                        continue;
+                    }
+                    cachedSceneTriangleCount += entity.getMesh().getTriangleCount();
+                    cachedSceneVertexCount += entity.getMesh().getVertexCount();
+                }
+            }
+        }
+
+        List<String> lines = new ArrayList<>();
+        lines.add(String.format(Locale.ROOT, "FPS: %.1f", engine.hudFps));
+        lines.add(String.format(Locale.ROOT, "FT: %.2f ms", engine.hudFrameTimeMs));
+        lines.add(String.format(Locale.ROOT,
+                "SCL: %.2fx%s",
+                engine.effectiveRenderScale(),
+                engine.interactiveRenderScaleActive ? " INT" : ""));
+        lines.add("CAM: " + projection + " | " + navMode + " | " + camMode);
+        lines.add(String.format(Locale.ROOT, "POS: %.2f %.2f %.2f", pos.x, pos.y, pos.z));
+        lines.add("GEO: "
+                + shortCount(cachedSceneTriangleCount) + " tri | "
+                + shortCount(cachedSceneVertexCount) + " vtx | "
+                + cachedSceneObjectCount + " obj");
+
+        if (engine.progressiveViewportEnabled) {
+            lines.add(String.format(Locale.ROOT,
+                    "AUT: %s x%.2f p%.1fms d%d",
+                    engine.viewportAutoPolicyTier,
+                    engine.viewportAutoOverloadRatio,
+                    engine.viewportPredictedFrameMs,
+                    engine.viewportFrameDropStreak));
+        }
+        if (engine.viewportNavigationPreviewActive) {
+            lines.add("FBK: " + engine.viewportNavigationFallbackMode
+                    + " " + (engine.viewportFallbackLockActive ? "lock" : "auto")
+                    + " " + (engine.viewportCameraMotionActive ? "mov" : "idle"));
+        }
+
+        if (viewMode.equals(RenderMode.RAY_TRACING.name())) {
+            lines.add("SPP: " + engine.rayTracerRenderer.getAccumulatedSamples());
+            lines.add(String.format(Locale.ROOT,
+                    "RT: d%d den %s r%d s%.2f",
+                    engine.rayMaxDepth,
+                    engine.rayDenoise ? "on" : "off",
+                    engine.rayDenoiseRadius,
+                    engine.rayDenoiseStrength));
+            lines.add("BNC: di" + engine.rayDiffuseBounces
+                    + " gl" + engine.rayGlossyBounces
+                    + " tr" + engine.rayTransmissionBounces);
+        } else if (viewMode.equals(RenderMode.PATH_TRACING.name())) {
+            lines.add("SPP: " + engine.pathTracerRenderer.getAccumulatedSamples());
+            lines.add(String.format(Locale.ROOT,
+                    "PT: d%d den %s %.2fs",
+                    engine.pathMaxDepth,
+                    engine.pathDenoise ? "on" : "off",
+                    engine.viewportPathGentleMotionSeconds));
+            lines.add("DNR: " + engine.viewportPathDenoiseProfileApplied
+                    + "/" + engine.viewportPathDenoiseRuntimeModeApplied);
+            lines.add(String.format(Locale.ROOT, "CLP: d%.1f i%.1f", engine.pathClampDirect, engine.pathClampIndirect));
+        } else {
+            lines.add("RST: wk " + engine.parallelWorkerCount
+                    + " mt " + (engine.parallelRasterEnabled ? "on" : "off")
+                    + (engine.viewDistanceCullingEnabled ? String.format(Locale.ROOT, " rng %.0f", engine.viewDistanceLimit) : ""));
+        }
+
+        if (engine.sceneImportController.isBusy()) {
+            lines.add("JOB: import");
+        }
+        if (engine.outputRenderController.isRenderInProgress()) {
+            lines.add("JOB: output");
+        }
+        return lines.toArray(String[]::new);
+    }
+
+    private static String shortCount(long value) {
+        long safe = Math.max(0L, value);
+        if (safe >= 1_000_000L) {
+            return String.format(Locale.ROOT, "%.1fM", safe / 1_000_000.0);
+        }
+        if (safe >= 1_000L) {
+            return String.format(Locale.ROOT, "%.1fk", safe / 1_000.0);
+        }
+        return Long.toString(safe);
     }
 
     private static int directionalSlotForLight(Engine engine, Light light) {

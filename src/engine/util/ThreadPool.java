@@ -8,6 +8,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Tady držím pevně velký thread pool pro paralelní vykreslování.
@@ -38,7 +39,16 @@ public class ThreadPool {
         if (cpu <= 2) {
             return 1;
         }
-        int reserve = cpu >= 12 ? 2 : 1;
+        int reserve;
+        if (cpu >= 24) {
+            reserve = 4;
+        } else if (cpu >= 16) {
+            reserve = 3;
+        } else if (cpu >= 8) {
+            reserve = 2;
+        } else {
+            reserve = 1;
+        }
         return Math.max(1, cpu - reserve);
     }
 
@@ -51,13 +61,25 @@ public class ThreadPool {
         if (tasks == null || tasks.length == 0) {
             return;
         }
+        RuntimeInstrumentation.FrameToken frameToken = RuntimeInstrumentation.captureCurrentToken();
+        LongAdder workerBusyNanos = new LongAdder();
         List<Future<?>> futures = new ArrayList<>(tasks.length);
         for (Runnable task : tasks) {
             if (task != null) {
-                futures.add(executor.submit(task));
+                futures.add(executor.submit(() -> {
+                    RuntimeInstrumentation.attachFrame(frameToken);
+                    long busyStart = System.nanoTime();
+                    try {
+                        task.run();
+                    } finally {
+                        workerBusyNanos.add(Math.max(0L, System.nanoTime() - busyStart));
+                        RuntimeInstrumentation.clearAttachedFrame(frameToken);
+                    }
+                }));
             }
         }
 
+        long waitStart = System.nanoTime();
         for (Future<?> f : futures) {
             try {
                 f.get();
@@ -68,6 +90,14 @@ public class ThreadPool {
                 throw new RuntimeException("ThreadPool task failed.", e.getCause());
             }
         }
+        long waitNanos = Math.max(0L, System.nanoTime() - waitStart);
+        long busyNanos = workerBusyNanos.sum();
+        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WORKER_WAIT_NS, waitNanos);
+        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WORKER_BUSY_NS, busyNanos);
+        long totalWindowNanos = waitNanos * Math.max(1, futures.size());
+        RuntimeInstrumentation.addCounter(
+                RuntimeInstrumentation.Counter.WORKER_IDLE_NS,
+                Math.max(0L, totalWindowNanos - busyNanos));
     }
 
     /**

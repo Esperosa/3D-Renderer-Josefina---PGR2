@@ -1,3 +1,32 @@
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+
 import engine.camera.PerspectiveCamera;
 import engine.core.RenderMode;
 import engine.geometry.MeshGenerator;
@@ -19,34 +48,7 @@ import engine.scene.Entity;
 import engine.scene.Scene;
 import engine.util.AnimatedGifWriter;
 import engine.util.MjpegAviWriter;
-
-import javax.imageio.IIOImage;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import engine.util.ThreadPool;
 
 /**
  * Tady generuju reprodukovatelný report s metrikami projektu a lehkým renderer benchmarkem.
@@ -103,7 +105,7 @@ public final class ProjectMetricsReport {
         projectCounts.put("Featured primitiva", invokeStringArraySize("engine.core.EngineSceneActions", "featuredPrimitiveTypes"));
 
         ImportStats importStats = collectImportStats(repoRoot);
-        EnumMap<TestBucket, Integer> testBuckets = classifyTestSuites(suiteEntries);
+        Map<TestBucket, Integer> testBuckets = classifyTestSuites(suiteEntries);
         BenchmarkEnvironment environment = BenchmarkEnvironment.capture();
         RendererBenchmarkSuite.BenchmarkMatrixReport benchmarkMatrix = RendererBenchmarkSuite.runMatrixBenchmarks();
         Scene scene = buildBenchmarkScene();
@@ -124,7 +126,7 @@ public final class ProjectMetricsReport {
     }
 
     private static JavaTreeStats scanJavaTree(Path root) throws Exception {
-        int files = 0;
+        int files;
         int totalLines = 0;
         int nonBlankLines = 0;
         try (Stream<Path> stream = Files.walk(root)) {
@@ -231,41 +233,44 @@ public final class ProjectMetricsReport {
         return TestBucket.OTHER;
     }
 
+    @SuppressWarnings("unused")
     private static List<BenchmarkResult> runBenchmarks() {
         Scene scene = buildBenchmarkScene();
         PerspectiveCamera camera = buildBenchmarkCamera();
+        int workers = resolveBenchmarkWorkerCount();
+        boolean parallel = workers > 1;
         List<BenchmarkResult> results = new ArrayList<>();
         results.add(benchmarkRenderer("Raster / PHONG", 256, 256, 3, 2, 5, 0.35, () -> {
             RasterRenderer renderer = new RasterRenderer();
-            renderer.setParameter("parallel", false);
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("parallel", parallel);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("unlitMode", false);
             renderer.setParameter("backfaceCulling", false);
             return renderer;
         }, scene, camera));
         results.add(benchmarkRenderer("Dithering", 256, 256, 3, 2, 5, 0.35, () -> {
             DitherRenderer renderer = new DitherRenderer();
-            renderer.setParameter("parallel", false);
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("parallel", parallel);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("style", DitherRenderer.DitherStyle.BLUE_NOISE);
             return renderer;
         }, scene, camera));
         results.add(benchmarkRenderer("Temporal Noise", 256, 256, 3, 2, 5, 0.35, () -> {
             TemporalNoiseRenderer renderer = new TemporalNoiseRenderer();
-            renderer.setParameter("parallel", false);
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("parallel", parallel);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("debugView", TemporalNoiseRenderer.DebugView.FINAL);
             return renderer;
         }, scene, camera));
         results.add(benchmarkRenderer("Hex Mosaic", 256, 256, 3, 2, 5, 0.35, () -> {
             HexMosaicRenderer renderer = new HexMosaicRenderer();
-            renderer.setParameter("parallel", false);
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("parallel", parallel);
+            renderer.setParameter("workerCount", workers);
             return renderer;
         }, scene, camera));
         results.add(benchmarkRenderer("Ray Tracing", 96, 96, 3, 1, 5, 0.35, () -> {
             RayTracerRenderer renderer = new RayTracerRenderer();
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("samplesPerFrame", 1);
             renderer.setParameter("maxDepth", 3);
             renderer.setParameter("sky", false);
@@ -274,7 +279,7 @@ public final class ProjectMetricsReport {
         }, scene, camera));
         results.add(benchmarkRenderer("Path Tracing", 96, 96, 3, 1, 5, 0.35, () -> {
             PathTracerRenderer renderer = new PathTracerRenderer();
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("samplesPerFrame", 1);
             renderer.setParameter("maxDepth", 3);
             renderer.setParameter("sky", false);
@@ -284,26 +289,29 @@ public final class ProjectMetricsReport {
         return results;
     }
 
+    @SuppressWarnings("unused")
     private static List<ResolutionScalingResult> runResolutionScalingBenchmarks(Scene scene, PerspectiveCamera camera) {
+        int workers = resolveBenchmarkWorkerCount();
+        boolean parallel = workers > 1;
         List<ResolutionScalingResult> rows = new ArrayList<>();
         rows.add(benchmarkScalingRow("Raster / PHONG", scene, camera, () -> {
             RasterRenderer renderer = new RasterRenderer();
-            renderer.setParameter("parallel", false);
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("parallel", parallel);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("unlitMode", false);
             renderer.setParameter("backfaceCulling", false);
             return renderer;
         }));
         rows.add(benchmarkScalingRow("Temporal Noise", scene, camera, () -> {
             TemporalNoiseRenderer renderer = new TemporalNoiseRenderer();
-            renderer.setParameter("parallel", false);
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("parallel", parallel);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("debugView", TemporalNoiseRenderer.DebugView.FINAL);
             return renderer;
         }));
         rows.add(benchmarkScalingRow("Ray Tracing", scene, camera, () -> {
             RayTracerRenderer renderer = new RayTracerRenderer();
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("samplesPerFrame", 1);
             renderer.setParameter("maxDepth", 3);
             renderer.setParameter("sky", false);
@@ -312,7 +320,7 @@ public final class ProjectMetricsReport {
         }));
         rows.add(benchmarkScalingRow("Path Tracing", scene, camera, () -> {
             PathTracerRenderer renderer = new PathTracerRenderer();
-            renderer.setParameter("workerCount", 1);
+            renderer.setParameter("workerCount", workers);
             renderer.setParameter("samplesPerFrame", 1);
             renderer.setParameter("maxDepth", 3);
             renderer.setParameter("sky", false);
@@ -370,6 +378,8 @@ public final class ProjectMetricsReport {
             max = Math.max(max, sorted[sorted.length - 1]);
             medians[pass] = medianOfSorted(sorted);
             means[pass] = Arrays.stream(passSamples).average().orElse(0.0);
+            shutdownRenderer(renderer);
+            cleanupBenchmarkResources();
         }
 
         double[] sortedMedians = medians.clone();
@@ -397,6 +407,8 @@ public final class ProjectMetricsReport {
         for (ResolutionCase resolution : RESOLUTION_CASES) {
             List<BufferedImage> frames = renderBenchmarkFrames(scene, camera, resolution, 8);
             samples.add(measureExportResolution(label, resolution, frames, writer));
+            frames.clear();
+            cleanupBenchmarkResources();
         }
         return new ExportBenchmarkResult(label, samples);
     }
@@ -484,6 +496,8 @@ public final class ProjectMetricsReport {
             max = Math.max(max, sorted[sorted.length - 1]);
             medians[pass] = medianOfSorted(sorted);
             means[pass] = Arrays.stream(samples).average().orElse(0.0);
+            shutdownRenderer(renderer);
+            cleanupBenchmarkResources();
         }
 
         double[] sortedMedians = medians.clone();
@@ -550,8 +564,9 @@ public final class ProjectMetricsReport {
                                                              ResolutionCase resolution,
                                                              int frameCount) {
         RasterRenderer renderer = new RasterRenderer();
-        renderer.setParameter("parallel", false);
-        renderer.setParameter("workerCount", 1);
+        int workers = resolveBenchmarkWorkerCount();
+        renderer.setParameter("parallel", workers > 1);
+        renderer.setParameter("workerCount", workers);
         renderer.setParameter("unlitMode", false);
         renderer.setParameter("backfaceCulling", false);
         renderer.init(resolution.width(), resolution.height());
@@ -567,7 +582,48 @@ public final class ProjectMetricsReport {
             renderer.render(scene, camera, fb, frame * 0.1);
             frames.add(framebufferToImage(fb));
         }
+        shutdownRenderer(renderer);
+        cleanupBenchmarkResources();
         return frames;
+    }
+
+    private static int resolveBenchmarkWorkerCount() {
+        int available = Math.max(1, Runtime.getRuntime().availableProcessors());
+        double scale = resolveCpuScale();
+        int scaled = Math.max(1, (int) Math.ceil(available * scale));
+        return Math.max(1, Math.min(ThreadPool.recommendedWorkerCount(), scaled));
+    }
+
+    private static double resolveCpuScale() {
+        String raw = System.getProperty("metrics.cpu.scale");
+        if (raw == null || raw.isBlank()) {
+            return 0.7;
+        }
+        try {
+            double value = Double.parseDouble(raw.trim());
+            if (!Double.isFinite(value)) {
+                return 0.7;
+            }
+            return Math.max(0.1, Math.min(1.0, value));
+        } catch (NumberFormatException ex) {
+            return 0.7;
+        }
+    }
+
+    private static void shutdownRenderer(Renderer renderer) {
+        if (renderer == null) {
+            return;
+        }
+        try {
+            renderer.setParameter("shutdown", true);
+        } catch (RuntimeException ignored) {
+            // Some renderers do not use an explicit shutdown flag.
+        }
+    }
+
+    private static void cleanupBenchmarkResources() {
+        System.gc();
+        System.runFinalization();
     }
 
     private static BufferedImage framebufferToImage(FrameBuffer fb) {
@@ -785,7 +841,7 @@ public final class ProjectMetricsReport {
                                  BenchmarkEnvironment environment,
                                  LinkedHashMap<String, Integer> projectCounts,
                                  ImportStats importStats,
-                                 EnumMap<TestBucket, Integer> testBuckets,
+                                 Map<TestBucket, Integer> testBuckets,
                                  RendererBenchmarkSuite.BenchmarkMatrixReport benchmarkMatrix,
                                  SceneComplexityStats sceneComplexity,
                                  List<ExportBenchmarkResult> exportBenchmarks) {
@@ -858,7 +914,7 @@ public final class ProjectMetricsReport {
                     .append(benchmarkMatrix.hostMetadata.maxMemoryMb)
                     .append(" MB |\n");
             out.append("| Benchmark CPU descriptor | ").append(benchmarkMatrix.hostMetadata.cpuDescriptor).append(" |\n");
-            out.append("| Per-case child metadata | `runtime_processors`, `max_memory_mb`, `java_*`, `os_*`, `cpu_descriptor` jsou v CSV po kazdem case; `Half CPU` child typicky vidi `13` processoru kvuli `ActiveProcessorCount` |\n");
+            out.append("| Per-case child metadata | `runtime_processors`, `max_memory_mb`, `java_*`, `os_*`, `cpu_descriptor` jsou v CSV po kazdem case; `Scaled CPU` child typicky vidi procesory podle `ActiveProcessorCount` |\n");
             out.append("| Interpretace Temporal Noise | steady-frame ve staticke scene typicky reuseuje analyzu; pro realny zaver cti i `dynamic-sequence` audit |\n");
             out.append('\n');
 

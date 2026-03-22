@@ -57,6 +57,7 @@ public final class MaterialGraphAuthoring {
         node.setNumber("metallic", material.getMetallic());
         node.setNumber("specular", material.getSpecularFactor());
         node.setNumber("ior", material.getRefractiveIndex());
+        node.setNumber("dispersion", material.getDispersion());
         node.setNumber("transmission", material.getTransmission());
         node.setNumber("opacity", material.getOpacity());
         node.setColor("emission", copyColor(material.getEmissionColor()));
@@ -71,6 +72,7 @@ public final class MaterialGraphAuthoring {
         node.setColor("color", copyColor(material.getDiffuseColor()));
         node.setNumber("roughness", Math.min(1.0, Math.max(0.0, material.getRoughness())));
         node.setNumber("ior", Math.max(1.0, material.getRefractiveIndex()));
+        node.setNumber("dispersion", material.getDispersion());
         node.setNumber("opacity", material.getOpacity());
     }
 

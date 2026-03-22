@@ -1,7 +1,6 @@
 package engine.core;
 
 import engine.core.history.EditorCommand;
-import engine.core.history.HistoryTransaction;
 import engine.core.history.SnapshotEditorCommand;
 import engine.material.MaterialNodeGraph;
 import engine.material.PhongMaterial;
@@ -27,7 +26,6 @@ import java.util.function.Supplier;
 
 final class EngineHistoryManager {
     private static final IdentityHashMap<Engine, SceneSnapshot> LAST_SCENE_BASELINES = new IdentityHashMap<>();
-    private static final IdentityHashMap<Engine, TimelineSnapshot> LAST_TIMELINE_BASELINES = new IdentityHashMap<>();
     private static final IdentityHashMap<Engine, PendingSceneGesture> PENDING_SCENE_GESTURES = new IdentityHashMap<>();
 
     private EngineHistoryManager() {
@@ -42,15 +40,6 @@ final class EngineHistoryManager {
         engine.activeHistoryTransaction = null;
         PENDING_SCENE_GESTURES.remove(engine);
         LAST_SCENE_BASELINES.put(engine, captureSceneSnapshot(engine));
-        LAST_TIMELINE_BASELINES.put(engine, captureTimelineSnapshot(engine));
-    }
-
-    static void updateActionHistory(Engine engine) {
-        // Záměrně prázdné. Historie už nesmí vznikat pollingem po framech.
-    }
-
-    static boolean isHistoryRestoring(Engine engine) {
-        return engine != null && engine.historyRestoring;
     }
 
     static String getUndoLabel(Engine engine) {
@@ -69,29 +58,6 @@ final class EngineHistoryManager {
         return command == null ? "" : command.getLabel();
     }
 
-    static void beginTransaction(Engine engine, String label) {
-        if (engine == null || engine.historyRestoring) {
-            return;
-        }
-        engine.activeHistoryTransaction = new HistoryTransaction(label);
-    }
-
-    static void commitTransaction(Engine engine) {
-        if (engine == null || engine.activeHistoryTransaction == null) {
-            return;
-        }
-        EditorCommand command = engine.activeHistoryTransaction.toCommand();
-        engine.activeHistoryTransaction = null;
-        if (command != null) {
-            pushCommand(engine, command);
-        }
-    }
-
-    static void cancelTransaction(Engine engine) {
-        if (engine != null) {
-            engine.activeHistoryTransaction = null;
-        }
-    }
 
     static void beginSceneGesture(Engine engine, String label) {
         if (engine == null || engine.historyRestoring || PENDING_SCENE_GESTURES.containsKey(engine)) {
@@ -113,7 +79,6 @@ final class EngineHistoryManager {
         if (command != null) {
             pushCommand(engine, command);
             LAST_SCENE_BASELINES.put(engine, after);
-            LAST_TIMELINE_BASELINES.put(engine, after.timeline);
         }
     }
 
@@ -153,7 +118,6 @@ final class EngineHistoryManager {
             pushCommand(engine, command);
         }
         LAST_SCENE_BASELINES.put(engine, after);
-        LAST_TIMELINE_BASELINES.put(engine, after == null ? null : after.timeline);
         return result;
     }
 
@@ -180,7 +144,6 @@ final class EngineHistoryManager {
         if (command != null) {
             pushCommand(engine, command);
         }
-        LAST_TIMELINE_BASELINES.put(engine, after);
         SceneSnapshot baseline = LAST_SCENE_BASELINES.get(engine);
         if (baseline != null) {
             baseline.timeline = after;
@@ -294,7 +257,6 @@ final class EngineHistoryManager {
 
     private static void syncBaselines(Engine engine) {
         LAST_SCENE_BASELINES.put(engine, captureSceneSnapshot(engine));
-        LAST_TIMELINE_BASELINES.put(engine, captureTimelineSnapshot(engine));
         PENDING_SCENE_GESTURES.remove(engine);
     }
 
@@ -341,6 +303,8 @@ final class EngineHistoryManager {
         snapshot.worldLightColor = copyVec3(engine.worldLightColor);
         snapshot.worldBackgroundColor = copyVec3(engine.worldBackgroundColor);
         snapshot.worldPresetKey = engine.worldPresetKey;
+        snapshot.worldEnvironmentYawDegrees = engine.worldEnvironmentYawDegrees;
+        snapshot.worldEnvironmentPitchDegrees = engine.worldEnvironmentPitchDegrees;
         snapshot.worldSunBaseIntensity = engine.worldSunBaseIntensity;
         snapshot.worldFillBaseIntensity = engine.worldFillBaseIntensity;
         snapshot.worldWarmBaseIntensity = engine.worldWarmBaseIntensity;
@@ -445,6 +409,8 @@ final class EngineHistoryManager {
         engine.worldLightColor = copyVec3(snapshot.worldLightColor);
         engine.worldBackgroundColor = copyVec3(snapshot.worldBackgroundColor);
         engine.worldPresetKey = snapshot.worldPresetKey;
+        engine.worldEnvironmentYawDegrees = snapshot.worldEnvironmentYawDegrees;
+        engine.worldEnvironmentPitchDegrees = snapshot.worldEnvironmentPitchDegrees;
         engine.worldSunBaseIntensity = snapshot.worldSunBaseIntensity;
         engine.worldFillBaseIntensity = snapshot.worldFillBaseIntensity;
         engine.worldWarmBaseIntensity = snapshot.worldWarmBaseIntensity;
@@ -647,6 +613,8 @@ final class EngineHistoryManager {
         if (!vecEquals(a.worldLightColor, b.worldLightColor)
                 || !vecEquals(a.worldBackgroundColor, b.worldBackgroundColor)
                 || !stringEquals(a.worldPresetKey, b.worldPresetKey)
+            || !nearEqual(a.worldEnvironmentYawDegrees, b.worldEnvironmentYawDegrees)
+            || !nearEqual(a.worldEnvironmentPitchDegrees, b.worldEnvironmentPitchDegrees)
                 || !nearEqual(a.worldSunBaseIntensity, b.worldSunBaseIntensity)
                 || !nearEqual(a.worldFillBaseIntensity, b.worldFillBaseIntensity)
                 || !nearEqual(a.worldWarmBaseIntensity, b.worldWarmBaseIntensity)
@@ -789,6 +757,7 @@ final class EngineHistoryManager {
                 .append(material.getShininess()).append('|')
                 .append(material.getReflectivity()).append('|')
                 .append(material.getRefractiveIndex()).append('|')
+                .append(material.getDispersion()).append('|')
                 .append(textureMapSignature(material.getDiffuseMap())).append('|')
                 .append(textureMapSignature(material.getNormalMap())).append('|')
                 .append(textureMapSignature(material.getMetallicRoughnessMap())).append('|')
@@ -1021,6 +990,8 @@ final class EngineHistoryManager {
         Vec3 worldLightColor;
         Vec3 worldBackgroundColor;
         String worldPresetKey;
+        double worldEnvironmentYawDegrees;
+        double worldEnvironmentPitchDegrees;
         double worldSunBaseIntensity;
         double worldFillBaseIntensity;
         double worldWarmBaseIntensity;

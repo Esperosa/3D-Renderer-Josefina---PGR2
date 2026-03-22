@@ -1,6 +1,17 @@
 package engine.core;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.IntConsumer;
+
 import engine.camera.Camera;
+import engine.math.Vec3;
 import engine.render.FrameBuffer;
 import engine.render.Renderer;
 import engine.render.post.DitherRenderer;
@@ -9,25 +20,17 @@ import engine.render.post.TemporalNoiseRenderer;
 import engine.render.post.WireframeRenderer;
 import engine.render.raster.RasterRenderer;
 import engine.render.ray.PathTracerRenderer;
+import engine.render.ray.ProgressiveRenderDefaults;
 import engine.render.ray.RayTracerRenderer;
+import engine.scene.Scene;
 import engine.sim.water.WaterParticleRenderer;
 import engine.sim.water.WaterSimulation;
-import engine.math.Vec3;
-import engine.scene.Scene;
 import engine.ui.UiStrings;
 import engine.util.AnimatedGifWriter;
 import engine.util.BitFont;
 import engine.util.MjpegAviWriter;
+import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
-
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Locale;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.IntConsumer;
 
 /**
  * Tady řídím finální output rendering mimo realtime viewport.
@@ -72,8 +75,12 @@ public class OutputRenderController {
         public boolean reflections = true;
         public boolean sky = true;
         public boolean denoise = true;
-        public int denoiseRadius = 2;
-        public double denoiseStrength = 0.50;
+        public int denoiseRadius = ProgressiveRenderDefaults.OUTPUT_DENOISE_RADIUS;
+        public double denoiseStrength = ProgressiveRenderDefaults.OUTPUT_DENOISE_STRENGTH;
+        public String toneMap = "EXPOSURE";
+        public double pathClampDirect = ProgressiveRenderDefaults.OUTPUT_PATH_CLAMP_DIRECT;
+        public double pathClampIndirect = ProgressiveRenderDefaults.OUTPUT_PATH_CLAMP_INDIRECT;
+        public boolean referenceClampEnabled = true;
         public boolean wireframeDepthHiddenLines = true;
         public boolean wireframeSilhouetteBoost = true;
         public boolean wireframeDashedMode = false;
@@ -112,10 +119,10 @@ public class OutputRenderController {
     private volatile String progressMessage;
     private volatile long renderStartNanos;
     private volatile long progressUiLastUpdateNanos;
-    private volatile int[] viewportPreviewPixels;
+    private final AtomicReference<int[]> viewportPreviewPixels;
     private volatile int viewportPreviewWidth;
     private volatile int viewportPreviewHeight;
-    private volatile String[] viewportPreviewLines;
+    private final AtomicReference<String[]> viewportPreviewLines;
     private volatile long viewportPreviewLastPublishNanos;
     private volatile OutputRenderJob activeViewportPreviewJob;
     private volatile int progressFrameNumber;
@@ -124,7 +131,6 @@ public class OutputRenderController {
     private volatile int progressFramesCompleted;
     private volatile String progressCurrentFile;
     private volatile String progressOutputFolder;
-    private volatile long progressCurrentFrameStartedNanos;
 
     public OutputRenderController() {
         this.settings = new Settings();
@@ -136,10 +142,10 @@ public class OutputRenderController {
         this.progressMessage = "Nečinný";
         this.renderStartNanos = 0L;
         this.progressUiLastUpdateNanos = 0L;
-        this.viewportPreviewPixels = new int[]{0xFF050608};
+        this.viewportPreviewPixels = new AtomicReference<>(new int[]{0xFF050608});
         this.viewportPreviewWidth = 1;
         this.viewportPreviewHeight = 1;
-        this.viewportPreviewLines = new String[0];
+        this.viewportPreviewLines = new AtomicReference<>(new String[0]);
         this.viewportPreviewLastPublishNanos = 0L;
         this.activeViewportPreviewJob = null;
         this.progressFrameNumber = 0;
@@ -148,7 +154,6 @@ public class OutputRenderController {
         this.progressFramesCompleted = 0;
         this.progressCurrentFile = "";
         this.progressOutputFolder = "";
-        this.progressCurrentFrameStartedNanos = 0L;
     }
 
     public Settings settings() {
@@ -156,12 +161,12 @@ public class OutputRenderController {
     }
 
     public boolean hasViewportPreview() {
-        return viewportPreviewPixels != null
-                && viewportPreviewPixels.length >= Math.max(1, viewportPreviewWidth * viewportPreviewHeight);
+        int[] pixels = viewportPreviewPixels.get();
+        return pixels != null && pixels.length >= Math.max(1, viewportPreviewWidth * viewportPreviewHeight);
     }
 
     public int[] getViewportPreviewPixels() {
-        return viewportPreviewPixels;
+        return viewportPreviewPixels.get();
     }
 
     public int getViewportPreviewWidth() {
@@ -173,7 +178,7 @@ public class OutputRenderController {
     }
 
     public String[] getViewportPreviewLines() {
-        String[] lines = viewportPreviewLines;
+        String[] lines = viewportPreviewLines.get();
         return lines == null ? new String[0] : lines.clone();
     }
 
@@ -211,6 +216,9 @@ public class OutputRenderController {
                 ? engine.hexMosaicRenderer.getWowModeName()
                 : settings.hexWowMode;
         settings.hexWowStrength = engine.hexWowStrength;
+        settings.toneMap = engine.activeMode == RenderMode.RAY_TRACING
+            ? engine.rayToneMap
+            : engine.pathToneMap;
     }
 
     public boolean isRenderInProgress() {
@@ -363,7 +371,7 @@ public class OutputRenderController {
         try {
             job.paths = createSessionPaths(job);
             job.session = new OutputRenderSessionContext();
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             progressMessage = "Output render selhal: " + ex.getMessage();
             clearViewportPreview();
             System.out.println(progressMessage);
@@ -382,7 +390,6 @@ public class OutputRenderController {
         progressFramesCompleted = 0;
         progressCurrentFile = "";
         progressOutputFolder = job.paths.sessionFolder.toString();
-        progressCurrentFrameStartedNanos = renderStartNanos;
         openProgressDialog(job);
 
         Thread worker = new Thread(() -> runRenderJob(scene, cameraBuilder, visibilityApplier, timelineFrameApplier, job),
@@ -441,9 +448,14 @@ public class OutputRenderController {
         job.shadows = settings.shadows;
         job.reflections = settings.reflections;
         job.sky = settings.sky;
+        job.referencePathMode = job.mode == RenderMode.PATH_TRACING;
         job.denoise = settings.denoise;
         job.denoiseRadius = Math.max(1, Math.min(4, settings.denoiseRadius));
         job.denoiseStrength = Math.max(0.0, Math.min(1.0, settings.denoiseStrength));
+        job.toneMap = settings.toneMap;
+        job.pathClampDirect = Math.max(0.0, settings.pathClampDirect);
+        job.pathClampIndirect = Math.max(0.0, settings.pathClampIndirect);
+        job.referenceClampEnabled = settings.referenceClampEnabled;
         job.wireframeDepthHiddenLines = settings.wireframeDepthHiddenLines;
         job.wireframeSilhouetteBoost = settings.wireframeSilhouetteBoost;
         job.wireframeDashedMode = settings.wireframeDashedMode;
@@ -582,7 +594,7 @@ public class OutputRenderController {
                 visibilityApplier.accept(false);
                 visibilityApplied = false;
             }
-        } catch (Exception ex) {
+        } catch (IOException | RuntimeException ex) {
             finalStatus = "Chyba: " + ex.getMessage();
             System.out.println("Output render failed: " + ex.getMessage());
             ex.printStackTrace(System.out);
@@ -810,10 +822,12 @@ public class OutputRenderController {
                                             int timelineFrame,
                                             int frameIndex,
                                             int frameCount) {
+        RuntimeInstrumentation.FrameToken frameToken =
+                RuntimeInstrumentation.beginFrame(RuntimeInstrumentation.FrameKind.OUTPUT, "output");
+        try {
         progressFrameIndex = frameIndex;
         progressFrameCount = Math.max(1, frameCount);
         progressFrameNumber = timelineFrame >= 0 ? timelineFrame : job.stillFrame;
-        progressCurrentFrameStartedNanos = System.nanoTime();
         if (timelineFrameApplier != null && timelineFrame >= 0) {
             timelineFrameApplier.accept(timelineFrame);
         }
@@ -822,6 +836,7 @@ public class OutputRenderController {
         if (renderCamera == null) {
             throw new IllegalStateException("Output camera builder returned null.");
         }
+        RuntimeInstrumentation.recordMode(job.mode, job.mode);
 
         double renderTimeSeconds = timelineFrame >= 0
                 ? (timelineFrame / Math.max(1.0, job.frameRate))
@@ -844,11 +859,14 @@ public class OutputRenderController {
         String phase = timelineFrame >= 0
                 ? "Snímek " + timelineFrame + " (" + (frameIndex + 1) + "/" + frameCount + ")"
                 : UiStrings.Output.STILL_IMAGE;
+        long outputRenderStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.OUTPUT_RENDER_TOTAL);
         renderProgressive(scene, job, renderCamera, outFb, renderTimeSeconds, doneBase, doneRange, total, phase);
         if (renderCancelRequested) {
+            RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.OUTPUT_RENDER_TOTAL, outputRenderStage);
             return null;
         }
         renderWaterOverlay(scene, renderCamera, outFb, renderTimeSeconds);
+        RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.OUTPUT_RENDER_TOTAL, outputRenderStage);
         publishViewportPreview(job, outFb, true);
         progressFramesCompleted = Math.min(frameCount, frameIndex + 1);
         if (job.session != null) {
@@ -858,7 +876,13 @@ public class OutputRenderController {
                 && (job.requestType == OutputRenderRequestType.STILL
                 || job.requestType == OutputRenderRequestType.IMAGE_SEQUENCE)
                 && "png".equals(job.imageFormat);
-        return OutputRenderArtifacts.framebufferToImage(outFb, job.width, job.height, withAlpha);
+        long copyStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.OUTPUT_COPY_ENCODE);
+        BufferedImage image = OutputRenderArtifacts.framebufferToImage(outFb, job.width, job.height, withAlpha);
+        RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.OUTPUT_COPY_ENCODE, copyStage);
+        return image;
+        } finally {
+            RuntimeInstrumentation.endFrame(frameToken);
+        }
     }
 
     private void renderProgressive(Scene scene,
@@ -941,8 +965,8 @@ public class OutputRenderController {
         int w = fb.getWidth();
         int h = fb.getHeight();
 
-        switch (job.mode) {
-            case MODEL: {
+        return switch (job.mode) {
+            case MODEL -> {
                 RasterRenderer renderer = new RasterRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("parallel", true);
@@ -951,9 +975,9 @@ public class OutputRenderController {
                 renderer.setParameter("backfaceCulling", job.backfaceCulling);
                 renderer.setParameter("unlitMode", true);
                 renderer.setParameter("modelPreviewMode", true);
-                return renderer;
+                yield renderer;
             }
-            case BASIC: {
+            case BASIC -> {
                 RasterRenderer renderer = new RasterRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("parallel", true);
@@ -962,9 +986,9 @@ public class OutputRenderController {
                 renderer.setParameter("backfaceCulling", job.backfaceCulling);
                 renderer.setParameter("unlitMode", true);
                 renderer.setParameter("modelPreviewMode", false);
-                return renderer;
+                yield renderer;
             }
-            case PHONG: {
+            case PHONG -> {
                 RasterRenderer renderer = new RasterRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("parallel", true);
@@ -973,17 +997,17 @@ public class OutputRenderController {
                 renderer.setParameter("backfaceCulling", job.backfaceCulling);
                 renderer.setParameter("unlitMode", false);
                 renderer.setParameter("modelPreviewMode", false);
-                return renderer;
+                yield renderer;
             }
-            case WIREFRAME: {
+            case WIREFRAME -> {
                 WireframeRenderer renderer = new WireframeRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("depthHiddenLines", job.wireframeDepthHiddenLines);
                 renderer.setParameter("silhouetteBoost", job.wireframeSilhouetteBoost);
                 renderer.setParameter("dashedMode", job.wireframeDashedMode);
-                return renderer;
+                yield renderer;
             }
-            case DITHERING: {
+            case DITHERING -> {
                 DitherRenderer renderer = new DitherRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("parallel", true);
@@ -997,9 +1021,9 @@ public class OutputRenderController {
                 renderer.setParameter("invert", job.ditherInvert);
                 renderer.setParameter("cellSize", job.ditherCellSize);
                 renderer.setParameter("asciiCharset", job.ditherAsciiCharset);
-                return renderer;
+                yield renderer;
             }
-            case TEMPORAL_NOISE: {
+            case TEMPORAL_NOISE -> {
                 TemporalNoiseRenderer renderer = new TemporalNoiseRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("parallel", true);
@@ -1014,9 +1038,9 @@ public class OutputRenderController {
                 renderer.setParameter("edgeBlendStrength", job.temporalEdgeBlendStrength);
                 renderer.setParameter("grainCellSize", job.temporalGrainCellSize);
                 renderer.setParameter("paletteLevels", job.temporalPaletteLevels);
-                return renderer;
+                yield renderer;
             }
-            case HEX_MOSAIC: {
+            case HEX_MOSAIC -> {
                 HexMosaicRenderer renderer = new HexMosaicRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("parallel", true);
@@ -1031,41 +1055,11 @@ public class OutputRenderController {
                 renderer.setParameter("debugCells", job.hexDebugCells);
                 renderer.setParameter("wowMode", job.hexWowMode);
                 renderer.setParameter("wowStrength", job.hexWowStrength);
-                return renderer;
+                yield renderer;
             }
-            case RAY_TRACING: {
-                RayTracerRenderer renderer = new RayTracerRenderer();
-                renderer.init(w, h);
-                renderer.setParameter("workerCount", job.workerCount);
-                renderer.setParameter("tileSize", job.tileSize);
-                renderer.setParameter("samplesPerFrame", job.samplesPerStep);
-                renderer.setParameter("maxDepth", job.maxDepth);
-                renderer.setParameter("directLighting", job.directLighting);
-                renderer.setParameter("shadows", job.shadows);
-                renderer.setParameter("reflections", job.reflections);
-                renderer.setParameter("sky", job.sky);
-                renderer.setParameter("denoise", job.denoise);
-                renderer.setParameter("denoiseRadius", job.denoiseRadius);
-                renderer.setParameter("denoiseStrength", job.denoiseStrength);
-                renderer.setParameter("reset", true);
-                return renderer;
-            }
-            case PATH_TRACING: {
-                PathTracerRenderer renderer = new PathTracerRenderer();
-                renderer.init(w, h);
-                renderer.setParameter("workerCount", job.workerCount);
-                renderer.setParameter("tileSize", job.tileSize);
-                renderer.setParameter("samplesPerFrame", job.samplesPerStep);
-                renderer.setParameter("maxDepth", job.maxDepth);
-                renderer.setParameter("directLighting", job.directLighting);
-                renderer.setParameter("sky", job.sky);
-                renderer.setParameter("denoise", job.denoise);
-                renderer.setParameter("denoiseRadius", job.denoiseRadius);
-                renderer.setParameter("denoiseStrength", job.denoiseStrength);
-                renderer.setParameter("reset", true);
-                return renderer;
-            }
-            default: {
+            case RAY_TRACING -> createRayTracingRenderer(job, w, h);
+            case PATH_TRACING -> createPathTracingRenderer(job, w, h);
+            default -> {
                 RasterRenderer renderer = new RasterRenderer();
                 renderer.init(w, h);
                 renderer.setParameter("parallel", true);
@@ -1073,9 +1067,68 @@ public class OutputRenderController {
                 renderer.setParameter("frustumCulling", job.frustumCulling);
                 renderer.setParameter("backfaceCulling", job.backfaceCulling);
                 renderer.setParameter("unlitMode", false);
-                return renderer;
+                yield renderer;
             }
-        }
+        };
+    }
+
+    private RayTracerRenderer createRayTracingRenderer(OutputRenderJob job, int width, int height) {
+        RayTracerRenderer renderer = new RayTracerRenderer();
+        renderer.init(width, height);
+        renderer.setParameter("autohardware", false);
+        renderer.setParameter("autoworkers", false);
+        renderer.setParameter("autotilesize", false);
+        renderer.setParameter("workerCount", job.workerCount);
+        renderer.setParameter("tileSize", job.tileSize);
+        renderer.setParameter("samplesPerFrame", job.samplesPerStep);
+        renderer.setParameter("maxDepth", job.maxDepth);
+        renderer.setParameter("directLighting", job.directLighting);
+        renderer.setParameter("shadows", job.shadows);
+        renderer.setParameter("reflections", job.reflections);
+        renderer.setParameter("sky", job.sky);
+        renderer.setParameter("adaptiveSampling", true);
+        renderer.setParameter("adaptiveMinSamples", ProgressiveRenderDefaults.OUTPUT_RAY_ADAPTIVE_MIN_SAMPLES);
+        renderer.setParameter("adaptiveThreshold", ProgressiveRenderDefaults.OUTPUT_RAY_ADAPTIVE_THRESHOLD);
+        renderer.setParameter("denoise", job.denoise);
+        renderer.setParameter("denoiseRadius", job.denoiseRadius);
+        renderer.setParameter("denoiseStrength", job.denoiseStrength);
+        renderer.setParameter("denoiseProfile", "QUALITY");
+        renderer.setParameter("denoiseRuntimeMode", "FULL_FRAME");
+        renderer.setParameter("denoiseTilePreset", "QUALITY");
+        renderer.setParameter("toneMap", job.toneMap);
+        renderer.setParameter("reset", true);
+        return renderer;
+    }
+
+    private PathTracerRenderer createPathTracingRenderer(OutputRenderJob job, int width, int height) {
+        PathTracerRenderer renderer = new PathTracerRenderer();
+        renderer.init(width, height);
+        renderer.setParameter("autohardware", false);
+        renderer.setParameter("autoworkers", false);
+        renderer.setParameter("autotilesize", false);
+        renderer.setParameter("workerCount", job.workerCount);
+        renderer.setParameter("tileSize", job.tileSize);
+        renderer.setParameter("samplesPerFrame", job.samplesPerStep);
+        renderer.setParameter("maxDepth", job.maxDepth);
+        renderer.setParameter("directLighting", job.directLighting);
+        renderer.setParameter("sky", job.sky);
+        renderer.setParameter("referenceMode", job.referencePathMode);
+        renderer.setParameter("historyFireflyClamp", !job.referencePathMode);
+        renderer.setParameter("adaptiveSampling", true);
+        renderer.setParameter("adaptiveMinSamples", ProgressiveRenderDefaults.OUTPUT_PATH_ADAPTIVE_MIN_SAMPLES);
+        renderer.setParameter("adaptiveThreshold", ProgressiveRenderDefaults.OUTPUT_PATH_ADAPTIVE_THRESHOLD);
+        renderer.setParameter("denoise", job.denoise);
+        renderer.setParameter("denoiseRadius", job.denoiseRadius);
+        renderer.setParameter("denoiseStrength", job.denoiseStrength);
+        renderer.setParameter("denoiseProfile", "QUALITY");
+        renderer.setParameter("denoiseRuntimeMode", "FULL_FRAME");
+        renderer.setParameter("denoiseTilePreset", "QUALITY");
+        renderer.setParameter("toneMap", job.toneMap);
+        renderer.setParameter("clampDirect", job.pathClampDirect);
+        renderer.setParameter("clampIndirect", job.pathClampIndirect);
+        renderer.setParameter("referenceClamp", job.referenceClampEnabled);
+        renderer.setParameter("reset", true);
+        return renderer;
     }
 
     private long computeInitialProgressTarget(OutputRenderJob job) {
@@ -1146,19 +1199,24 @@ public class OutputRenderController {
     private void openProgressDialog(OutputRenderJob job) {
         activeViewportPreviewJob = job;
         viewportPreviewLastPublishNanos = 0L;
-        viewportPreviewPixels = new int[]{0xFF050608};
+        viewportPreviewPixels.set(new int[]{0xFF050608});
         viewportPreviewWidth = 1;
         viewportPreviewHeight = 1;
-        viewportPreviewLines = buildViewportPreviewLines(job);
+        viewportPreviewLines.set(buildViewportPreviewLines(job));
     }
 
     private void updateProgressDialog(String message, long current, long total) {
-        viewportPreviewLines = buildViewportPreviewLines(activeViewportPreviewJob);
+        if (message != null && !message.isBlank()) {
+            progressMessage = message;
+        }
+        progressCurrent = Math.max(0L, current);
+        progressTarget = Math.max(1L, total);
+        viewportPreviewLines.set(buildViewportPreviewLines(activeViewportPreviewJob));
     }
 
     private void finishProgressDialog(String status) {
         progressMessage = status;
-        viewportPreviewLines = buildViewportPreviewLines(activeViewportPreviewJob);
+        viewportPreviewLines.set(buildViewportPreviewLines(activeViewportPreviewJob));
     }
 
     private void publishViewportPreview(OutputRenderJob job, FrameBuffer outFb, boolean force) {
@@ -1173,15 +1231,18 @@ public class OutputRenderController {
         activeViewportPreviewJob = job;
         viewportPreviewWidth = Math.max(1, outFb.getWidth());
         viewportPreviewHeight = Math.max(1, outFb.getHeight());
-        viewportPreviewPixels = outFb.getColorBuffer().clone();
-        viewportPreviewLines = buildViewportPreviewLines(job);
+        RuntimeInstrumentation.addCounter(
+                RuntimeInstrumentation.Counter.BYTES_COPIED,
+                (long) viewportPreviewWidth * (long) viewportPreviewHeight * 4L);
+        viewportPreviewPixels.set(outFb.getColorBuffer().clone());
+        viewportPreviewLines.set(buildViewportPreviewLines(job));
     }
 
     private void clearViewportPreview() {
-        viewportPreviewPixels = new int[]{0xFF050608};
+        viewportPreviewPixels.set(new int[]{0xFF050608});
         viewportPreviewWidth = 1;
         viewportPreviewHeight = 1;
-        viewportPreviewLines = new String[0];
+        viewportPreviewLines.set(new String[0]);
         viewportPreviewLastPublishNanos = 0L;
         activeViewportPreviewJob = null;
         progressFrameNumber = 0;
@@ -1190,7 +1251,6 @@ public class OutputRenderController {
         progressFramesCompleted = 0;
         progressCurrentFile = "";
         progressOutputFolder = "";
-        progressCurrentFrameStartedNanos = 0L;
     }
 
     private String buildProgressDetails(OutputRenderJob job) {

@@ -24,7 +24,7 @@ public final class WorldLightStrengthTests {
 
     private static void testPresetSwitchResetsAllBuiltInWorldLights() {
         Engine engine = createEngineWithWorldLights();
-        engine.applyWorldPreset(UiStrings.World.PRESET_CONTRAST);
+        engine.applyWorldPreset(UiStrings.World.PRESET_DAY);
         engine.applyWorldPreset(UiStrings.World.PRESET_SUNSET);
 
         assertNear(1.45, engine.sunLight.getIntensity(), "Přepnutí na západ musí přepsat slunce z kontrastní předvolby");
@@ -35,7 +35,7 @@ public final class WorldLightStrengthTests {
 
     private static void testZeroStrengthMutesAllPresetLights() {
         Engine engine = createEngineWithWorldLights();
-        engine.applyWorldPreset(UiStrings.World.PRESET_CONTRAST);
+        engine.applyWorldPreset(UiStrings.World.PRESET_DAY);
 
         engine.worldLightStrength = 0.0;
         engine.applyWorldLightSettings();

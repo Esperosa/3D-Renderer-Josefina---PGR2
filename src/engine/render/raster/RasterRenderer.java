@@ -17,6 +17,7 @@ import engine.render.Texture;
 import engine.scene.Entity;
 import engine.scene.Light;
 import engine.scene.Scene;
+import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
 
 import java.util.ArrayList;
@@ -44,7 +45,23 @@ public class RasterRenderer implements Renderer {
     private boolean modelPreviewMode;
     private boolean frustumCulling;
     private boolean backfaceCulling;
+    private boolean previewFastMaterialMode;
+    private boolean previewDisableNormalMap;
+    private boolean previewDisableMetallicRoughnessMap;
+    private boolean previewDisableEmissiveMap;
+    private boolean previewDisableTransmissionPreview;
+    private boolean previewDisableSheen;
+    private boolean previewDisableClearcoat;
+    private boolean previewPointLightsDiffuseOnly;
+    private boolean previewDiffuseOnlyLighting;
+    private boolean previewBaseIdentityMode;
+    private MaterialProfile materialProfile;
     private static final double CLIP_EPS = 1e-6;
+
+    private enum MaterialProfile {
+        PHONG,
+        DITHER
+    }
 
     private static class PreparedEntity {
         final int objectId;
@@ -207,6 +224,17 @@ public class RasterRenderer implements Renderer {
         this.modelPreviewMode = false;
         this.frustumCulling = true;
         this.backfaceCulling = true;
+        this.previewFastMaterialMode = false;
+        this.previewDisableNormalMap = false;
+        this.previewDisableMetallicRoughnessMap = false;
+        this.previewDisableEmissiveMap = false;
+        this.previewDisableTransmissionPreview = false;
+        this.previewDisableSheen = false;
+        this.previewDisableClearcoat = false;
+        this.previewPointLightsDiffuseOnly = false;
+        this.previewDiffuseOnlyLighting = false;
+        this.previewBaseIdentityMode = false;
+        this.materialProfile = MaterialProfile.PHONG;
     }
 
     @Override
@@ -233,6 +261,7 @@ public class RasterRenderer implements Renderer {
             }
         }
 
+        long baseSetupStart = RuntimeInstrumentation.isEnabled() ? System.nanoTime() : 0L;
         int clearColor = 0xFF000000 | scene.getBackgroundColor().toIntRGB();
         Mat4 view = camera.getViewMatrix();
         Mat4 projection = camera.getProjectionMatrix();
@@ -241,24 +270,57 @@ public class RasterRenderer implements Renderer {
 
         Light[] lights = scene.getLights().toArray(new Light[0]);
         phongShader.setup(scene.getAmbientColor(), 1.0, lights);
+        phongShader.setPreviewProfile(previewDiffuseOnlyLighting, previewPointLightsDiffuseOnly);
         Vec3 cameraPosition = camera.getPosition();
-        List<PreparedEntity> prepared = prepareEntities(scene, vp, fbWidth, fbHeight, cameraPosition);
         fb.clear(clearColor, 1.0f);
+        if (RuntimeInstrumentation.isEnabled()) {
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_HYBRID_BASE_SETUP_NS,
+                    System.nanoTime() - baseSetupStart);
+        }
+        long prepareStart = RuntimeInstrumentation.isEnabled() ? System.nanoTime() : 0L;
+        List<PreparedEntity> prepared = prepareEntities(scene, vp, fbWidth, fbHeight, cameraPosition);
+        if (RuntimeInstrumentation.isEnabled()) {
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_HYBRID_BASE_PREPARE_NS,
+                    System.nanoTime() - prepareStart);
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_BASE_PREPARE_TRANSFORM_NS,
+                    System.nanoTime() - prepareStart);
+        }
         if (prepared.isEmpty()) {
             return;
         }
 
+        long tileBinStart = RuntimeInstrumentation.isEnabled() ? System.nanoTime() : 0L;
         TileBins tileBins = buildTileBins(prepared, fbWidth, fbHeight);
+        if (RuntimeInstrumentation.isEnabled()) {
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_HYBRID_BASE_BINNING_NS,
+                    System.nanoTime() - tileBinStart);
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_BASE_TILE_BINNING_NS,
+                    System.nanoTime() - tileBinStart);
+        }
         if (tileBins.bins.length == 0) {
             return;
         }
 
+        long rasterStart = RuntimeInstrumentation.isEnabled() ? System.nanoTime() : 0L;
         if (!parallelEnabled || workerCount <= 1 || threadPool == null || workerRasterizers.length == 0 || tileBins.bins.length <= 1) {
             renderTilesSequential(prepared, tileBins, fb, rasterizer);
+            if (RuntimeInstrumentation.isEnabled()) {
+                long elapsed = System.nanoTime() - rasterStart;
+                RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_HYBRID_BASE_RASTER_NS, elapsed);
+            }
             return;
         }
 
         renderParallel(prepared, tileBins, fb);
+        if (RuntimeInstrumentation.isEnabled()) {
+            long elapsed = System.nanoTime() - rasterStart;
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_HYBRID_BASE_RASTER_NS, elapsed);
+        }
     }
 
     @Override
@@ -290,6 +352,50 @@ public class RasterRenderer implements Renderer {
         }
         if ("backfaceCulling".equalsIgnoreCase(key) && value instanceof Boolean) {
             backfaceCulling = (Boolean) value;
+            return;
+        }
+        if ("previewFastMaterialMode".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewFastMaterialMode = (Boolean) value;
+            return;
+        }
+        if ("previewDisableNormalMap".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewDisableNormalMap = (Boolean) value;
+            return;
+        }
+        if ("previewDisableMetallicRoughnessMap".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewDisableMetallicRoughnessMap = (Boolean) value;
+            return;
+        }
+        if ("previewDisableEmissiveMap".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewDisableEmissiveMap = (Boolean) value;
+            return;
+        }
+        if ("previewDisableTransmissionPreview".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewDisableTransmissionPreview = (Boolean) value;
+            return;
+        }
+        if ("previewDisableSheen".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewDisableSheen = (Boolean) value;
+            return;
+        }
+        if ("previewDisableClearcoat".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewDisableClearcoat = (Boolean) value;
+            return;
+        }
+        if ("previewPointLightsDiffuseOnly".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewPointLightsDiffuseOnly = (Boolean) value;
+            return;
+        }
+        if ("previewDiffuseOnlyLighting".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewDiffuseOnlyLighting = (Boolean) value;
+            return;
+        }
+        if ("previewBaseIdentityMode".equalsIgnoreCase(key) && value instanceof Boolean) {
+            previewBaseIdentityMode = (Boolean) value;
+            return;
+        }
+        if ("materialprofile".equalsIgnoreCase(key) && value != null) {
+            materialProfile = parseMaterialProfile(String.valueOf(value));
             return;
         }
         if ("parallel".equalsIgnoreCase(key) && value instanceof Boolean) {
@@ -440,7 +546,7 @@ public class RasterRenderer implements Renderer {
             );
             Vec3 cameraCopy = new Vec3(cameraPosition.x, cameraPosition.y, cameraPosition.z);
             preparedEntity.shader = (x, y, depth, worldPos, worldNormal, uv0, uv1, worldTangent) ->
-                    shadeFragment(currentObjectId, material, cameraCopy, worldPos, worldNormal, uv0, uv1, worldTangent);
+                    shadeFragment(x, y, currentObjectId, material, cameraCopy, worldPos, worldNormal, uv0, uv1, worldTangent);
             prepared.add(preparedEntity);
         }
         return prepared;
@@ -899,8 +1005,12 @@ public class RasterRenderer implements Renderer {
         return out;
     }
 
-    private int shadeFragment(int objectId, PhongMaterial material, Vec3 cameraPosition,
+    private int shadeFragment(int x, int y, int objectId, PhongMaterial material, Vec3 cameraPosition,
                               float[] worldPos, float[] worldNormal, float[] uv0, float[] uv1, float[] worldTangent) {
+        final boolean sampleMetrics = RuntimeInstrumentation.isEnabled() && ((x & 7) == 0) && ((y & 7) == 0);
+        final long metricScale = 64L;
+        final long shadingStart = sampleMetrics ? System.nanoTime() : 0L;
+        final long materialStart = sampleMetrics ? System.nanoTime() : 0L;
         float wx = worldPos[0];
         float wy = worldPos[1];
         float wz = worldPos[2];
@@ -919,7 +1029,12 @@ public class RasterRenderer implements Renderer {
             return packColor(baseR * boost, baseG * boost, baseB * boost, 1.0);
         }
 
-        MaterialGraphEvaluator.Result graph = material != null && material.hasNodeGraph()
+        if (previewBaseIdentityMode) {
+            return shadeBaseIdentity(material, uv0, uv1);
+        }
+
+        boolean fastMaterial = previewFastMaterialMode;
+        MaterialGraphEvaluator.Result graph = !fastMaterial && material != null && material.hasNodeGraph()
                 ? MaterialGraphEvaluator.evaluateRasterShared(material, wx, wy, wz, uv0, uv1)
                 : null;
         boolean graphApplied = graph != null && graph.graphApplied;
@@ -942,20 +1057,26 @@ public class RasterRenderer implements Renderer {
             int gz = (int) Math.floor(wz / cell);
             boolean even = ((gx + gz) & 1) == 0;
             if (even) {
-                baseR = 0.56;
-                baseG = 0.58;
-                baseB = 0.61;
+                // White tiles: mirror-like glossy look.
+                baseR = 0.97;
+                baseG = 0.97;
+                baseB = 0.97;
+                roughness = 0.0;
+                metallic = 0.0;
             } else {
-                baseR = 0.36;
-                baseG = 0.39;
-                baseB = 0.43;
+                // Dark tiles: 50% metallic + 50% roughness.
+                baseR = 0.06;
+                baseG = 0.06;
+                baseB = 0.06;
+                roughness = 0.5;
+                metallic = 0.5;
             }
             double fx = Math.abs((wx / cell) - Math.floor(wx / cell) - 0.5);
             double fz = Math.abs((wz / cell) - Math.floor(wz / cell) - 0.5);
             if (fx > 0.485 || fz > 0.485) {
-                baseR = Math.min(1.0, baseR + 0.10);
-                baseG = Math.min(1.0, baseG + 0.10);
-                baseB = Math.min(1.0, baseB + 0.10);
+                baseR = Math.min(1.0, baseR + (even ? 0.015 : 0.10));
+                baseG = Math.min(1.0, baseG + (even ? 0.015 : 0.10));
+                baseB = Math.min(1.0, baseB + (even ? 0.015 : 0.10));
             }
         }
 
@@ -976,7 +1097,7 @@ public class RasterRenderer implements Renderer {
         }
 
         if (!graphApplied) {
-            TextureMap metallicRoughnessMap = material.getMetallicRoughnessMap();
+            TextureMap metallicRoughnessMap = previewDisableMetallicRoughnessMap ? null : material.getMetallicRoughnessMap();
             if (canSampleTextureMap(metallicRoughnessMap, uv0, uv1)) {
                 int mrTexel = sampleTextureMap(metallicRoughnessMap, uv0, uv1);
                 roughness *= ((mrTexel >> 8) & 0xFF) / 255.0;
@@ -986,13 +1107,15 @@ public class RasterRenderer implements Renderer {
         roughness = clamp01(roughness);
         metallic = clamp01(metallic);
 
-        Vec3 mappedNormal = applyNormalMap(material, nx, ny, nz, uv0, uv1, worldTangent);
+        Vec3 mappedNormal = previewDisableNormalMap
+                ? new Vec3(nx, ny, nz).normalizeInPlace()
+                : applyNormalMap(material, nx, ny, nz, uv0, uv1, worldTangent);
         nx = (float) mappedNormal.x;
         ny = (float) mappedNormal.y;
         nz = (float) mappedNormal.z;
 
         if (!graphApplied) {
-            TextureMap emissiveMap = material.getEmissiveMap();
+            TextureMap emissiveMap = previewDisableEmissiveMap ? null : material.getEmissiveMap();
             if (canSampleTextureMap(emissiveMap, uv0, uv1)) {
                 int emissiveTexel = sampleTextureMap(emissiveMap, uv0, uv1);
                 emissionR *= ((emissiveTexel >> 16) & 0xFF) / 255.0;
@@ -1009,12 +1132,14 @@ public class RasterRenderer implements Renderer {
         boolean volumeActive = graphApplied ? graph.volumeConnected : pureVolume;
         Vec3 medium = graphApplied ? graph.mediumColor : material.getMediumColor();
 
-        if (!pureVolume && (transmission > 0.01 || (graphApplied && volumeActive && graph.density > 0.01))) {
+        if (!previewDisableTransmissionPreview
+                && !pureVolume
+                && (transmission > 0.01 || (graphApplied && volumeActive && graph.density > 0.01))) {
             double previewMix = clamp01(transmission * 0.32 + (1.0 - opacity) * 0.45 + (volumeActive ? graph.density * 0.08 : 0.0));
             baseR = mix(baseR, medium.x, previewMix);
             baseG = mix(baseG, medium.y, previewMix);
             baseB = mix(baseB, medium.z, previewMix);
-        } else if (pureVolume) {
+        } else if (!previewDisableTransmissionPreview && pureVolume) {
             double density = graphApplied ? graph.density : material.getDensity();
             double fogMix = clamp01(density * 0.18 + (1.0 - opacity) * 0.40);
             baseR = mix(baseR, medium.x, fogMix);
@@ -1022,11 +1147,24 @@ public class RasterRenderer implements Renderer {
             baseB = mix(baseB, medium.z, fogMix);
         }
 
+        if (materialProfile == MaterialProfile.DITHER) {
+            // Dither benefits from stronger diffuse separation and tamer glossy glass highlights.
+            roughness = clamp01(roughness * 1.18 + 0.05);
+            metallic = clamp01(metallic * 0.65);
+            transmission = clamp01(transmission * 0.55);
+            baseR = clamp01(Math.pow(baseR, 0.92));
+            baseG = clamp01(Math.pow(baseG, 0.92));
+            baseB = clamp01(Math.pow(baseB, 0.92));
+        }
+
         Vec3 specularFactor = material.getSpecularColorFactor();
-        double clearcoatFactor = graphApplied ? graph.clearcoatFactor : material.getClearcoatFactor();
+        double clearcoatFactor = previewDisableClearcoat ? 0.0 : (graphApplied ? graph.clearcoatFactor : material.getClearcoatFactor());
         double clearcoatRoughness = graphApplied ? graph.clearcoatRoughness : material.getClearcoatRoughness();
         double specular = graphApplied ? graph.specularFactor : material.getSpecularFactor();
-        Vec3 sheenColor = graphApplied ? graph.sheenColor : material.getSheenColor();
+        if (materialProfile == MaterialProfile.DITHER) {
+            specular = clamp01(specular * 0.82);
+        }
+        Vec3 sheenColor = previewDisableSheen ? Vec3.ZERO : (graphApplied ? graph.sheenColor : material.getSheenColor());
         double sheenRoughness = graphApplied ? graph.sheenRoughness : material.getSheenRoughness();
         double clearcoatBoost = clearcoatFactor * (1.0 - clearcoatRoughness * 0.65);
         double specR = clamp01(material.getSpecularColor().x * specular * specularFactor.x
@@ -1051,6 +1189,12 @@ public class RasterRenderer implements Renderer {
             return color;
         }
 
+        if (sampleMetrics) {
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_BASE_MATERIAL_NS,
+                    (System.nanoTime() - materialStart) * metricScale);
+        }
+        long directLightStart = sampleMetrics ? System.nanoTime() : 0L;
         int shaded = phongShader.shadeFast(
                 wx, wy, wz,
                 nx, ny, nz,
@@ -1063,6 +1207,11 @@ public class RasterRenderer implements Renderer {
                 specB,
                 shininess
         );
+        if (sampleMetrics) {
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_BASE_DIRECT_LIGHT_NS,
+                    (System.nanoTime() - directLightStart) * metricScale);
+        }
         double vx = cameraPosition.x - wx;
         double vy = cameraPosition.y - wy;
         double vz = cameraPosition.z - wz;
@@ -1072,7 +1221,55 @@ public class RasterRenderer implements Renderer {
         emissionR += sheenColor.x * sheenWeight * 0.35;
         emissionG += sheenColor.y * sheenWeight * 0.35;
         emissionB += sheenColor.z * sheenWeight * 0.35;
-        return applyAlpha(addEmission(shaded, emissionR, emissionG, emissionB), effectivePreviewAlpha(material, opacity, transmission));
+        int result = applyAlpha(addEmission(shaded, emissionR, emissionG, emissionB), effectivePreviewAlpha(material, opacity, transmission));
+        if (sampleMetrics) {
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.PREVIEW_BASE_SHADING_NS,
+                    (System.nanoTime() - shadingStart) * metricScale);
+        }
+        return result;
+    }
+
+    private static MaterialProfile parseMaterialProfile(String raw) {
+        if (raw == null) {
+            return MaterialProfile.PHONG;
+        }
+        String key = raw.trim().toUpperCase();
+        if ("DITHER".equals(key) || "DITHERING".equals(key)) {
+            return MaterialProfile.DITHER;
+        }
+        return MaterialProfile.PHONG;
+    }
+
+    private int shadeBaseIdentity(PhongMaterial material, float[] uv0, float[] uv1) {
+        if (material == null) {
+            return 0xFF808080;
+        }
+        double opacity = clamp01(material.getOpacity());
+        Vec3 diffuse = material.getDiffuseColor();
+        double baseR = diffuse.x;
+        double baseG = diffuse.y;
+        double baseB = diffuse.z;
+
+        TextureMap diffuseMap = material.getDiffuseMap();
+        if (canSampleTextureMap(diffuseMap, uv0, uv1)) {
+            int texel = sampleTextureMap(diffuseMap, uv0, uv1);
+            baseR *= ((texel >> 16) & 0xFF) / 255.0;
+            baseG *= ((texel >> 8) & 0xFF) / 255.0;
+            baseB *= (texel & 0xFF) / 255.0;
+            opacity *= ((texel >>> 24) & 0xFF) / 255.0;
+        }
+
+        if (material.getAlphaMode() == PhongMaterial.AlphaMode.MASK
+                && opacity < material.getAlphaCutoff()) {
+            return 0x00000000;
+        }
+
+        return packColor(
+                baseR,
+                baseG,
+                baseB,
+                effectivePreviewAlpha(material, opacity, 0.0));
     }
 
     private static int sampleTextureMap(TextureMap map, float[] uv0, float[] uv1) {

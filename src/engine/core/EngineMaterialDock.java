@@ -1,5 +1,20 @@
 package engine.core;
 
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
+import engine.material.Material;
 import engine.material.MaterialGraphAuthoring;
 import engine.material.MaterialPresets;
 import engine.material.PhongMaterial;
@@ -10,19 +25,6 @@ import engine.scene.Entity;
 import engine.ui.UiStrings;
 import engine.ui.UiTheme;
 import engine.util.UiBuilder;
-
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 final class EngineMaterialDock {
     static final ExecutorService PREVIEW_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
@@ -51,7 +53,7 @@ final class EngineMaterialDock {
         EditorFocusContext.mark(host, EditorFocusContext.MATERIAL_WORKSPACE);
 
         Entity entity = engine.selectedEntity;
-        PhongMaterial material = entity == null ? null : ensurePhongMaterial(entity);
+        PhongMaterial material = entity == null ? null : existingPhongMaterial(entity);
         JLabel summaryLabel = new JLabel();
         host.add(buildSummaryBar(engine, entity, material, summaryLabel), BorderLayout.NORTH);
         if (entity == null) {
@@ -64,6 +66,33 @@ final class EngineMaterialDock {
         if (entity.getMesh() == null) {
             summaryLabel.setText(UiStrings.MaterialDock.NO_MESH_SELECTED);
             host.add(buildEmptyState(engine, UiStrings.MaterialDock.EMPTY_NO_MESH), BorderLayout.CENTER);
+            host.revalidate();
+            host.repaint();
+            return;
+        }
+        if (material == null) {
+            summaryLabel.setText("Materiál není typu Phong");
+            JPanel unsupported = buildEmptyState(engine,
+                    "Vybraný objekt používá jiný typ materiálu. Pro node workspace proveďte převod na Phong explicitně.");
+            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 0));
+            actions.setOpaque(false);
+            actions.add(createMiniButton(engine, "Převést na Phong", () -> {
+                engine.applySceneEdit("Převod materiálu na Phong", () -> {
+                    Material source = entity.getMaterial();
+                    Vec3 base = source != null ? source.getBaseColor() : new Vec3(0.7, 0.7, 0.7);
+                    PhongMaterial converted = new PhongMaterial(base, 32.0);
+                    if (source != null) {
+                        converted.copyFrom(source);
+                    }
+                    converted.getOrCreateNodeGraph();
+                    MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(converted);
+                    entity.setMaterial(converted);
+                });
+                rebuildInto(engine, host);
+                engine.rebuildSceneDetailsPanel();
+            }));
+            unsupported.add(actions, BorderLayout.SOUTH);
+            host.add(unsupported, BorderLayout.CENTER);
             host.revalidate();
             host.repaint();
             return;
@@ -246,6 +275,20 @@ final class EngineMaterialDock {
         material.getOrCreateNodeGraph();
         MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
         entity.setMaterial(material);
+        return material;
+    }
+
+    static PhongMaterial existingPhongMaterial(Entity entity) {
+        if (entity == null || !(entity.getMaterial() instanceof PhongMaterial)) {
+            return null;
+        }
+        PhongMaterial material = (PhongMaterial) entity.getMaterial();
+        if (!material.hasNodeGraph()) {
+            material.getOrCreateNodeGraph();
+            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
+        } else {
+            MaterialGraphAuthoring.syncCompatibilityBindings(material);
+        }
         return material;
     }
 }

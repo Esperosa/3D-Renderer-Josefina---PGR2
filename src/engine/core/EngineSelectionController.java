@@ -1,14 +1,18 @@
 package engine.core;
 
-import engine.math.Vec3;
-import engine.math.Ray;
-import engine.geometry.Mesh;
-import engine.scene.Entity;
-import engine.scene.Light;
-
 import java.awt.event.MouseEvent;
 
+import engine.geometry.Mesh;
+import engine.math.AABB;
+import engine.math.Ray;
+import engine.math.Vec3;
+import engine.scene.Entity;
+import engine.scene.Light;
+import engine.util.RuntimeInstrumentation;
+
 final class EngineSelectionController {
+    private static final int DRAG_START_THRESHOLD_PX = 4;
+
     private EngineSelectionController() {
     }
 
@@ -25,6 +29,7 @@ final class EngineSelectionController {
             }
             engine.captureSelectLatch = lmbDown;
             engine.draggingSelectedObject = false;
+            engine.pendingSelectedObjectDrag = false;
             return;
         }
         engine.captureSelectLatch = false;
@@ -35,6 +40,7 @@ final class EngineSelectionController {
                     && EngineViewportOverlay.tryActivateGizmoHandleAtCanvas(
                     engine, engine.input.getMouseX(), engine.input.getMouseY())) {
                 engine.draggingSelectedObject = false;
+                engine.pendingSelectedObjectDrag = false;
                 return;
             }
             Engine.SceneItemRef hit = pickSceneItemUnderMouse(
@@ -44,6 +50,7 @@ final class EngineSelectionController {
                 applyHitSelection(engine, hit, false);
             } else {
                 engine.draggingSelectedObject = false;
+                engine.pendingSelectedObjectDrag = false;
                 if (engine.objectFocusMode) {
                     engine.objectFocusMode = false;
                     engine.transformMode = Engine.TransformMode.NONE;
@@ -60,12 +67,22 @@ final class EngineSelectionController {
         if (!engine.input.isMouseButtonDown(MouseEvent.BUTTON1)) {
             engine.commitSceneGesture();
             engine.draggingSelectedObject = false;
+            engine.pendingSelectedObjectDrag = false;
         }
     }
 
     static void updateSelectedObjectDrag(Engine engine, double dt) {
         if (engine.mouseCaptured || engine.selectedEntity == null || engine.selectedEntity.isStatic()) {
+            engine.pendingSelectedObjectDrag = false;
             return;
+        }
+        if (engine.pendingSelectedObjectDrag && engine.input.isMouseButtonDown(MouseEvent.BUTTON1)) {
+            int dxStart = engine.input.getMouseX() - engine.pendingDragStartMouseX;
+            int dyStart = engine.input.getMouseY() - engine.pendingDragStartMouseY;
+            if (Math.abs(dxStart) + Math.abs(dyStart) >= DRAG_START_THRESHOLD_PX) {
+                engine.pendingSelectedObjectDrag = false;
+                engine.draggingSelectedObject = true;
+            }
         }
         if (!engine.draggingSelectedObject || !engine.input.isMouseButtonDown(MouseEvent.BUTTON1)) {
             return;
@@ -106,6 +123,7 @@ final class EngineSelectionController {
         engine.selectedForceField = null;
         engine.objectFocusMode = false;
         engine.draggingSelectedObject = false;
+        engine.pendingSelectedObjectDrag = false;
         engine.transformMode = Engine.TransformMode.NONE;
         engine.axisConstraint = Engine.AxisConstraint.NONE;
         engine.gizmoDragActive = false;
@@ -220,9 +238,17 @@ final class EngineSelectionController {
         Entity hitEntity = null;
         double bestT = Double.POSITIVE_INFINITY;
         for (Entity entity : engine.scene.getAllMeshEntities()) {
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PICK_CANDIDATES, 1L);
             Mesh mesh = entity.getMesh();
             if (mesh == null || mesh.getIndices() == null || mesh.getPositions() == null) {
                 continue;
+            }
+            AABB bounds = entity.getWorldBounds();
+            if (bounds != null) {
+                double boundsHit = bounds.intersectRay(ray);
+                if (!Double.isFinite(boundsHit) || boundsHit == Double.MAX_VALUE || boundsHit > bestT) {
+                    continue;
+                }
             }
 
             double exactT = engine.intersectRayMesh(rayOrigin, rayDir, mesh, entity.getWorldMatrix(), bestT);
@@ -236,22 +262,30 @@ final class EngineSelectionController {
 
     private static void applyHitSelection(Engine engine, Engine.SceneItemRef hit, boolean crosshairSelection) {
         if (hit.type == Engine.SceneItemType.ENTITY && hit.entity != null) {
+            boolean wasAlreadySelected = hit.entity == engine.selectedEntity;
             if (shouldDeselectOnDoubleClick(engine, hit.entity)) {
                 clearSelection(engine, "Deselected.");
             } else {
                 engine.setCurrentEntitySelection(hit.entity);
                 boolean isOutputCameraEntity = engine.selectedEntity == engine.outputCameraEntity;
                 if (crosshairSelection) {
+                    engine.pendingSelectedObjectDrag = false;
                     engine.window.selectRightTab("Object");
                     engine.refreshObjectInspectorValues();
                     engine.syncOutlinerSelectionToCurrentSelection();
                     engine.rebuildSceneDetailsPanel();
                     System.out.println("Selected (crosshair): " + engine.selectedEntity.getName());
                 } else {
-                    boolean frameOnSelect = engine.selectionViewMode == Engine.SelectionViewMode.FRAME_AND_FOCUS
-                            && !isOutputCameraEntity;
+                        boolean frameOnSelect = engine.selectionViewMode == Engine.SelectionViewMode.FRAME_AND_FOCUS
+                            && !isOutputCameraEntity
+                            && engine.activeMode != RenderMode.PHONG;
                     engine.objectFocusMode = frameOnSelect;
-                    engine.draggingSelectedObject = !isOutputCameraEntity;
+                        engine.draggingSelectedObject = false;
+                        engine.pendingSelectedObjectDrag = wasAlreadySelected
+                            && !isOutputCameraEntity
+                            && !frameOnSelect;
+                        engine.pendingDragStartMouseX = engine.input.getMouseX();
+                        engine.pendingDragStartMouseY = engine.input.getMouseY();
                     if (frameOnSelect) {
                         engine.cameraController.frameTarget(engine.selectedEntity.getTransform().getPosition());
                         engine.camera.lookAt(engine.selectedEntity.getTransform().getPosition());

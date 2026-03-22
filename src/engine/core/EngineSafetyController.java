@@ -8,6 +8,9 @@ final class EngineSafetyController {
     private static final double SEVERE_FRAME_MS = 650.0;
     private static final double HARD_FRAME_MS = 1500.0;
     private static final int SEVERE_STREAK_LIMIT = 2;
+    private static final double HEAVY_MODE_SEVERE_FRAME_MS = 1800.0;
+    private static final double HEAVY_MODE_HARD_FRAME_MS = 3200.0;
+    private static final int HEAVY_MODE_SEVERE_STREAK_LIMIT = 4;
     private static final long RECOVERY_DURATION_NS = 1_250_000_000L;
     private static final long RECOVERY_REARM_GAP_NS = 900_000_000L;
     private static final int RECOVERY_SLEEP_MS = 28;
@@ -22,17 +25,31 @@ final class EngineSafetyController {
         if (engine == null || !engine.safetyMonitorEnabled) {
             return false;
         }
+        if (engine.activeMode == RenderMode.PATH_TRACING
+                && engine.pathAccumulationLock
+                && !engine.timelineEnabled
+                && !engine.safetyRecoveryActive) {
+            return false;
+        }
         if (engine.safetyRecoveryActive && now >= engine.safetyRecoveryUntilNanos) {
             finishRecovery(engine);
         }
         if (!engine.safetyRecoveryActive && isMemoryPressureCritical()) {
             armRecovery(engine, now, "Paměťový tlak");
         }
-        return engine.safetyRecoveryActive;
+        // Safety uz nesmi stopnout viewport loop; fallback render mode resi EngineRenderRuntime.
+        return false;
     }
 
-    static void recordFrame(Engine engine, double frameTimeMs, long now) {
+    static void recordFrame(Engine engine, double frameTimeMs, long now, boolean viewportInteractionActive) {
         if (engine == null || !engine.safetyMonitorEnabled || !Double.isFinite(frameTimeMs) || frameTimeMs <= 0.0) {
+            return;
+        }
+        boolean heavyViewportMode = engine.activeMode == RenderMode.RAY_TRACING
+                || engine.activeMode == RenderMode.PATH_TRACING;
+        if (engine.activeMode == RenderMode.PATH_TRACING
+                && engine.pathAccumulationLock
+                && !EngineRenderRuntime.shouldAdvanceDynamicScene(engine, viewportInteractionActive)) {
             return;
         }
         if (engine.safetyRecoveryActive) {
@@ -40,13 +57,17 @@ final class EngineSafetyController {
             return;
         }
 
-        if (frameTimeMs >= HARD_FRAME_MS) {
+        double hardFrameMs = heavyViewportMode ? HEAVY_MODE_HARD_FRAME_MS : HARD_FRAME_MS;
+        double severeFrameMs = heavyViewportMode ? HEAVY_MODE_SEVERE_FRAME_MS : SEVERE_FRAME_MS;
+        int severeStreakLimit = heavyViewportMode ? HEAVY_MODE_SEVERE_STREAK_LIMIT : SEVERE_STREAK_LIMIT;
+
+        if (frameTimeMs >= hardFrameMs) {
             armRecovery(engine, now, "Extrémně dlouhý frame");
             return;
         }
-        if (frameTimeMs >= SEVERE_FRAME_MS) {
+        if (frameTimeMs >= severeFrameMs) {
             engine.safetySevereFrameStreak++;
-            if (engine.safetySevereFrameStreak >= SEVERE_STREAK_LIMIT) {
+            if (engine.safetySevereFrameStreak >= severeStreakLimit) {
                 armRecovery(engine, now, "Přetížený viewport");
             }
             return;
@@ -102,14 +123,10 @@ final class EngineSafetyController {
         engine.safetySevereFrameStreak = 0;
         engine.safetyViewportScaleClamp = Math.min(engine.safetyViewportScaleClamp, RECOVERY_SCALE_CLAMP);
 
-        // Tady při recovery shodím akumulaci těžkých rendererů a interní scale clamp, aby se mi viewport rychle nadechl.
-        if (engine.pathTracerRenderer != null) {
-            engine.pathTracerRenderer.setParameter("reset", true);
-        }
-        if (engine.rayTracerRenderer != null) {
-            engine.rayTracerRenderer.setParameter("reset", true);
-        }
-        if (engine.frameBuffer != null) {
+        // Safety recovery má jen tlumit viewport scale; progresivní akumulaci nerestartujeme,
+        // protože to ve špičkách vede k viditelnému cyklickému resetování sample countu.
+        if (engine.frameBuffer != null
+                && !(engine.pathAccumulationLock && engine.activeMode == RenderMode.PATH_TRACING)) {
             EngineRenderRuntime.applyRenderScale(engine, false);
         }
         if ("Paměťový tlak".equals(engine.safetyRecoveryReason)) {
@@ -125,7 +142,8 @@ final class EngineSafetyController {
         engine.safetyRecoveryUntilNanos = 0L;
         engine.safetyViewportScaleClamp = 1.0;
         engine.safetySevereFrameStreak = 0;
-        if (engine.frameBuffer != null) {
+        if (engine.frameBuffer != null
+                && !(engine.pathAccumulationLock && engine.activeMode == RenderMode.PATH_TRACING)) {
             EngineRenderRuntime.applyRenderScale(engine, false);
         }
     }

@@ -132,50 +132,56 @@ final class EngineOutputTabBuilder {
                 });
         timingSection.add(engine.sectionTitle("Počet snímků: " + frameCount));
         timingSection.add(engine.sectionTitle("Náhled délky: " + formatDuration(durationSeconds)));
-        if ("still".equals(exportType)) {
-            timingSection.add(engine.sectionTitle("Statický snímek používá snímek "
-                    + (outputSettings.useTimelineRange ? engine.timelineCurrentFrame : outputSettings.frameStart) + "."));
+        switch (exportType) {
+            case "still" -> timingSection.add(engine.sectionTitle("Statický snímek používá snímek "
+                + (outputSettings.useTimelineRange ? engine.timelineCurrentFrame : outputSettings.frameStart) + "."));
+            default -> {
+            }
         }
 
         JPanel formatSection = engine.addCollapsibleSection(outputTab, "Formát obrazu / videa", true);
-        if ("still".equals(exportType) || "sequence".equals(exportType)) {
-            engine.addComboRow(formatSection, "Formát obrazu",
-                    new String[]{"PNG", "JPG"},
-                    "jpg".equalsIgnoreCase(outputSettings.format) ? "JPG" : "PNG",
-                    value -> {
-                        outputSettings.format = "JPG".equalsIgnoreCase(value) ? "jpg" : "png";
-                        refreshOutputTab(engine);
-                    });
-            if ("jpg".equalsIgnoreCase(outputSettings.format)) {
-                engine.addNumericRow(formatSection, "Kvalita JPG",
-                        engine.formatTransformValue(outputSettings.jpgQuality),
-                        text -> {
-                            outputSettings.jpgQuality = Math.max(0.05, Math.min(1.0,
-                                    engine.parseOrFallback(text, outputSettings.jpgQuality)));
+        switch (exportType) {
+            case "still", "sequence" -> {
+                engine.addComboRow(formatSection, "Formát obrazu",
+                        new String[]{"PNG", "JPG"},
+                        "jpg".equalsIgnoreCase(outputSettings.format) ? "JPG" : "PNG",
+                        value -> {
+                            outputSettings.format = "JPG".equalsIgnoreCase(value) ? "jpg" : "png";
                             refreshOutputTab(engine);
                         });
-            } else {
-                engine.addBooleanRow(formatSection, "Uložit alfa kanál, pokud to jde", outputSettings.saveAlphaWhenPossible, value -> {
-                    outputSettings.saveAlphaWhenPossible = value;
-                    refreshOutputTab(engine);
-                });
-            }
-        } else if ("gif".equals(exportType)) {
-            engine.addBooleanRow(formatSection, "Opakovat stále dokola", outputSettings.gifLoopForever, value -> {
-                outputSettings.gifLoopForever = value;
-                refreshOutputTab(engine);
-            });
-            formatSection.add(engine.sectionTitle("Zpoždění snímku se odvozuje z FPS: "
-                    + Math.max(10, (int) Math.round(1000.0 / Math.max(1.0, resolvedFps))) + " ms"));
-        } else {
-            engine.addNumericRow(formatSection, "Kvalita MJPEG",
-                    engine.formatTransformValue(outputSettings.aviJpegQuality),
-                    text -> {
-                        outputSettings.aviJpegQuality = Math.max(0.05, Math.min(1.0,
-                                engine.parseOrFallback(text, outputSettings.aviJpegQuality)));
+                if ("jpg".equalsIgnoreCase(outputSettings.format)) {
+                    engine.addNumericRow(formatSection, "Kvalita JPG",
+                            engine.formatTransformValue(outputSettings.jpgQuality),
+                            text -> {
+                                outputSettings.jpgQuality = Math.max(0.05, Math.min(1.0,
+                                        engine.parseOrFallback(text, outputSettings.jpgQuality)));
+                                refreshOutputTab(engine);
+                            });
+                } else {
+                    engine.addBooleanRow(formatSection, "Uložit alfa kanál, pokud to jde", outputSettings.saveAlphaWhenPossible, value -> {
+                        outputSettings.saveAlphaWhenPossible = value;
                         refreshOutputTab(engine);
                     });
-            formatSection.add(UiBuilder.helperText("AVI se zapisuje jako fixed-rate MJPEG bez externích kodeků."));
+                }
+            }
+            case "gif" -> {
+                engine.addBooleanRow(formatSection, "Opakovat stále dokola", outputSettings.gifLoopForever, value -> {
+                    outputSettings.gifLoopForever = value;
+                    refreshOutputTab(engine);
+                });
+                formatSection.add(engine.sectionTitle("Zpoždění snímku se odvozuje z FPS: "
+                        + Math.max(10, (int) Math.round(1000.0 / Math.max(1.0, resolvedFps))) + " ms"));
+            }
+            default -> {
+                engine.addNumericRow(formatSection, "Kvalita MJPEG",
+                        engine.formatTransformValue(outputSettings.aviJpegQuality),
+                        text -> {
+                            outputSettings.aviJpegQuality = Math.max(0.05, Math.min(1.0,
+                                    engine.parseOrFallback(text, outputSettings.aviJpegQuality)));
+                            refreshOutputTab(engine);
+                        });
+                formatSection.add(UiBuilder.helperText("AVI se zapisuje jako fixed-rate MJPEG bez externích kodeků."));
+            }
         }
 
         JPanel engineSection = engine.addCollapsibleSection(outputTab, "Renderer výstupu", true);
@@ -461,10 +467,9 @@ final class EngineOutputTabBuilder {
         summary.append("Interní rozlišení: ").append(internalWidth).append(" x ").append(internalHeight)
                 .append(" @ scale ").append(String.format("%.2f", outputSettings.internalScale)).append('\n');
         summary.append("Rozsah snímků: ");
-        if ("still".equals(exportType)) {
-            summary.append(startFrame);
-        } else {
-            summary.append(startFrame).append(" .. ").append(endFrame);
+        switch (exportType) {
+            case "still" -> summary.append(startFrame);
+            default -> summary.append(startFrame).append(" .. ").append(endFrame);
         }
         summary.append('\n');
         summary.append("FPS: ").append(String.format("%.2f", fps)).append('\n');
@@ -475,14 +480,11 @@ final class EngineOutputTabBuilder {
         summary.append("Denoise: ").append(outputSettings.denoise ? UiStrings.Common.YES : UiStrings.Common.NO).append('\n');
         summary.append("Primární výstup: ").append(previewPaths.primaryOutputPreview(exportType, outputSettings.format)).append('\n');
         summary.append("Obsah session: ");
-        if ("sequence".equals(exportType)) {
-            summary.append("manifest + preview + log + ").append(previewPaths.sequenceFolderName).append("/frames");
-        } else if ("gif".equals(exportType)) {
-            summary.append("manifest + preview + log + animation.gif");
-        } else if ("avi".equals(exportType)) {
-            summary.append("manifest + preview + log + animation.avi");
-        } else {
-            summary.append("manifest + preview + log + statický snímek");
+        switch (exportType) {
+            case "sequence" -> summary.append("manifest + preview + log + ").append(previewPaths.sequenceFolderName).append("/frames");
+            case "gif" -> summary.append("manifest + preview + log + animation.gif");
+            case "avi" -> summary.append("manifest + preview + log + animation.avi");
+            default -> summary.append("manifest + preview + log + statický snímek");
         }
         return summary.toString();
     }
@@ -574,7 +576,7 @@ final class EngineOutputTabBuilder {
             case DITHERING -> buildOutputDitherSettings(engine, section, outputSettings);
             case TEMPORAL_NOISE -> buildOutputTemporalSettings(engine, section, outputSettings);
             case RAY_TRACING -> buildOutputRaySettings(engine, section, outputSettings);
-            case PATH_TRACING -> buildOutputPathSettings(section);
+            case PATH_TRACING -> buildOutputPathSettings(engine, section, outputSettings);
             case HEX_MOSAIC -> buildOutputHexSettings(engine, section, outputSettings);
         }
     }
@@ -643,6 +645,13 @@ final class EngineOutputTabBuilder {
                     engine.parseOrFallback(text, outputSettings.denoiseStrength)));
             refreshOutputTab(engine);
         });
+        engine.addComboRow(section, "Tone map",
+                new String[]{"EXPOSURE", "FILMIC", "ACES"},
+                outputSettings.toneMap,
+                value -> {
+                    outputSettings.toneMap = value;
+                    refreshOutputTab(engine);
+                });
     }
 
     private static void buildOutputRaySettings(Engine engine,
@@ -661,8 +670,23 @@ final class EngineOutputTabBuilder {
                 });
     }
 
-    private static void buildOutputPathSettings(JPanel section) {
-        section.add(UiBuilder.helperText("Path Tracing používá společné progresivní volby výše. Další přepínače specifické pro output zde nejsou potřeba."));
+    private static void buildOutputPathSettings(Engine engine,
+                                                JPanel section,
+                                                OutputRenderController.Settings outputSettings) {
+        section.add(UiBuilder.helperText("Path Tracing pro export může držet referenční transport a zároveň použít finální denoise a clampy podobně jako Cycles."));
+        engine.addBooleanRow(section, "Reference clamp", outputSettings.referenceClampEnabled,
+                value -> {
+                    outputSettings.referenceClampEnabled = value;
+                    refreshOutputTab(engine);
+                });
+        engine.addNumericRow(section, "Clamp direct", engine.formatTransformValue(outputSettings.pathClampDirect), text -> {
+            outputSettings.pathClampDirect = Math.max(0.0, engine.parseOrFallback(text, outputSettings.pathClampDirect));
+            refreshOutputTab(engine);
+        });
+        engine.addNumericRow(section, "Clamp indirect", engine.formatTransformValue(outputSettings.pathClampIndirect), text -> {
+            outputSettings.pathClampIndirect = Math.max(0.0, engine.parseOrFallback(text, outputSettings.pathClampIndirect));
+            refreshOutputTab(engine);
+        });
     }
 
     private static void buildOutputWireframeSettings(Engine engine,

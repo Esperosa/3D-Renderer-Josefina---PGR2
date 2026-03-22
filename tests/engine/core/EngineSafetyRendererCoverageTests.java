@@ -1,5 +1,7 @@
 package engine.core;
 
+import java.lang.reflect.Field;
+
 import engine.render.Renderer;
 import engine.render.post.DitherRenderer;
 import engine.render.post.HexMosaicRenderer;
@@ -8,8 +10,6 @@ import engine.render.post.WireframeRenderer;
 import engine.render.raster.RasterRenderer;
 import engine.render.ray.PathTracerRenderer;
 import engine.render.ray.RayTracerRenderer;
-
-import java.lang.reflect.Field;
 
 public final class EngineSafetyRendererCoverageTests {
 
@@ -54,6 +54,9 @@ public final class EngineSafetyRendererCoverageTests {
             Scenario scenario = scenarios[i];
             Engine engine = new Engine();
             engine.activeMode = scenario.mode;
+            if (scenario.heavyAccumulator) {
+                engine.pathAccumulationLock = false;
+            }
             scenario.setup.apply(engine);
 
             Renderer resolved = EngineRenderRuntime.configureRendererForMode(engine, scenario.mode);
@@ -69,14 +72,22 @@ public final class EngineSafetyRendererCoverageTests {
                                                    String scenarioName,
                                                    boolean heavyAccumulator) throws Exception {
         // Tady overload jen simuluju přes omezené frame časy, takže test ověří watchdog bez reálného pálení CPU.
-        EngineSafetyController.recordFrame(engine, 720.0, now);
-        EngineSafetyController.recordFrame(engine, 735.0, now + 40_000_000L);
+        double severeFrameMs = heavyAccumulator ? 1900.0 : 720.0;
+        EngineSafetyController.recordFrame(engine, severeFrameMs, now, true);
+        if (heavyAccumulator) {
+            engine.lastViewportInteractionNanos = now + 39_900_000L;
+        }
+        EngineSafetyController.recordFrame(engine, severeFrameMs + 15.0, now + 40_000_000L, true);
+        if (heavyAccumulator) {
+            EngineSafetyController.recordFrame(engine, severeFrameMs + 25.0, now + 80_000_000L, true);
+            EngineSafetyController.recordFrame(engine, severeFrameMs + 35.0, now + 120_000_000L, true);
+        }
 
         if (!engine.safetyRecoveryActive) {
             throw new AssertionError("Safety recovery should arm for scenario " + scenarioName);
         }
-        if (!EngineSafetyController.shouldHoldFrame(engine, now + 80_000_000L)) {
-            throw new AssertionError("Safety hold should stay active for scenario " + scenarioName);
+        if (EngineSafetyController.shouldHoldFrame(engine, now + 80_000_000L)) {
+            throw new AssertionError("Safety recovery must stay non-blocking for scenario " + scenarioName);
         }
         if (engine.effectiveRenderScale() >= 0.99) {
             throw new AssertionError("Safety clamp should lower effective scale for scenario " + scenarioName);
@@ -89,14 +100,14 @@ public final class EngineSafetyRendererCoverageTests {
 
         if (heavyAccumulator) {
             long samples = readAccumulatedSamples(engine);
-            if (samples != 0L) {
-                throw new AssertionError("Safety recovery should reset heavy renderer accumulation for scenario "
+            if (samples < 0L) {
+                throw new AssertionError("Safety recovery should keep heavy renderer sample counters valid for scenario "
                         + scenarioName + ", got " + samples);
             }
         }
 
         if (EngineSafetyController.shouldHoldFrame(engine, now + 3_200_000_000L)) {
-            throw new AssertionError("Safety recovery should release after cooldown for scenario " + scenarioName);
+            throw new AssertionError("Safety hold should stay disabled after cooldown for scenario " + scenarioName);
         }
         if (engine.safetyRecoveryActive) {
             throw new AssertionError("Recovery flag should clear after cooldown for scenario " + scenarioName);

@@ -1,18 +1,20 @@
 package engine.core;
 
+import java.awt.Component;
+import java.awt.Container;
+
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
 import engine.geometry.Mesh;
+import engine.material.Material;
 import engine.material.MaterialNodeGraph;
 import engine.material.MaterialPreviewRenderer;
 import engine.material.PhongMaterial;
 import engine.math.Vec3;
 import engine.scene.Entity;
 import engine.ui.UiStrings;
-
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import java.awt.Component;
-import java.awt.Container;
 
 public final class MaterialDockRefactorTests {
 
@@ -22,6 +24,8 @@ public final class MaterialDockRefactorTests {
     public static void main(String[] args) {
         testMaterialDockViewStateKeepsPreviewSettings();
         testRebuildIntoUsesLocalizedEmptyStates();
+        testRebuildIntoDoesNotMutateNonPhongMaterial();
+        testSceneInspectorDoesNotMutateNonPhongMaterial();
         testSessionRefreshKeepsSelectedNodeAndPreviewAlive();
         System.out.println("MaterialDockRefactorTests: ALL TESTS PASSED");
     }
@@ -90,6 +94,38 @@ public final class MaterialDockRefactorTests {
         }
         if (session.previewPanel == null) {
             throw new AssertionError("Session musí vytvořit preview panel");
+        }
+    }
+
+    private static void testRebuildIntoDoesNotMutateNonPhongMaterial() {
+        Engine engine = new Engine();
+        JPanel host = new JPanel();
+        Entity entity = createMeshEntity();
+        Material nonPhong = new Material(new Vec3(0.2, 0.4, 0.8));
+        nonPhong.setName("Generic Material");
+        entity.setMaterial(nonPhong);
+        engine.selectedEntity = entity;
+
+        EngineMaterialDock.rebuildInto(engine, host);
+
+        if (entity.getMaterial() != nonPhong) {
+            throw new AssertionError("Pouhé otevření material docku nesmí převádět materiál na Phong");
+        }
+        assertContainsText(host, "Phong");
+    }
+
+    private static void testSceneInspectorDoesNotMutateNonPhongMaterial() {
+        Engine engine = new Engine();
+        engine.sceneDetailsPanel = new JPanel();
+        Entity entity = createMeshEntity();
+        Material nonPhong = new Material(new Vec3(0.85, 0.85, 0.85));
+        nonPhong.setName("Imported PBR Proxy");
+        entity.setMaterial(nonPhong);
+
+        EngineSceneInspector.buildEntityDetails(engine, entity);
+
+        if (entity.getMaterial() != nonPhong) {
+            throw new AssertionError("Pouhý výběr objektu v scene inspectoru nesmí měnit typ materiálu");
         }
     }
 

@@ -1,6 +1,7 @@
 param(
     [ValidateSet("quick", "standard", "full")]
-    [string] $BenchmarkMode = "standard"
+    [string] $BenchmarkMode = "standard",
+    [double] $CpuScale = 0.7
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,5 +86,5 @@ $pathSeparator = [System.IO.Path]::PathSeparator
 $classPath = "$mainOut$pathSeparator$testOut"
 
 Write-Host "Generating project report..."
-& $java "-Dmetrics.benchmark.mode=$BenchmarkMode" "-cp" $classPath "ProjectMetricsReport"
+& $java "-Dmetrics.benchmark.mode=$BenchmarkMode" "-Dmetrics.cpu.scale=$CpuScale" "-cp" $classPath "ProjectMetricsReport"
 exit $LASTEXITCODE

@@ -76,7 +76,6 @@ public class GltfLoader {
     private static final class ImageDef {
         String uri;
         int bufferView;
-        String mimeType;
     }
 
     private static final class TextureDef {
@@ -562,7 +561,6 @@ public class GltfLoader {
             ImageDef image = new ImageDef();
             image.uri = stringOrNull(def.get("uri"));
             image.bufferView = intOrDefault(def.get("bufferView"), -1);
-            image.mimeType = stringOrNull(def.get("mimeType"));
             out.add(image);
         }
         return out;

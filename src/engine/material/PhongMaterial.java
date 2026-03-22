@@ -114,7 +114,7 @@ public class PhongMaterial extends Material {
     }
 
     public void setRefractiveIndex(double n) {
-        this.refractiveIndex = Math.max(1e-6, n);
+        this.refractiveIndex = Math.max(1.0, n);
     }
 
     public Texture getDiffuseTexture() {
@@ -287,8 +287,8 @@ public class PhongMaterial extends Material {
     @Override
     public void copyFrom(Material source) {
         super.copyFrom(source);
-        if (source instanceof PhongMaterial) {
-            copyFrom((PhongMaterial) source);
+        if (source instanceof PhongMaterial phong) {
+            copyFrom(phong);
         }
     }
 

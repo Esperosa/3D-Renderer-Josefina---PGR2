@@ -26,7 +26,8 @@ final class RenderSettingsSync {
             boolean rayReflections,
             boolean rayDenoise,
             int rayDenoiseRadius,
-            double rayDenoiseStrength) {
+            double rayDenoiseStrength,
+            String toneMapMode) {
         if (rayTracerRenderer == null) {
             return 1;
         }
@@ -46,6 +47,7 @@ final class RenderSettingsSync {
         rayTracerRenderer.setParameter("denoise", rayDenoise);
         rayTracerRenderer.setParameter("denoiseRadius", rayDenoiseRadius);
         rayTracerRenderer.setParameter("denoiseStrength", rayDenoiseStrength);
+        rayTracerRenderer.setParameter("toneMap", toneMapMode);
         return rayMaxDepth;
     }
 
@@ -62,7 +64,10 @@ final class RenderSettingsSync {
             boolean pathSkyEnvironment,
             boolean pathDenoise,
             int pathDenoiseRadius,
-            double pathDenoiseStrength) {
+            double pathDenoiseStrength,
+            double pathClampDirect,
+            double pathClampIndirect,
+            String toneMapMode) {
         if (pathTracerRenderer == null) {
             return 1;
         }
@@ -78,9 +83,14 @@ final class RenderSettingsSync {
         pathTracerRenderer.setParameter("maxDepth", pathMaxDepth);
         pathTracerRenderer.setParameter("directLighting", pathDirectLighting);
         pathTracerRenderer.setParameter("sky", pathSkyEnvironment);
+        pathTracerRenderer.setParameter("referenceMode", false);
+        pathTracerRenderer.setParameter("historyFireflyClamp", true);
         pathTracerRenderer.setParameter("denoise", pathDenoise);
         pathTracerRenderer.setParameter("denoiseRadius", pathDenoiseRadius);
         pathTracerRenderer.setParameter("denoiseStrength", pathDenoiseStrength);
+        pathTracerRenderer.setParameter("toneMap", toneMapMode);
+        pathTracerRenderer.setParameter("clampDirect", pathClampDirect);
+        pathTracerRenderer.setParameter("clampIndirect", pathClampIndirect);
         return pathMaxDepth;
     }
 }

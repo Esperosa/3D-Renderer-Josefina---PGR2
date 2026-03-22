@@ -5,6 +5,7 @@ import engine.material.Material;
 import engine.math.AABB;
 import engine.math.Mat4;
 import engine.physics.RigidBody;
+import engine.util.RuntimeInstrumentation;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,10 +25,16 @@ public class Entity {
     private RigidBody rigidBody;
     private Entity parent;
     private final List<Entity> children;
+    private Scene ownerScene;
 
     private boolean visible;
     private boolean castShadow;
     private boolean isStatic;
+    private boolean worldMatrixDirty;
+    private boolean worldBoundsDirty;
+    private long worldTransformVersion;
+    private long cachedTransformRevision;
+    private long cachedParentWorldVersion;
 
     public Entity(String name) {
         this(name, null, new Material());
@@ -36,6 +43,7 @@ public class Entity {
     public Entity(String name, Mesh mesh, Material material) {
         this.name = name == null ? "Entity" : name;
         this.transform = new Transform();
+        this.transform.setDirtyListener(this::markSpatialDirty);
         this.worldMatrix = Mat4.identity();
         this.mesh = mesh;
         this.material = material == null ? new Material() : material;
@@ -43,6 +51,11 @@ public class Entity {
         this.visible = true;
         this.castShadow = true;
         this.isStatic = false;
+        this.worldMatrixDirty = true;
+        this.worldBoundsDirty = true;
+        this.worldTransformVersion = 1L;
+        this.cachedTransformRevision = Long.MIN_VALUE;
+        this.cachedParentWorldVersion = Long.MIN_VALUE;
     }
 
     // Tady řeším hierarchii entity.
@@ -55,6 +68,7 @@ public class Entity {
         }
         child.parent = this;
         children.add(child);
+        child.markSpatialDirty();
     }
 
     public void removeChild(Entity child) {
@@ -63,6 +77,7 @@ public class Entity {
         }
         if (children.remove(child)) {
             child.parent = null;
+            child.markSpatialDirty();
         }
     }
 
@@ -80,17 +95,34 @@ public class Entity {
     }
 
     public Mat4 getWorldMatrix() {
-        Mat4 local = transform.getLocalMatrix();
-        worldMatrix = (parent == null) ? local : parent.getWorldMatrix().multiply(local);
+        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WORLD_MATRIX_CALLS, 1L);
+        long parentVersion = parent == null ? Long.MIN_VALUE : parent.getWorldTransformVersion();
+        long transformRevision = transform.getRevision();
+        if (worldMatrixDirty
+                || cachedTransformRevision != transformRevision
+                || cachedParentWorldVersion != parentVersion) {
+            Mat4 local = transform.getLocalMatrix();
+            worldMatrix = (parent == null) ? local : parent.getWorldMatrix().multiply(local);
+            cachedTransformRevision = transformRevision;
+            cachedParentWorldVersion = parentVersion;
+            worldMatrixDirty = false;
+            worldBoundsDirty = true;
+            worldTransformVersion++;
+        }
         return worldMatrix;
     }
 
     public void computeWorldBounds() {
+        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.BOUNDS_RECOMPUTES, 1L);
         if (mesh == null || mesh.getAABB() == null) {
             worldBounds = null;
+            worldBoundsDirty = false;
             return;
         }
-        worldBounds = mesh.getAABB().transform(getWorldMatrix());
+        if (worldBoundsDirty || worldBounds == null) {
+            worldBounds = mesh.getAABB().transform(getWorldMatrix());
+            worldBoundsDirty = false;
+        }
     }
 
     // Tady držím přístupové metody.
@@ -100,6 +132,10 @@ public class Entity {
 
     public void setMesh(Mesh m) {
         this.mesh = m;
+        markSpatialDirty();
+        if (ownerScene != null) {
+            ownerScene.markMeshEntityCacheDirty();
+        }
     }
 
     public Material getMaterial() {
@@ -131,7 +167,13 @@ public class Entity {
     }
 
     public void setVisible(boolean visible) {
+        if (this.visible == visible) {
+            return;
+        }
         this.visible = visible;
+        if (ownerScene != null) {
+            ownerScene.markMeshEntityCacheDirty();
+        }
     }
 
     public boolean isCastShadow() {
@@ -151,6 +193,40 @@ public class Entity {
     }
 
     public AABB getWorldBounds() {
+        if (worldBoundsDirty) {
+            computeWorldBounds();
+        }
         return worldBounds;
+    }
+
+    public boolean isSpatialDirty() {
+        if (worldMatrixDirty || worldBoundsDirty || transform.isDirty()) {
+            return true;
+        }
+        if (parent != null && cachedParentWorldVersion != parent.getWorldTransformVersion()) {
+            return true;
+        }
+        return cachedTransformRevision != transform.getRevision();
+    }
+
+    public long getWorldTransformVersion() {
+        return worldTransformVersion;
+    }
+
+    void setOwnerScene(Scene ownerScene) {
+        this.ownerScene = ownerScene;
+    }
+
+    void markSpatialDirty() {
+        worldMatrixDirty = true;
+        worldBoundsDirty = true;
+        if (ownerScene != null) {
+            ownerScene.markSpatialDirty();
+        }
+        for (Entity child : children) {
+            if (child != null) {
+                child.markSpatialDirty();
+            }
+        }
     }
 }

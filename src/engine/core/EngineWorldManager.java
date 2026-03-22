@@ -4,10 +4,10 @@ import engine.math.Vec3;
 import engine.physics.RigidBody;
 import engine.scene.AreaLight;
 import engine.scene.ConeLight;
+import engine.scene.Entity;
 import engine.scene.Light;
 import engine.scene.PointLight;
-import engine.ui.UiStrings;
-
+import engine.scene.Scene;
 import java.util.List;
 
 final class EngineWorldManager {
@@ -25,127 +25,81 @@ final class EngineWorldManager {
         applyWorldLightSettings(engine, false);
     }
 
+    static void applyWorldPreset(Engine engine, String presetName) {
+        if (engine == null) {
+            return;
+        }
+        WorldPresetCatalog.Definition preset = WorldPresetCatalog.resolve(presetName);
+        applyPresetState(engine, preset);
+        applyStoredWorldLightSettings(engine);
+        engine.rebuildSceneDetailsPanel();
+    }
+
+    static void applyPresetState(Engine engine, WorldPresetCatalog.Definition preset) {
+        if (engine == null || preset == null) {
+            return;
+        }
+        engine.worldPresetKey = preset.key();
+        engine.worldLightColor = preset.ambientColor();
+        engine.worldBackgroundColor = preset.backgroundColor();
+        engine.worldLightStrength = preset.strength();
+        engine.worldSunBaseIntensity = preset.sunIntensity() / preset.strength();
+        engine.worldFillBaseIntensity = preset.fillIntensity() / preset.strength();
+        engine.worldWarmBaseIntensity = preset.warmIntensity() / preset.strength();
+        engine.worldCoolBaseIntensity = preset.coolIntensity() / preset.strength();
+        if (engine.sunLight != null) {
+            engine.sunLight.setColor(preset.sunColor());
+        }
+        if (engine.fillLight != null) {
+            engine.fillLight.setColor(preset.fillColor());
+        }
+        if (engine.warmWorldLight != null) {
+            engine.warmWorldLight.setColor(preset.warmColor());
+        }
+        if (engine.coolWorldLight != null) {
+            engine.coolWorldLight.setColor(preset.coolColor());
+        }
+    }
+
     private static void applyWorldLightSettings(Engine engine, boolean captureCurrentBases) {
-        if (engine.scene == null) {
+        if (engine == null) {
+            return;
+        }
+        Scene scene = engine.scene;
+        if (scene == null) {
             return;
         }
         if (captureCurrentBases) {
             captureWorldLightBases(engine);
         }
+
         double strength = Math.max(0.0, engine.worldLightStrength);
-        engine.scene.setAmbientColor(new Vec3(
+        scene.setAmbientColor(new Vec3(
                 Math.max(0.0, engine.worldLightColor.x * strength),
                 Math.max(0.0, engine.worldLightColor.y * strength),
                 Math.max(0.0, engine.worldLightColor.z * strength)
         ));
-        engine.scene.setEnvironmentStrength(strength);
-        engine.scene.setBackgroundColor(new Vec3(
+        scene.setEnvironmentStrength(strength);
+        scene.setBackgroundColor(new Vec3(
                 clamp01(engine.worldBackgroundColor.x),
                 clamp01(engine.worldBackgroundColor.y),
                 clamp01(engine.worldBackgroundColor.z)
         ));
+        scene.setEnvironmentYawDegrees(engine.worldEnvironmentYawDegrees);
+        scene.setEnvironmentPitchDegrees(engine.worldEnvironmentPitchDegrees);
+
+        WorldEnvironmentLibrary.EnvironmentBinding binding = WorldEnvironmentLibrary.resolveForPreset(engine.worldPresetKey);
+        if (binding != null) {
+            scene.setEnvironmentMapKey(binding.assetKey);
+            scene.setEnvironmentMap(binding.map);
+            scene.setEnvironmentExposure(binding.exposure);
+        }
+
         applyScaledIntensity(engine.sunLight, engine.worldSunBaseIntensity, strength);
         applyScaledIntensity(engine.fillLight, engine.worldFillBaseIntensity, strength);
         applyScaledIntensity(engine.warmWorldLight, engine.worldWarmBaseIntensity, strength);
         applyScaledIntensity(engine.coolWorldLight, engine.worldCoolBaseIntensity, strength);
         engine.worldLightAppliedStrength = strength;
-    }
-
-    static void applyWorldPreset(Engine engine, String presetName) {
-        if (presetName == null) {
-            return;
-        }
-        String presetKey = UiStrings.worldPresetKey(presetName);
-        engine.worldPresetKey = presetKey;
-        switch (presetKey) {
-            case "Warm Sunset":
-                engine.worldLightColor = new Vec3(0.34, 0.20, 0.12);
-                engine.worldBackgroundColor = new Vec3(0.18, 0.09, 0.06);
-                engine.worldLightStrength = 1.15;
-                engine.worldSunBaseIntensity = 1.45 / engine.worldLightStrength;
-                engine.worldFillBaseIntensity = 0.28 / engine.worldLightStrength;
-                engine.worldWarmBaseIntensity = 0.95 / engine.worldLightStrength;
-                engine.worldCoolBaseIntensity = 0.25 / engine.worldLightStrength;
-                if (engine.sunLight != null) {
-                    engine.sunLight.setColor(new Vec3(1.0, 0.83, 0.65));
-                }
-                if (engine.fillLight != null) {
-                    engine.fillLight.setColor(new Vec3(0.42, 0.50, 0.72));
-                }
-                if (engine.warmWorldLight != null) {
-                    engine.warmWorldLight.setColor(new Vec3(1.0, 0.78, 0.58));
-                }
-                if (engine.coolWorldLight != null) {
-                    engine.coolWorldLight.setColor(new Vec3(0.42, 0.56, 0.86));
-                }
-                break;
-            case "Cool Night":
-                engine.worldLightColor = new Vec3(0.10, 0.16, 0.25);
-                engine.worldBackgroundColor = new Vec3(0.03, 0.05, 0.11);
-                engine.worldLightStrength = 0.78;
-                engine.worldSunBaseIntensity = 0.58 / engine.worldLightStrength;
-                engine.worldFillBaseIntensity = 0.32 / engine.worldLightStrength;
-                engine.worldWarmBaseIntensity = 0.28 / engine.worldLightStrength;
-                engine.worldCoolBaseIntensity = 0.78 / engine.worldLightStrength;
-                if (engine.sunLight != null) {
-                    engine.sunLight.setColor(new Vec3(0.70, 0.80, 1.0));
-                }
-                if (engine.fillLight != null) {
-                    engine.fillLight.setColor(new Vec3(0.34, 0.44, 0.72));
-                }
-                if (engine.coolWorldLight != null) {
-                    engine.coolWorldLight.setColor(new Vec3(0.55, 0.74, 1.0));
-                }
-                if (engine.warmWorldLight != null) {
-                    engine.warmWorldLight.setColor(new Vec3(0.96, 0.72, 0.52));
-                }
-                break;
-            case "High Contrast":
-                engine.worldLightColor = new Vec3(0.16, 0.18, 0.19);
-                engine.worldBackgroundColor = new Vec3(0.02, 0.03, 0.04);
-                engine.worldLightStrength = 0.68;
-                engine.worldSunBaseIntensity = 1.8 / engine.worldLightStrength;
-                engine.worldFillBaseIntensity = 0.22 / engine.worldLightStrength;
-                engine.worldWarmBaseIntensity = 0.52 / engine.worldLightStrength;
-                engine.worldCoolBaseIntensity = 0.48 / engine.worldLightStrength;
-                if (engine.sunLight != null) {
-                    engine.sunLight.setColor(new Vec3(1.0, 0.97, 0.92));
-                }
-                if (engine.fillLight != null) {
-                    engine.fillLight.setColor(new Vec3(0.52, 0.60, 0.78));
-                }
-                if (engine.warmWorldLight != null) {
-                    engine.warmWorldLight.setColor(new Vec3(1.0, 0.82, 0.62));
-                }
-                if (engine.coolWorldLight != null) {
-                    engine.coolWorldLight.setColor(new Vec3(0.54, 0.68, 1.0));
-                }
-                break;
-            case "Studio Neutral":
-            default:
-                engine.worldLightColor = new Vec3(0.18, 0.20, 0.24);
-                engine.worldBackgroundColor = new Vec3(0.06, 0.08, 0.11);
-                engine.worldLightStrength = 1.0;
-                engine.worldSunBaseIntensity = 1.35;
-                engine.worldFillBaseIntensity = 0.42;
-                engine.worldWarmBaseIntensity = 0.55;
-                engine.worldCoolBaseIntensity = 0.48;
-                if (engine.sunLight != null) {
-                    engine.sunLight.setColor(new Vec3(1.0, 0.97, 0.92));
-                }
-                if (engine.fillLight != null) {
-                    engine.fillLight.setColor(new Vec3(0.52, 0.60, 0.78));
-                }
-                if (engine.warmWorldLight != null) {
-                    engine.warmWorldLight.setColor(new Vec3(1.0, 0.82, 0.62));
-                }
-                if (engine.coolWorldLight != null) {
-                    engine.coolWorldLight.setColor(new Vec3(0.54, 0.68, 1.0));
-                }
-                break;
-        }
-        applyStoredWorldLightSettings(engine);
-        engine.rebuildSceneDetailsPanel();
     }
 
     static String registerLightName(Engine engine, Light light, String preferredName) {
@@ -220,9 +174,9 @@ final class EngineWorldManager {
         if (engine.scene == null) {
             return;
         }
-        Vec3 pos = engine.spawnPositionFromPointer(3.2).add(new Vec3(0.0, 0.7, 0.0));
+        Vec3 pos = resolveSunLikeSpawnPosition(engine);
         ConeLight light = new ConeLight(pos, new Vec3(1.0, 0.96, 0.88), 1.20);
-        light.setDirection(new Vec3(0.0, -1.0, 0.0));
+        light.setDirection(resolveSunLikeTargetDirection(engine, pos));
         light.setConeAngleDegrees(34.0);
         light.setSoftness(0.35);
         light.setAttenuation(1.0, 0.09, 0.028);
@@ -233,6 +187,49 @@ final class EngineWorldManager {
         engine.refreshSceneOutliner();
         engine.syncOutlinerSelectionToCurrentSelection();
         engine.rebuildSceneDetailsPanel();
+    }
+
+    private static Vec3 resolveSunLikeSpawnPosition(Engine engine) {
+        if (engine == null || engine.camera == null) {
+            return new Vec3(0.0, 2.0, 0.0);
+        }
+        return engine.camera.getPosition().add(new Vec3(0.0, 2.0, 0.0));
+    }
+
+    private static Vec3 resolveSunLikeTargetDirection(Engine engine, Vec3 lightPosition) {
+        Vec3 fallback = engine != null && engine.camera != null
+                ? engine.camera.getForward().normalize()
+                : new Vec3(0.0, -1.0, 0.0);
+        Vec3 target = resolveJosefinaTargetCenter(engine);
+        if (target == null) {
+            return fallback;
+        }
+        Vec3 direction = target.sub(lightPosition);
+        if (direction.lengthSquared() <= 1e-10) {
+            return fallback;
+        }
+        return direction.normalize();
+    }
+
+    private static Vec3 resolveJosefinaTargetCenter(Engine engine) {
+        if (engine == null || engine.scene == null) {
+            return null;
+        }
+        Entity target = engine.demoEntity;
+        if (target == null) {
+            target = engine.scene.findByName(EngineSceneBootstrap.STARTUP_MODEL_DISPLAY_NAME);
+        }
+        if (target == null) {
+            return null;
+        }
+        target.computeWorldBounds();
+        if (target.getWorldBounds() != null) {
+            return target.getWorldBounds().center();
+        }
+        if (target.getTransform() != null) {
+            return target.getTransform().getPosition();
+        }
+        return null;
     }
 
     private static Engine.ForceField newForceField(Engine engine, Engine.ForceFieldType type, String prefix) {

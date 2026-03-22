@@ -23,12 +23,16 @@ public final class SceneOverlayIconDrawer {
             int cx,
             int cy,
             int r,
-            Camera camera) {
+            Camera camera,
+            double pixelScale) {
         if (light == null) {
             return;
         }
         int baseColor = selected ? 0xFFFFCE57 : 0xFF7BC7FF;
         int accent = selected ? 0xFFFFEEC2 : 0xFFBDE7FF;
+        int thick2 = scaledPixels(2, pixelScale, 1);
+        int thick3 = scaledPixels(3, pixelScale, 1);
+        int arrow = scaledPixels(7, pixelScale, 3);
 
         if (light instanceof ConeLight) {
             ConeLight cone = (ConeLight) light;
@@ -49,27 +53,29 @@ public final class SceneOverlayIconDrawer {
             }
             double ux = dx / len;
             double uy = dy / len;
-            int px = (int) Math.round(-uy * (r + 2));
-            int py = (int) Math.round(ux * (r + 2));
-            int bx = (int) Math.round(cx + ux * (r + 7));
-            int by = (int) Math.round(cy + uy * (r + 7));
-            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, bx + px, by + py, baseColor, 3);
-            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, bx - px, by - py, baseColor, 3);
-            OverlayDrawUtil.drawLineThick(pixels, w, h, bx + px, by + py, bx - px, by - py, accent, 3);
-            OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, r - 3, accent, 2);
+            int px = (int) Math.round(-uy * (r + scaledPixels(2, pixelScale, 1)));
+            int py = (int) Math.round(ux * (r + scaledPixels(2, pixelScale, 1)));
+            int bx = (int) Math.round(cx + ux * (r + scaledPixels(7, pixelScale, 3)));
+            int by = (int) Math.round(cy + uy * (r + scaledPixels(7, pixelScale, 3)));
+            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, bx + px, by + py, baseColor, thick3);
+            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, bx - px, by - py, baseColor, thick3);
+            OverlayDrawUtil.drawLineThick(pixels, w, h, bx + px, by + py, bx - px, by - py, accent, thick3);
+            OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, Math.max(1, r - scaledPixels(3, pixelScale, 1)), accent, thick2);
             return;
         }
 
         if (light instanceof AreaLight) {
             AreaLight area = (AreaLight) light;
             OverlayDrawUtil.drawSquareBorder(pixels, w, h, cx - r, cy - r, 2 * r + 1, 2 * r + 1, baseColor);
-            OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, Math.max(5, r - 4), accent, 2);
+            OverlayDrawUtil.drawCircleOutlineThick(
+                    pixels, w, h, cx, cy, Math.max(scaledPixels(5, pixelScale, 2), r - scaledPixels(4, pixelScale, 2)),
+                    accent, thick2);
             Vec3 p = area.getPosition();
             Vec3 d = area.getEmissionDirection();
             int[] end = new int[2];
             double[] depth = new double[1];
             if (ScreenProjectionUtil.projectWorldPointWithDepth(p.add(d.mul(0.9)), vp, w, h, end, depth)) {
-                OverlayDrawUtil.drawArrowHeadThick(pixels, w, h, cx, cy, end[0], end[1], accent, 7.0, 3);
+                OverlayDrawUtil.drawArrowHeadThick(pixels, w, h, cx, cy, end[0], end[1], accent, arrow, thick3);
             }
             return;
         }
@@ -89,18 +95,20 @@ public final class SceneOverlayIconDrawer {
             }
             sx /= len;
             sy /= len;
-            int ex = (int) Math.round(cx + sx * (r + 10));
-            int ey = (int) Math.round(cy + sy * (r + 10));
-            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, ex, ey, baseColor, 3);
-            OverlayDrawUtil.drawArrowHeadThick(pixels, w, h, cx, cy, ex, ey, accent, 7.0, 3);
-            OverlayDrawUtil.drawSquareBorder(pixels, w, h, cx - 4, cy - 4, 9, 9, accent);
+            int ex = (int) Math.round(cx + sx * (r + scaledPixels(10, pixelScale, 4)));
+            int ey = (int) Math.round(cy + sy * (r + scaledPixels(10, pixelScale, 4)));
+            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, ex, ey, baseColor, thick3);
+            OverlayDrawUtil.drawArrowHeadThick(pixels, w, h, cx, cy, ex, ey, accent, arrow, thick3);
+            int half = scaledPixels(4, pixelScale, 2);
+            OverlayDrawUtil.drawSquareBorder(pixels, w, h, cx - half, cy - half, 2 * half + 1, 2 * half + 1, accent);
             return;
         }
 
-        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, r, baseColor, 2);
-        OverlayDrawUtil.drawLineThick(pixels, w, h, cx - r, cy, cx + r, cy, accent, 3);
-        OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy - r, cx, cy + r, accent, 3);
-        OverlayDrawUtil.drawSquare(pixels, w, h, cx - 1, cy - 1, 3, 3, accent);
+        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, r, baseColor, thick2);
+        OverlayDrawUtil.drawLineThick(pixels, w, h, cx - r, cy, cx + r, cy, accent, thick3);
+        OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy - r, cx, cy + r, accent, thick3);
+        int centerHalf = scaledPixels(1, pixelScale, 1);
+        OverlayDrawUtil.drawSquare(pixels, w, h, cx - centerHalf, cy - centerHalf, 2 * centerHalf + 1, 2 * centerHalf + 1, accent);
     }
 
     public static void drawVectorForceIcon(
@@ -112,9 +120,12 @@ public final class SceneOverlayIconDrawer {
             int r,
             Vec3 direction,
             boolean selected,
-            Camera camera) {
+            Camera camera,
+            double pixelScale) {
         int baseColor = selected ? 0xFFFFC767 : 0xFF8DE8B8;
         int accent = selected ? 0xFFFFEDC0 : 0xFFC9FFE3;
+        int thick3 = scaledPixels(3, pixelScale, 1);
+        int arrow = scaledPixels(8, pixelScale, 3);
         Vec3 dir = direction == null ? new Vec3(0.0, -1.0, 0.0) : direction.normalize();
         Vec3 right = camera.getRight().normalize();
         Vec3 up = camera.getUp().normalize();
@@ -128,32 +139,53 @@ public final class SceneOverlayIconDrawer {
         }
         sx /= len;
         sy /= len;
-        int ex = (int) Math.round(cx + sx * (r + 9));
-        int ey = (int) Math.round(cy + sy * (r + 9));
-        OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, ex, ey, baseColor, 3);
-        OverlayDrawUtil.drawArrowHeadThick(pixels, w, h, cx, cy, ex, ey, accent, 8.0, 3);
-        OverlayDrawUtil.drawSquareBorder(pixels, w, h, cx - 3, cy - 3, 7, 7, accent);
+        int ex = (int) Math.round(cx + sx * (r + scaledPixels(9, pixelScale, 3)));
+        int ey = (int) Math.round(cy + sy * (r + scaledPixels(9, pixelScale, 3)));
+        OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy, ex, ey, baseColor, thick3);
+        OverlayDrawUtil.drawArrowHeadThick(pixels, w, h, cx, cy, ex, ey, accent, arrow, thick3);
+        int half = scaledPixels(3, pixelScale, 1);
+        OverlayDrawUtil.drawSquareBorder(pixels, w, h, cx - half, cy - half, 2 * half + 1, 2 * half + 1, accent);
     }
 
     public static void drawPointForceIcon(
-            int[] pixels, int w, int h, int cx, int cy, int r, boolean attract, boolean selected) {
+            int[] pixels, int w, int h, int cx, int cy, int r, boolean attract, boolean selected, double pixelScale) {
         int baseColor = selected ? 0xFFFFC767 : 0xFF8DE8B8;
         int accent = selected ? 0xFFFFEDC0 : 0xFFC9FFE3;
-        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, r, baseColor, 2);
-        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, Math.max(5, r - 4), accent, 2);
-        OverlayDrawUtil.drawLineThick(pixels, w, h, cx - r / 2, cy, cx + r / 2, cy, accent, 3);
+        int thick2 = scaledPixels(2, pixelScale, 1);
+        int thick3 = scaledPixels(3, pixelScale, 1);
+        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, r, baseColor, thick2);
+        OverlayDrawUtil.drawCircleOutlineThick(
+                pixels, w, h, cx, cy,
+                Math.max(scaledPixels(5, pixelScale, 2), r - scaledPixels(4, pixelScale, 2)), accent, thick2);
+        OverlayDrawUtil.drawLineThick(pixels, w, h, cx - r / 2, cy, cx + r / 2, cy, accent, thick3);
         if (attract) {
-            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy - r / 2, cx, cy + r / 2, accent, 3);
+            OverlayDrawUtil.drawLineThick(pixels, w, h, cx, cy - r / 2, cx, cy + r / 2, accent, thick3);
         }
     }
 
-    public static void drawTurbulenceForceIcon(int[] pixels, int w, int h, int cx, int cy, int r, boolean selected) {
+    public static void drawTurbulenceForceIcon(
+            int[] pixels, int w, int h, int cx, int cy, int r, boolean selected, double pixelScale) {
         int baseColor = selected ? 0xFFFFC767 : 0xFF8DE8B8;
         int accent = selected ? 0xFFFFEDC0 : 0xFFC9FFE3;
-        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, r, baseColor, 2);
-        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, Math.max(4, r - 4), accent, 2);
-        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, Math.max(2, r - 7), baseColor, 2);
-        OverlayDrawUtil.drawLineThick(pixels, w, h, cx - r + 2, cy + 1, cx - 1, cy - 2, accent, 3);
-        OverlayDrawUtil.drawLineThick(pixels, w, h, cx - 1, cy - 2, cx + r - 2, cy + 2, accent, 3);
+        int thick2 = scaledPixels(2, pixelScale, 1);
+        int thick3 = scaledPixels(3, pixelScale, 1);
+        OverlayDrawUtil.drawCircleOutlineThick(pixels, w, h, cx, cy, r, baseColor, thick2);
+        OverlayDrawUtil.drawCircleOutlineThick(
+                pixels, w, h, cx, cy,
+                Math.max(scaledPixels(4, pixelScale, 2), r - scaledPixels(4, pixelScale, 2)), accent, thick2);
+        OverlayDrawUtil.drawCircleOutlineThick(
+                pixels, w, h, cx, cy,
+                Math.max(scaledPixels(2, pixelScale, 1), r - scaledPixels(7, pixelScale, 3)), baseColor, thick2);
+        OverlayDrawUtil.drawLineThick(
+                pixels, w, h, cx - r + scaledPixels(2, pixelScale, 1), cy + scaledPixels(1, pixelScale, 1),
+                cx - scaledPixels(1, pixelScale, 1), cy - scaledPixels(2, pixelScale, 1), accent, thick3);
+        OverlayDrawUtil.drawLineThick(
+                pixels, w, h, cx - scaledPixels(1, pixelScale, 1), cy - scaledPixels(2, pixelScale, 1),
+                cx + r - scaledPixels(2, pixelScale, 1), cy + scaledPixels(2, pixelScale, 1), accent, thick3);
+    }
+
+    private static int scaledPixels(int basePixels, double pixelScale, int minPixels) {
+        int scaled = (int) Math.round(basePixels * pixelScale);
+        return Math.max(minPixels, scaled);
     }
 }

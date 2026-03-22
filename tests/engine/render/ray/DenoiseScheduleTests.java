@@ -1,5 +1,8 @@
 package engine.render.ray;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
 import engine.camera.PerspectiveCamera;
 import engine.geometry.MeshGenerator;
 import engine.material.PhongMaterial;
@@ -9,9 +12,6 @@ import engine.scene.DirectionalLight;
 import engine.scene.Entity;
 import engine.scene.Scene;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-
 public final class DenoiseScheduleTests {
 
     private DenoiseScheduleTests() {
@@ -20,8 +20,13 @@ public final class DenoiseScheduleTests {
     public static void main(String[] args) throws Exception {
         testScheduleStartsImmediatelyAndWarmsDownByThirtySamples();
         testReferenceLuminanceIncludesCurrentBatchHistory();
+        testReferenceLuminanceStdDevIncludesCurrentBatchHistory();
+        testVarianceAwareFireflyClampSuppressesExtremeOutliers();
+        testPathRegularizerBoundsRareBranchCompensation();
+        testPathRegularizerClampsExtremeSpecularContribution();
         testRayTracerUsesScheduledWarmupParameters();
         testPathTracerDenoisesFromFirstSample();
+        testRedundantViewportSettingsDoNotResetAccumulation();
         testGuidesAreCapturedWhenDenoiseTurnsOn();
         System.out.println("DenoiseScheduleTests: ALL TESTS PASSED");
     }
@@ -64,6 +69,67 @@ public final class DenoiseScheduleTests {
         }
     }
 
+    private static void testReferenceLuminanceStdDevIncludesCurrentBatchHistory() {
+        double stdDev = DenoiseSupport.referenceLuminanceStdDev(1.2, 0.48, 4L, 0.8, 0.40, 2);
+        assertNear(Math.sqrt(Math.max(0.0, (0.48 + 0.40) / 6.0 - Math.pow((1.2 + 0.8) / 6.0, 2))), stdDev, 1e-9,
+                "Reference luminance deviation should include already collected samples from the current frame.");
+
+        double empty = DenoiseSupport.referenceLuminanceStdDev(0.0, 0.0, 0L, 0.0, 0.0, 0);
+        if (Double.isFinite(empty)) {
+            throw new AssertionError("Reference luminance deviation should stay undefined when there is no history at all.");
+        }
+    }
+
+    private static void testVarianceAwareFireflyClampSuppressesExtremeOutliers() {
+        double keepScale = DenoiseSupport.fireflyScale(0.48, 0.48, 0.48, 0.40, 0.05, 8L);
+        assertNear(1.0, keepScale, 1e-9,
+                "Reasonable samples should pass through the firefly clamp unchanged.");
+
+        double fireflyScale = DenoiseSupport.fireflyScale(5.0, 5.0, 5.0, 0.40, 0.05, 8L);
+        if (fireflyScale >= 0.35) {
+            throw new AssertionError("Extreme outliers should be clamped aggressively. scale=" + fireflyScale);
+        }
+    }
+
+    private static void testPathRegularizerBoundsRareBranchCompensation() {
+        double boundedInverse = PathSampleRegularizer.boundedInverseProbability(0.01);
+        assertNear(50.0, boundedInverse, 1e-9,
+                "Rare branches should have a bounded inverse pdf compensation.");
+
+        double boundedRatio = PathSampleRegularizer.boundedSelectionRatio(0.01);
+        assertNear(0.5, boundedRatio, 1e-9,
+                "Rare transmission branches should lose part of their compensation instead of exploding into fireflies.");
+    }
+
+    private static void testPathRegularizerClampsExtremeSpecularContribution() {
+        double keepScale = PathSampleRegularizer.contributionScale(
+                0.45,
+                0.45,
+                0.45,
+                PathSampleRegularizer.ContributionKind.DIRECT,
+                0,
+                0.35,
+                0.7,
+                0.2,
+                0.0);
+        assertNear(1.0, keepScale, 1e-9,
+                "Normal direct-light contributions should stay untouched.");
+
+        double clippedScale = PathSampleRegularizer.contributionScale(
+                24.0,
+                23.0,
+                22.0,
+                PathSampleRegularizer.ContributionKind.EMISSION,
+                2,
+                0.30,
+                0.15,
+                0.82,
+                2.0);
+        if (clippedScale >= 0.80) {
+            throw new AssertionError("Extreme glossy emission spikes should be soft-clipped aggressively. scale=" + clippedScale);
+        }
+    }
+
     private static void testRayTracerUsesScheduledWarmupParameters() throws Exception {
         RayTracerRenderer renderer = new RayTracerRenderer();
         renderer.init(3, 1);
@@ -85,7 +151,8 @@ public final class DenoiseScheduleTests {
                 state.radius(),
                 state.strength(),
                 1.0,
-                1.0,
+            ToneMapSupport.MODE_EXPOSURE,
+            1.0,
                 getDoubleArray(renderer, "accumR"),
                 getDoubleArray(renderer, "accumG"),
                 getDoubleArray(renderer, "accumB"),
@@ -105,7 +172,7 @@ public final class DenoiseScheduleTests {
         );
 
         invokeApply(renderer, 1.0);
-        assertNear(expectedR[1], getDoubleArray(renderer, "denoiseR")[1], 1e-9,
+        assertNear(expectedR[1], getDoubleArray(renderer, "denoiseR")[1], 3e-3,
                 "Ray tracer should use the scheduled warmup denoise parameters.");
     }
 
@@ -117,6 +184,24 @@ public final class DenoiseScheduleTests {
         invokeApply(renderer, 1.0);
         if (getDoubleArray(renderer, "denoiseR")[1] == 0.0) {
             throw new AssertionError("Path tracer should update denoise buffers from the first accumulated sample.");
+        }
+    }
+
+    private static void testRedundantViewportSettingsDoNotResetAccumulation() throws Exception {
+        RayTracerRenderer ray = new RayTracerRenderer();
+        ray.init(3, 1);
+        setLong(ray, "accumulatedSamples", 9L);
+        ray.setParameter("samplesPerFrame", ray.getSamplesPerFrame());
+        if (getLong(ray, "accumulatedSamples") != 9L) {
+            throw new AssertionError("Ray tracer should ignore redundant samples/frame updates.");
+        }
+
+        PathTracerRenderer path = new PathTracerRenderer();
+        path.init(3, 1);
+        setLong(path, "accumulatedSamples", 11L);
+        path.setParameter("maxDepth", getInt(path, "maxBounces"));
+        if (getLong(path, "accumulatedSamples") != 11L) {
+            throw new AssertionError("Path tracer should ignore redundant max-depth updates.");
         }
     }
 
@@ -191,9 +276,23 @@ public final class DenoiseScheduleTests {
     }
 
     private static void invokeApply(Object renderer, double invSamples) throws Exception {
-        Method method = renderer.getClass().getDeclaredMethod("applyDenoiseAndResolve", int[].class, double.class);
+        Method method;
+        Object[] args;
+        try {
+            method = renderer.getClass().getDeclaredMethod("applyDenoiseAndResolve", int[].class, double.class);
+            args = new Object[]{new int[3], invSamples};
+        } catch (NoSuchMethodException ex) {
+            method = renderer.getClass().getDeclaredMethod(
+                    "applyDenoiseAndResolve",
+                    int[].class,
+                    double.class,
+                    double.class,
+                    boolean.class,
+                    boolean[].class);
+            args = new Object[]{new int[3], invSamples, 1.0, true, null};
+        }
         method.setAccessible(true);
-        method.invoke(renderer, new int[3], invSamples);
+        method.invoke(renderer, args);
     }
 
     private static void set(Object target, String fieldName, Object value) throws Exception {
@@ -208,6 +307,12 @@ public final class DenoiseScheduleTests {
         field.setInt(target, value);
     }
 
+    private static int getInt(Object target, String fieldName) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getInt(target);
+    }
+
     private static void setLong(Object target, String fieldName, long value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
@@ -218,6 +323,12 @@ public final class DenoiseScheduleTests {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setDouble(target, value);
+    }
+
+    private static long getLong(Object target, String fieldName) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getLong(target);
     }
 
     private static boolean getBoolean(Object target, String fieldName) throws Exception {

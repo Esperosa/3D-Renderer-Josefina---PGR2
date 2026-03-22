@@ -19,11 +19,11 @@ public final class WorldPresetHistoryTests {
 
     private static void testWorldPresetStateSurvivesUndoRedoWithoutUi() {
         Engine engine = createEngine();
-        String studioPreset = UiStrings.worldPresetKey(UiStrings.World.PRESET_STUDIO);
+        String defaultPreset = UiStrings.worldPresetKey(UiStrings.World.PRESET_CLOUDY);
         String sunsetPreset = UiStrings.worldPresetKey(UiStrings.World.PRESET_SUNSET);
         EngineHistoryManager.resetActionHistoryBaseline(engine);
 
-        assertEquals(studioPreset, engine.worldPresetKey, "Výchozí preset prostředí musí začínat na studiu");
+        assertEquals(defaultPreset, engine.worldPresetKey, "Vychozi preset prostredi musi zacinat na oblacnem dni");
 
         engine.applyWorldPreset(UiStrings.World.PRESET_SUNSET);
         assertEquals(sunsetPreset, engine.worldPresetKey, "Použití předvolby musí přepsat uložený preset key");
@@ -32,10 +32,10 @@ public final class WorldPresetHistoryTests {
         assertNear(1.15, engine.scene.getEnvironmentStrength(), "Předvolba západu musí propsat sílu i do scény");
 
         engine.undoLastAction();
-        assertEquals(studioPreset, engine.worldPresetKey, "Undo musí vrátit i uložený preset key");
-        assertNear(1.0, engine.worldLightStrength, "Undo musí vrátit výchozí sílu prostředí");
-        assertVecNear(new Vec3(0.18, 0.20, 0.24), engine.worldLightColor, "Undo musí vrátit výchozí ambientní barvu");
-        assertNear(1.0, engine.scene.getEnvironmentStrength(), "Undo musí vrátit výchozí sílu scény");
+        assertEquals(defaultPreset, engine.worldPresetKey, "Undo musi vratit i ulozeny preset key");
+        assertNear(0.92, engine.worldLightStrength, "Undo musi vratit vychozi silu prostredi");
+        assertVecNear(new Vec3(0.18, 0.20, 0.23), engine.worldLightColor, "Undo musi vratit vychozi ambientni barvu");
+        assertNear(0.92, engine.scene.getEnvironmentStrength(), "Undo musi vratit vychozi silu sceny");
 
         engine.redoLastAction();
         assertEquals(sunsetPreset, engine.worldPresetKey, "Redo musí obnovit uložený preset key");

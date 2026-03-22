@@ -1,13 +1,13 @@
 package engine.core;
 
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.PointerInfo;
+
 import engine.camera.Camera;
 import engine.camera.CameraController;
 import engine.math.Vec3;
 import engine.scene.Entity;
-
-import java.awt.MouseInfo;
-import java.awt.Point;
-import java.awt.PointerInfo;
 
 final class EngineCameraRuntime {
     private EngineCameraRuntime() {
@@ -44,7 +44,7 @@ final class EngineCameraRuntime {
             return;
         }
 
-        Point center = engine.window.getCanvasCenterOnScreen();
+        Point center = engine.window.getCapturePointOnScreen();
         PointerInfo pointerInfo = MouseInfo.getPointerInfo();
         if (center == null || pointerInfo == null) {
             return;
@@ -70,8 +70,9 @@ final class EngineCameraRuntime {
         engine.mouseCaptured = true;
         engine.captureSelectLatch = false;
         engine.window.setCursorCaptured(true);
+        engine.window.getCanvas().requestFocusInWindow();
         engine.cameraController.setMouseLookAlways(true);
-        Point center = engine.window.getCanvasCenterOnScreen();
+        Point center = engine.window.getCapturePointOnScreen();
         if (engine.mouseRobot != null && center != null) {
             engine.mouseRobot.mouseMove(center.x, center.y);
         }
@@ -121,11 +122,10 @@ final class EngineCameraRuntime {
         }
         engine.camera.setPosition(position);
         engine.camera.lookAt(position.add(fwd));
-        if (engine.orthographicProjection) {
-            copyCameraPose(engine.camera, engine.perspectiveCamera);
-        } else {
-            copyCameraPose(engine.camera, engine.orthographicCamera);
-        }
+        Camera companionCamera = engine.orthographicProjection
+                ? engine.perspectiveCamera
+                : engine.orthographicCamera;
+        copyCameraPose(engine.camera, companionCamera);
         if (engine.cameraController != null) {
             engine.cameraController.syncStateFromCamera();
         }
@@ -170,12 +170,12 @@ final class EngineCameraRuntime {
             engine.savedFpsForward = new Vec3(fwd.x, fwd.y, fwd.z);
             engine.savedFpsPoseValid = true;
             engine.setNavigationPreset(Engine.NavigationPreset.FPS);
-        } else if (engine.navigationPreset == Engine.NavigationPreset.BLENDER) {
-            applyCameraPose(engine, pos, fwd);
-            rememberCurrentBlendPose(engine);
-            engine.cameraController.setOrbitTarget(pos.add(fwd.mul(4.0)));
         } else {
             applyCameraPose(engine, pos, fwd);
+            if (engine.navigationPreset == Engine.NavigationPreset.BLENDER) {
+                rememberCurrentBlendPose(engine);
+                engine.cameraController.setOrbitTarget(pos.add(fwd.mul(4.0)));
+            }
         }
     }
 

@@ -49,6 +49,7 @@ final class MaterialGraphSurfaceEvaluator {
         out.metallic = material == null ? 0.0 : material.getMetallic();
         out.specularFactor = material == null ? 1.0 : material.getSpecularFactor();
         out.refractiveIndex = material == null ? 1.0 : material.getRefractiveIndex();
+        out.dispersion = material == null ? 0.0 : material.getDispersion();
         out.transmission = material == null ? 0.0 : material.getTransmission();
         out.opacity = material == null ? 1.0 : material.getOpacity();
         out.emissionColor.set(material == null ? Vec3.ZERO : material.getEmissionColor());
@@ -69,6 +70,7 @@ final class MaterialGraphSurfaceEvaluator {
         out.metallic = MaterialGraphValueEvaluator.resolveValueInput(state, node, "metallic", node.getNumber("metallic", 0.0));
         out.specularFactor = MaterialGraphValueEvaluator.resolveValueInput(state, node, "specular", node.getNumber("specular", 1.0));
         out.refractiveIndex = Math.max(1.0, MaterialGraphValueEvaluator.resolveValueInput(state, node, "ior", node.getNumber("ior", 1.45)));
+        out.dispersion = MathUtil.clamp01(MaterialGraphValueEvaluator.resolveValueInput(state, node, "dispersion", node.getNumber("dispersion", 0.0)));
         out.transmission = MaterialGraphValueEvaluator.resolveValueInput(state, node, "transmission", node.getNumber("transmission", 0.0));
         out.opacity = MaterialGraphValueEvaluator.resolveValueInput(state, node, "opacity", node.getNumber("opacity", 1.0));
         out.emissionColor.set(MaterialGraphValueEvaluator.resolveColorInput(state, node, "emission", node.getColor("emission", Vec3.ZERO)));
@@ -95,6 +97,8 @@ final class MaterialGraphSurfaceEvaluator {
         out.specularFactor = 1.0;
         out.refractiveIndex = Math.max(1.0, MaterialGraphValueEvaluator.resolveValueInput(state, node, "ior",
                 node.getNumber("ior", 1.45)));
+        out.dispersion = MathUtil.clamp01(MaterialGraphValueEvaluator.resolveValueInput(state, node, "dispersion",
+            node.getNumber("dispersion", 0.0)));
         out.transmission = 1.0;
         out.opacity = MathUtil.clamp01(MaterialGraphValueEvaluator.resolveValueInput(state, node, "opacity",
                 node.getNumber("opacity", 1.0)));
@@ -120,6 +124,7 @@ final class MaterialGraphSurfaceEvaluator {
         out.metallic = 0.0;
         out.specularFactor = 0.0;
         out.refractiveIndex = 1.0;
+        out.dispersion = 0.0;
         out.transmission = 0.0;
         out.opacity = 1.0;
         out.emissionColor.set(color);
@@ -143,6 +148,7 @@ final class MaterialGraphSurfaceEvaluator {
         out.metallic = MaterialGraphValueEvaluator.mix(a.metallic, b.metallic, factor);
         out.specularFactor = MaterialGraphValueEvaluator.mix(a.specularFactor, b.specularFactor, factor);
         out.refractiveIndex = MaterialGraphValueEvaluator.mix(a.refractiveIndex, b.refractiveIndex, factor);
+        out.dispersion = MaterialGraphValueEvaluator.mix(a.dispersion, b.dispersion, factor);
         out.transmission = MaterialGraphValueEvaluator.mix(a.transmission, b.transmission, factor);
         out.opacity = MaterialGraphValueEvaluator.mix(a.opacity, b.opacity, factor);
         Vec3.lerp(a.emissionColor, b.emissionColor, factor, out.emissionColor);
@@ -175,6 +181,7 @@ final class MaterialGraphSurfaceEvaluator {
         out.metallic = 0.0;
         out.specularFactor = 0.0;
         out.refractiveIndex = 1.0;
+        out.dispersion = 0.0;
         out.transmission = 1.0;
         out.opacity = MathUtil.clamp01(MaterialGraphValueEvaluator.resolveValueInput(state, node, "opacity", node.getNumber("opacity", 0.0)));
         out.emissionColor.zero();

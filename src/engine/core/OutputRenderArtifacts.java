@@ -1,5 +1,7 @@
 package engine.core;
 
+import engine.util.RuntimeInstrumentation;
+
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -29,6 +31,9 @@ final class OutputRenderArtifacts {
         int srcW = fb.getWidth();
         int srcH = fb.getHeight();
         int[] src = fb.getColorBuffer();
+        RuntimeInstrumentation.addCounter(
+                RuntimeInstrumentation.Counter.BYTES_COPIED,
+                Math.max(0L, (long) srcW * (long) srcH * 4L));
         BufferedImage base = new BufferedImage(srcW, srcH, BufferedImage.TYPE_INT_ARGB);
         base.setRGB(0, 0, srcW, srcH, src, 0, srcW);
 

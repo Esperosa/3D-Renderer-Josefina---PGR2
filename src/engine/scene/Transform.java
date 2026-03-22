@@ -14,31 +14,37 @@ public class Transform {
     private Vec3 scale = Vec3.ONE;
     private Mat4 localMatrix = Mat4.identity();
     private boolean dirty = true;
+    private long revision = 1L;
+    private Runnable dirtyListener;
+
+    public void setDirtyListener(Runnable dirtyListener) {
+        this.dirtyListener = dirtyListener;
+    }
 
     // Tady měním transformaci.
     public void setPosition(Vec3 p) {
         position = p;
-        dirty = true;
+        markDirty();
     }
 
     public void setRotation(Quaternion q) {
         rotation = q == null ? new Quaternion() : q.normalize();
-        dirty = true;
+        markDirty();
     }
 
     public void setScale(Vec3 s) {
         scale = s;
-        dirty = true;
+        markDirty();
     }
 
     public void translate(Vec3 delta) {
         position = position.add(delta);
-        dirty = true;
+        markDirty();
     }
 
     public void rotate(Vec3 axis, double radians) {
         rotation = Quaternion.fromAxisAngle(axis, radians).multiply(rotation).normalize();
-        dirty = true;
+        markDirty();
     }
 
     // Tady držím přístupové metody.
@@ -52,6 +58,14 @@ public class Transform {
 
     public Vec3 getScale() {
         return scale;
+    }
+
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public long getRevision() {
+        return revision;
     }
 
     // Tady skládám lokální matici.
@@ -73,10 +87,18 @@ public class Transform {
     // Tady držím pohodlné Euler převody.
     public void setEulerAngles(double pitch, double yaw, double roll) {
         rotation = Quaternion.fromEuler(pitch, yaw, roll);
-        dirty = true;
+        markDirty();
     }
 
     public Vec3 getEulerAngles() {
         return rotation.toEuler();
+    }
+
+    private void markDirty() {
+        dirty = true;
+        revision++;
+        if (dirtyListener != null) {
+            dirtyListener.run();
+        }
     }
 }

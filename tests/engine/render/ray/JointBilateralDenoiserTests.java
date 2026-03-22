@@ -13,6 +13,7 @@ public final class JointBilateralDenoiserTests {
         testGuideBuffersPreserveEdges();
         testAlbedoGuidePreservesMaterialBoundaries();
         testVarianceGuidedPixelsSmoothMoreWhenTheyAreNoisy();
+        testRoughnessGuideLetsDiffusePixelsSmoothMoreThanGlossyOnes();
         testStableFramesUseFewerPasses();
         testParallelMatchesSequential();
         System.out.println("JointBilateralDenoiserTests: ALL TESTS PASSED");
@@ -47,9 +48,9 @@ public final class JointBilateralDenoiserTests {
             }
         }
 
-        JointBilateralDenoiser.apply(width, height, 1, null, 1, 1.0, 1.0, 1.0,
+        JointBilateralDenoiser.apply(width, height, 1, null, 1, 1.0, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0,
                 accumR, accumG, accumB, sameDepth, sameNormal, sameR, sameG, sameB, sameDepthColor);
-        JointBilateralDenoiser.apply(width, height, 1, null, 1, 1.0, 1.0, 1.0,
+        JointBilateralDenoiser.apply(width, height, 1, null, 1, 1.0, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0,
                 accumR, accumG, accumB, separatedDepth, separatedNormal, separatedR, separatedG, separatedB, separatedColor);
 
         double sameCenter = sameR[2];
@@ -83,7 +84,7 @@ public final class JointBilateralDenoiserTests {
         double[] seqG = new double[count];
         double[] seqB = new double[count];
         int[] seqColor = new int[count];
-        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.65, 1.1, 1.0,
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.65, 1.1, ToneMapSupport.MODE_EXPOSURE, 1.0,
                 accumR, accumG, accumB, depth, normal, seqR, seqG, seqB, seqColor);
 
         double[] parR = new double[count];
@@ -92,7 +93,7 @@ public final class JointBilateralDenoiserTests {
         int[] parColor = new int[count];
         ThreadPool pool = new ThreadPool(3);
         try {
-            JointBilateralDenoiser.apply(width, height, 3, pool, 2, 0.65, 1.1, 1.0,
+                JointBilateralDenoiser.apply(width, height, 3, pool, 2, 0.65, 1.1, ToneMapSupport.MODE_EXPOSURE, 1.0,
                     accumR, accumG, accumB, depth, normal, parR, parG, parB, parColor);
         } finally {
             pool.shutdown();
@@ -138,9 +139,9 @@ public final class JointBilateralDenoiserTests {
         double[] separatedB = new double[5];
         int[] separatedOut = new int[5];
 
-        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.7, 1.0, 1.0,
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.7, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0,
                 accumR, accumG, accumB, depth, normal, flatAlbedo, flatR, flatG, flatB, flatOut);
-        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.7, 1.0, 1.0,
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.7, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0,
                 accumR, accumG, accumB, depth, normal, separatedAlbedo, separatedR, separatedG, separatedB, separatedOut);
 
         if (separatedR[2] >= flatR[2] - 0.004) {
@@ -183,10 +184,10 @@ public final class JointBilateralDenoiserTests {
         double[] highScratchB = new double[3];
         int[] highOut = new int[3];
 
-        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.62, 1.0, 1.0 / sampleCount,
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.62, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0 / sampleCount,
                 accumR, accumG, accumB, lowNoiseLuma, lowNoiseLumaSq, sampleCount,
                 depth, normal, null, lowR, lowG, lowB, lowScratchR, lowScratchG, lowScratchB, lowOut);
-        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.62, 1.0, 1.0 / sampleCount,
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.62, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0 / sampleCount,
                 accumR, accumG, accumB, highNoiseLuma, highNoiseLumaSq, sampleCount,
                 depth, normal, null, highR, highG, highB, highScratchR, highScratchG, highScratchB, highOut);
 
@@ -196,12 +197,66 @@ public final class JointBilateralDenoiserTests {
         }
     }
 
+    private static void testRoughnessGuideLetsDiffusePixelsSmoothMoreThanGlossyOnes() {
+        int width = 3;
+        int height = 1;
+        long sampleCount = 48L;
+        double[] accumR = new double[]{16.8, 11.4, 16.8};
+        double[] accumG = new double[3];
+        double[] accumB = new double[3];
+        double[] accumLuma = new double[]{16.8, 11.4, 16.8};
+        double[] accumLumaSq = new double[]{7.0, 6.0, 7.0};
+        float[] depth = new float[]{1.0f, 1.0f, 1.0f};
+        float[] normal = new float[9];
+        float[] albedo = new float[9];
+        for (int i = 0; i < 3; i++) {
+            setNormal(normal, i, 0.0f, 0.0f, 1.0f);
+            setColor(albedo, i, 0.6f, 0.6f, 0.6f);
+        }
+
+        float[] roughGuide = new float[]{0.95f, 0.95f, 0.95f};
+        float[] glossyGuide = new float[]{0.08f, 0.08f, 0.08f};
+
+        double[] roughR = new double[3];
+        double[] roughG = new double[3];
+        double[] roughB = new double[3];
+        double[] roughScratchR = new double[3];
+        double[] roughScratchG = new double[3];
+        double[] roughScratchB = new double[3];
+        int[] roughOut = new int[3];
+
+        double[] glossyR = new double[3];
+        double[] glossyG = new double[3];
+        double[] glossyB = new double[3];
+        double[] glossyScratchR = new double[3];
+        double[] glossyScratchG = new double[3];
+        double[] glossyScratchB = new double[3];
+        int[] glossyOut = new int[3];
+
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.68, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0 / sampleCount,
+                accumR, accumG, accumB, accumLuma, accumLumaSq, sampleCount,
+                depth, normal, albedo, roughGuide,
+                roughR, roughG, roughB, roughScratchR, roughScratchG, roughScratchB, roughOut);
+        JointBilateralDenoiser.apply(width, height, 1, null, 2, 0.68, 1.0, ToneMapSupport.MODE_EXPOSURE, 1.0 / sampleCount,
+                accumR, accumG, accumB, accumLuma, accumLumaSq, sampleCount,
+                depth, normal, albedo, glossyGuide,
+                glossyR, glossyG, glossyB, glossyScratchR, glossyScratchG, glossyScratchB, glossyOut);
+
+        if (roughR[1] <= glossyR[1] + 0.01) {
+            throw new AssertionError("Rough diffuse pixels should accept stronger denoise than glossy ones. rough="
+                    + roughR[1] + " glossy=" + glossyR[1]);
+        }
+    }
+
     private static void testStableFramesUseFewerPasses() {
-        if (JointBilateralDenoiser.resolvePassCount(2, 1.0) != 3) {
-            throw new AssertionError("Radius 2 should keep the full pass budget while the frame is noisy.");
+        if (JointBilateralDenoiser.resolvePassCount(2, 1.0) != 4) {
+            throw new AssertionError("Radius 2 should unlock the widest cleanup budget while the frame is very noisy.");
+        }
+        if (JointBilateralDenoiser.resolvePassCount(2, 0.20) != 3) {
+            throw new AssertionError("Moderately noisy frames should keep a medium denoise budget.");
         }
         if (JointBilateralDenoiser.resolvePassCount(2, 0.04) != 2) {
-            throw new AssertionError("Very stable frames should skip the widest cleanup pass.");
+            throw new AssertionError("Very stable frames should collapse to the minimum useful cleanup footprint.");
         }
         if (JointBilateralDenoiser.resolvePassCount(1, 0.02) != 2) {
             throw new AssertionError("Low-radius denoise should keep its minimum two-pass footprint.");

@@ -18,6 +18,7 @@ public final class RayIntersectionUtil {
 
         double bestT = maxT;
         for (int i = 0; i < indices.length; i += 3) {
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PICK_TRIANGLE_TESTS, 1L);
             int i0 = indices[i] * 3;
             int i1 = indices[i + 1] * 3;
             int i2 = indices[i + 2] * 3;

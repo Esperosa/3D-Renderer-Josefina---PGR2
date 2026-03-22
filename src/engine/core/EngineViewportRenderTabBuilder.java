@@ -1,15 +1,16 @@
 package engine.core;
 
+import java.awt.Dimension;
+
+import javax.swing.Box;
+import javax.swing.JPanel;
+
 import engine.render.post.DitherRenderer;
 import engine.render.post.TemporalNoiseRenderer;
 import engine.ui.UiStrings;
 import engine.ui.UiTheme;
 import engine.util.ThreadPool;
 import engine.util.UiBuilder;
-
-import javax.swing.Box;
-import javax.swing.JPanel;
-import java.awt.Dimension;
 
 /**
  * Tady stavím panel pro živé nastavení viewport rendererů.
@@ -112,7 +113,7 @@ final class EngineViewportRenderTabBuilder {
                         engine.viewportNavigationFallbackMode == null ? RenderMode.MODEL : engine.viewportNavigationFallbackMode),
                 value -> engine.viewportNavigationFallbackMode = EngineRenderPanelSupport.parseRenderModeLabel(value));
         engine.addNumericRow(globalSection, "Cílové FPS viewportu", engine.formatTransformValue(engine.viewportTargetFps), text -> {
-            engine.viewportTargetFps = Math.max(12.0, Math.min(120.0, engine.parseOrFallback(text, engine.viewportTargetFps)));
+            engine.viewportTargetFps = Math.max(12.0, Math.min(25.0, engine.parseOrFallback(text, engine.viewportTargetFps)));
         });
         engine.addNumericRow(globalSection, "Měřítko viewportu", engine.formatTransformValue(engine.renderScale), text -> {
             engine.renderScale = Math.max(0.30, Math.min(1.00, engine.parseOrFallback(text, engine.renderScale)));
@@ -322,6 +323,13 @@ final class EngineViewportRenderTabBuilder {
             engine.rayDenoiseStrength = Math.max(0.0, Math.min(1.0, engine.parseOrFallback(text, engine.rayDenoiseStrength)));
             engine.applyRaySettings();
         });
+        engine.addComboRow(raySection, "Tone map",
+                new String[]{"EXPOSURE", "FILMIC", "ACES"},
+                engine.rayToneMap,
+                value -> {
+                    engine.rayToneMap = value;
+                    engine.applyRaySettings();
+                });
     }
 
     private static void buildPathSection(Engine engine, JPanel pathSection) {
@@ -372,6 +380,9 @@ final class EngineViewportRenderTabBuilder {
             engine.pathDenoise = value;
             engine.applyPathSettings();
         });
+        engine.addBooleanRow(pathSection, "Zamknout akumulaci (bez resetu)", engine.pathAccumulationLock, value -> {
+            engine.pathAccumulationLock = value;
+        });
         engine.addNumericRow(pathSection, "Radius denoise", Integer.toString(engine.pathDenoiseRadius), text -> {
             engine.pathDenoiseRadius = Math.max(1, Math.min(4,
                     (int) Math.round(engine.parseOrFallback(text, engine.pathDenoiseRadius))));
@@ -379,6 +390,21 @@ final class EngineViewportRenderTabBuilder {
         });
         engine.addNumericRow(pathSection, "Síla denoise", engine.formatTransformValue(engine.pathDenoiseStrength), text -> {
             engine.pathDenoiseStrength = Math.max(0.0, Math.min(1.0, engine.parseOrFallback(text, engine.pathDenoiseStrength)));
+            engine.applyPathSettings();
+        });
+        engine.addComboRow(pathSection, "Tone map",
+                new String[]{"EXPOSURE", "FILMIC", "ACES"},
+                engine.pathToneMap,
+                value -> {
+                    engine.pathToneMap = value;
+                    engine.applyPathSettings();
+                });
+        engine.addNumericRow(pathSection, "Clamp direct", engine.formatTransformValue(engine.pathClampDirect), text -> {
+            engine.pathClampDirect = Math.max(0.0, engine.parseOrFallback(text, engine.pathClampDirect));
+            engine.applyPathSettings();
+        });
+        engine.addNumericRow(pathSection, "Clamp indirect", engine.formatTransformValue(engine.pathClampIndirect), text -> {
+            engine.pathClampIndirect = Math.max(0.0, engine.parseOrFallback(text, engine.pathClampIndirect));
             engine.applyPathSettings();
         });
     }

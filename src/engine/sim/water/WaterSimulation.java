@@ -5,6 +5,7 @@ import engine.math.Mat4;
 import engine.math.Vec3;
 import engine.scene.Entity;
 import engine.scene.Scene;
+import engine.util.RuntimeInstrumentation;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -182,6 +183,9 @@ public final class WaterSimulation {
                        Vec3 gravity,
                        double floorY,
                        boolean simulationEnabled) {
+        if (!simulationEnabled && activeCount == 0 && emitters.isEmpty()) {
+            return;
+        }
         pruneEmittersNotInScene(scene);
         rebuildCollisionProxies(scene, floorY);
 
@@ -199,6 +203,9 @@ public final class WaterSimulation {
                            Vec3 gravity,
                            double floorY,
                            boolean simulationEnabled) {
+        if (!simulationEnabled && activeCount == 0 && emitters.isEmpty()) {
+            return;
+        }
         pruneEmittersNotInScene(scene);
         rebuildCollisionProxies(scene, floorY);
 
@@ -273,6 +280,7 @@ public final class WaterSimulation {
             return false;
         }
         for (Entity entity : scene.getEntities()) {
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.ENTITIES_VISITED, 1L);
             if (entity instanceof WaterEmitterEntity) {
                 return true;
             }
@@ -285,6 +293,7 @@ public final class WaterSimulation {
             return 0.0;
         }
         for (Entity entity : scene.getEntities()) {
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.ENTITIES_VISITED, 1L);
             if (isFloorCandidate(entity)) {
                 return entity.getTransform().getPosition().y;
             }
@@ -552,11 +561,13 @@ public final class WaterSimulation {
     }
 
     private void rebuildCollisionProxies(Scene scene, double floorY) {
+        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WATER_PROXY_REBUILDS, 1L);
         collisionProxyCount = 0;
         if (scene == null) {
             return;
         }
         for (Entity entity : scene.getEntities()) {
+            RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.ENTITIES_VISITED, 1L);
             if (collisionProxyCount >= colliderMinX.length) {
                 break;
             }

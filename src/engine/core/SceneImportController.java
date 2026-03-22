@@ -24,6 +24,7 @@ import java.util.List;
 final class SceneImportController {
     private static final int APPLY_CHUNK_ENTRIES = 4;
     private static final int APPLY_CHUNK_TRIANGLE_BUDGET = 220_000;
+    private static final long APPLY_CHUNK_TIME_BUDGET_NS = 6_000_000L;
 
     private static final class LoadedImport {
         final String filePath;
@@ -163,10 +164,12 @@ final class SceneImportController {
 
         int processedEntries = 0;
         int remainingTriangleBudget = APPLY_CHUNK_TRIANGLE_BUDGET;
+        long chunkStartNanos = System.nanoTime();
         List<ImportedScene.Entry> entries = job.loaded.importedScene.getEntries();
         while (job.entryIndex < job.totalEntries
                 && processedEntries < APPLY_CHUNK_ENTRIES
-                && remainingTriangleBudget > 0) {
+                && remainingTriangleBudget > 0
+                && System.nanoTime() - chunkStartNanos < APPLY_CHUNK_TIME_BUDGET_NS) {
             ImportedScene.Entry entry = entries.get(job.entryIndex++);
             if (entry == null || entry.getMesh() == null) {
                 continue;

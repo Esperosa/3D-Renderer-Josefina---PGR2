@@ -39,9 +39,14 @@ final class OutputRenderJob {
     boolean shadows;
     boolean reflections;
     boolean sky;
+    boolean referencePathMode;
     boolean denoise;
     int denoiseRadius;
     double denoiseStrength;
+    String toneMap;
+    double pathClampDirect;
+    double pathClampIndirect;
+    boolean referenceClampEnabled;
     boolean wireframeDepthHiddenLines;
     boolean wireframeSilhouetteBoost;
     boolean wireframeDashedMode;

@@ -16,6 +16,7 @@ public final class PrincipledBsdfNodeDefinition extends BaseMaterialNodeDefiniti
                         in("metallic", "Metallic", MaterialNodeGraph.ValueType.VALUE),
                         in("specular", "Specular", MaterialNodeGraph.ValueType.VALUE),
                         in("ior", "IOR", MaterialNodeGraph.ValueType.VALUE),
+                        in("dispersion", "Dispersion", MaterialNodeGraph.ValueType.VALUE),
                         in("transmission", "Transmission", MaterialNodeGraph.ValueType.VALUE),
                         in("opacity", "Opacity", MaterialNodeGraph.ValueType.VALUE),
                         in("emission", "Emission", MaterialNodeGraph.ValueType.COLOR),
@@ -39,6 +40,7 @@ public final class PrincipledBsdfNodeDefinition extends BaseMaterialNodeDefiniti
         node.setNumber("metallic", 0.0);
         node.setNumber("specular", 1.0);
         node.setNumber("ior", 1.45);
+        node.setNumber("dispersion", 0.0);
         node.setNumber("transmission", 0.0);
         node.setNumber("opacity", 1.0);
         node.setColor("emission", Vec3.ZERO);

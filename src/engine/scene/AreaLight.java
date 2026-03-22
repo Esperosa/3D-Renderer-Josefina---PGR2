@@ -11,11 +11,15 @@ public class AreaLight extends PointLight {
 
     private Vec3 emissionDirection;
     private double spreadAngleDegrees;
+    private double surfaceRadius;
+    private int shadowSamples;
 
     public AreaLight(Vec3 position, Vec3 color, double intensity) {
         super(position, color, intensity);
         this.emissionDirection = new Vec3(0.0, -1.0, 0.0);
         this.spreadAngleDegrees = 120.0;
+        this.surfaceRadius = 0.45;
+        this.shadowSamples = 10;
     }
 
     public Vec3 getEmissionDirection() {
@@ -36,6 +40,22 @@ public class AreaLight extends PointLight {
 
     public void setSpreadAngleDegrees(double spreadAngleDegrees) {
         this.spreadAngleDegrees = Math.max(10.0, Math.min(179.0, spreadAngleDegrees));
+    }
+
+    public double getSurfaceRadius() {
+        return surfaceRadius;
+    }
+
+    public void setSurfaceRadius(double surfaceRadius) {
+        this.surfaceRadius = Math.max(0.01, Math.min(20.0, surfaceRadius));
+    }
+
+    public int getShadowSamples() {
+        return shadowSamples;
+    }
+
+    public void setShadowSamples(int shadowSamples) {
+        this.shadowSamples = Math.max(1, Math.min(64, shadowSamples));
     }
 
     @Override

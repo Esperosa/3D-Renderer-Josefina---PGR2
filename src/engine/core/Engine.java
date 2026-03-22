@@ -1,5 +1,28 @@
 package engine.core;
 
+import java.awt.Component;
+import java.awt.Robot;
+import java.awt.event.KeyEvent;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Random;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+
 import engine.camera.Camera;
 import engine.camera.CameraController;
 import engine.camera.OrthographicCamera;
@@ -24,40 +47,20 @@ import engine.render.post.HexMosaicRenderer;
 import engine.render.post.TemporalNoiseRenderer;
 import engine.render.post.WireframeRenderer;
 import engine.render.raster.RasterRenderer;
-import engine.render.ray.RayTracerRenderer;
 import engine.render.ray.PathTracerRenderer;
-import engine.sim.water.WaterSimulation;
+import engine.render.ray.ProgressiveRenderDefaults;
+import engine.render.ray.RayTracerRenderer;
 import engine.scene.DirectionalLight;
 import engine.scene.Entity;
 import engine.scene.Light;
 import engine.scene.PointLight;
 import engine.scene.Scene;
+import engine.sim.water.WaterSimulation;
 import engine.util.BitFont;
 import engine.util.RayIntersectionUtil;
+import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
 import engine.util.UiBuilder;
-
-import java.awt.Component;
-import java.awt.Robot;
-import java.awt.event.KeyEvent;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Random;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.DefaultListModel;
-import javax.swing.JList;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.JToggleButton;
 
 /**
  * Tady držím centrální řídicí třídu enginu.
@@ -173,6 +176,8 @@ public class Engine {
     Vec3 worldLightColor;
     Vec3 worldBackgroundColor;
     String worldPresetKey;
+    double worldEnvironmentYawDegrees;
+    double worldEnvironmentPitchDegrees;
     double worldSunBaseIntensity;
     double worldFillBaseIntensity;
     double worldWarmBaseIntensity;
@@ -202,6 +207,9 @@ public class Engine {
     boolean viewportContextMenuRecapturePending;
     boolean objectFocusMode;
     boolean draggingSelectedObject;
+    boolean pendingSelectedObjectDrag;
+    int pendingDragStartMouseX;
+    int pendingDragStartMouseY;
     boolean captureSelectLatch;
     boolean gizmoDragActive;
     double renderScale;
@@ -219,20 +227,98 @@ public class Engine {
     long lastViewportInteractionNanos;
     double viewportTargetFps;
     double viewportSmoothedFrameMs;
+    double viewportFastFrameMs;
+    double viewportPredictedFrameMs;
+    double viewportHeavySmoothedFrameMs;
+    double viewportHeavyFastFrameMs;
+    double viewportHeavyPredictedFrameMs;
+    long viewportLastHeavyFrameNanos;
+    int viewportFrameDropStreak;
     double viewportAdaptiveScaleCurrent;
     double viewportAdaptiveScaleApplied;
     double viewportScalePressureSeconds;
     double viewportCriticalPressureSeconds;
     long viewportCriticalPreviewStartNanos;
+    long viewportCriticalPreviewHoldUntilNanos;
+    long viewportCriticalRecoverStartNanos;
     boolean viewportCriticalPreviewActive;
+    long viewportWarmupUntilNanos;
+    boolean viewportWarmupCaptureActive;
+    int viewportWarmupSampleCount;
+    int viewportWarmupSampleWriteIndex;
+    double[] viewportWarmupFrameSamples;
+    double viewportWarmupSeedMs;
+    double viewportWarmupSeedWeight;
+    long viewportWarmupSeedExpiresNanos;
+    boolean viewportInteractionActiveLast;
     boolean viewDistanceCullingEnabled;
     double viewDistanceLimit;
     boolean viewportNavigationPreviewEnabled;
     boolean viewportNavigationPreviewActive;
+    boolean viewportCameraMotionActive;
+    boolean viewportSceneMotionActive;
+    boolean viewportMotionLatchedActive;
+    long viewportMotionEntryBoostUntilNanos;
+    long viewportMotionHoldUntilNanos;
+    int viewportMotionExitStableFrames;
+    boolean viewportFallbackLockActive;
+    boolean launchFullscreen;
     RenderMode viewportNavigationFallbackMode;
     RenderMode viewportDisplayedMode;
+    boolean renderModeSwitchTransitionActive;
+    String renderModeSwitchTargetLabel;
+    long renderModeSwitchStartNanos;
+    long renderModeSwitchRevealStartNanos;
+    long renderModeSwitchSampleBaseline;
+    String viewportAutoPolicyTier;
+    double viewportAutoOverloadRatio;
+    int viewportDynamicResolutionTierIndex;
+    long viewportDynamicResolutionLastSwitchNanos;
+    int viewportDynamicResolutionSwitchCount;
+    int viewportDynamicResolutionDownshiftCount;
+    int viewportDynamicResolutionUpshiftCount;
+    int viewportDynamicResolutionDownshiftArmFrames;
+    int viewportDynamicResolutionRecoverStableFrames;
+    int viewportDynamicResolutionRecoverSampleGateFrames;
+    int viewportDynamicDecisionWindowCount;
+    int viewportDynamicDecisionWindowIndex;
+    double viewportDynamicDecisionWindowSumMs;
+    double viewportDynamicDecisionWindowMeanMs;
+    double[] viewportDynamicDecisionWindowSamplesMs;
+    int viewportUpshiftEvaluationFrames;
+    int viewportUpshiftBlockedByDwellCount;
+    int viewportUpshiftBlockedByArmCount;
+    int viewportUpshiftBlockedByOverloadCount;
+    int viewportUpshiftBlockedByFrameDropCount;
+    int viewportUpshiftBlockedByCriticalPressureCount;
+    int viewportUpshiftBlockedByScalePressureCount;
+    int viewportUpshiftBlockedByQualityTierCount;
+    int viewportUpshiftBlockedBySampleGateCount;
+    double viewportUpshiftLastOverloadRatio;
+    double viewportUpshiftLastOverloadThreshold;
+    int viewportUpshiftLastSampleCount;
+    int viewportUpshiftLastSampleGate;
+    String viewportUpshiftLastQualityTier;
+    boolean viewportUpshiftLastMotionActive;
+    String viewportUpshiftLastBlockReason;
+    long startupAppStartNanos;
+    long startupWindowCreatedNanos;
+    long startupFirstRenderedFrameNanos;
+    long startupFirstPresentedFrameNanos;
+    long startupFirstInteractiveFrameNanos;
+    long startupSplashClosedNanos;
+    long startupFocusRequestedNanos;
+    long startupFocusAcquiredNanos;
+    boolean startupInputReady;
+    boolean startupFocusReady;
+    double viewportPathGentleMotionSeconds;
+    boolean viewportPathDenoiseEnabledApplied;
+    String viewportPathDenoiseProfileApplied;
+    String viewportPathDenoiseRuntimeModeApplied;
     int baseWidth;
     int baseHeight;
+    int explicitPreviewRenderWidth;
+    int explicitPreviewRenderHeight;
     int lastCanvasWidth;
     int lastCanvasHeight;
     boolean postAAEnabled;
@@ -240,6 +326,7 @@ public class Engine {
     String loadedModelPath;
     String loadedDiffuseTexturePath;
     boolean smoothUpscaling;
+    long escapeExitArmedUntilNanos;
     NavigationPreset navigationPreset;
     SelectionViewMode selectionViewMode;
     CameraController.Mode fpsCameraMode;
@@ -257,6 +344,7 @@ public class Engine {
     long lastSelectionClickNanos;
     Entity lastSelectionClickEntity;
     boolean animationPlaybackEnabled;
+    double animatedSceneElapsedSeconds;
     boolean timelineEnabled;
     boolean timelineLoop;
     int timelineStartFrame;
@@ -311,6 +399,7 @@ public class Engine {
     boolean rayDenoise;
     int rayDenoiseRadius;
     double rayDenoiseStrength;
+    String rayToneMap;
 
     int pathSamplesPerFrame;
     int pathTileSize;
@@ -323,8 +412,12 @@ public class Engine {
     boolean pathDirectLighting;
     boolean pathSkyEnvironment;
     boolean pathDenoise;
+    boolean pathAccumulationLock;
     int pathDenoiseRadius;
     double pathDenoiseStrength;
+    double pathClampDirect;
+    double pathClampIndirect;
+    String pathToneMap;
 
     final OutputRenderController outputRenderController;
     final SceneImportController sceneImportController;
@@ -404,11 +497,14 @@ public class Engine {
         this.viewportContextMenuRecapturePending = false;
         this.objectFocusMode = false;
         this.draggingSelectedObject = false;
+        this.pendingSelectedObjectDrag = false;
+        this.pendingDragStartMouseX = 0;
+        this.pendingDragStartMouseY = 0;
         this.captureSelectLatch = false;
         this.gizmoDragActive = false;
         this.renderScale = 1.00;
         this.progressiveViewportEnabled = true;
-        this.interactiveRenderScale = 0.75;
+        this.interactiveRenderScale = 0.80;
         this.interactiveRenderScaleActive = false;
         this.safetyMonitorEnabled = true;
         this.safetyRecoveryActive = false;
@@ -421,20 +517,97 @@ public class Engine {
         this.lastViewportInteractionNanos = 0L;
         this.viewportTargetFps = 25.0;
         this.viewportSmoothedFrameMs = 1000.0 / this.viewportTargetFps;
+        this.viewportFastFrameMs = this.viewportSmoothedFrameMs;
+        this.viewportPredictedFrameMs = this.viewportSmoothedFrameMs;
+        this.viewportHeavySmoothedFrameMs = this.viewportSmoothedFrameMs;
+        this.viewportHeavyFastFrameMs = this.viewportSmoothedFrameMs;
+        this.viewportHeavyPredictedFrameMs = this.viewportSmoothedFrameMs;
+        this.viewportLastHeavyFrameNanos = 0L;
+        this.viewportFrameDropStreak = 0;
         this.viewportAdaptiveScaleCurrent = 1.0;
         this.viewportAdaptiveScaleApplied = 1.0;
         this.viewportScalePressureSeconds = 0.0;
         this.viewportCriticalPressureSeconds = 0.0;
         this.viewportCriticalPreviewStartNanos = 0L;
+        this.viewportCriticalPreviewHoldUntilNanos = 0L;
+        this.viewportCriticalRecoverStartNanos = 0L;
         this.viewportCriticalPreviewActive = false;
+        this.viewportWarmupUntilNanos = 0L;
+        this.viewportWarmupCaptureActive = false;
+        this.viewportWarmupSampleCount = 0;
+        this.viewportWarmupSampleWriteIndex = 0;
+        this.viewportWarmupFrameSamples = new double[16];
+        this.viewportWarmupSeedMs = this.viewportSmoothedFrameMs;
+        this.viewportWarmupSeedWeight = 0.0;
+        this.viewportWarmupSeedExpiresNanos = 0L;
+        this.viewportInteractionActiveLast = false;
         this.viewDistanceCullingEnabled = false;
         this.viewDistanceLimit = 120.0;
         this.viewportNavigationPreviewEnabled = true;
         this.viewportNavigationPreviewActive = false;
+        this.viewportCameraMotionActive = false;
+        this.viewportSceneMotionActive = false;
+        this.viewportMotionLatchedActive = false;
+        this.viewportMotionEntryBoostUntilNanos = 0L;
+        this.viewportMotionHoldUntilNanos = 0L;
+        this.viewportMotionExitStableFrames = 0;
+        this.viewportFallbackLockActive = false;
+        this.launchFullscreen = false;
         this.viewportNavigationFallbackMode = RenderMode.MODEL;
         this.viewportDisplayedMode = RenderMode.PHONG;
+        this.renderModeSwitchTransitionActive = false;
+        this.renderModeSwitchTargetLabel = "";
+        this.renderModeSwitchStartNanos = 0L;
+        this.renderModeSwitchRevealStartNanos = 0L;
+        this.renderModeSwitchSampleBaseline = -1L;
+        this.viewportAutoPolicyTier = "BALANCED";
+        this.viewportAutoOverloadRatio = 1.0;
+        this.viewportDynamicResolutionTierIndex = 0;
+        this.viewportDynamicResolutionLastSwitchNanos = 0L;
+        this.viewportDynamicResolutionSwitchCount = 0;
+        this.viewportDynamicResolutionDownshiftCount = 0;
+        this.viewportDynamicResolutionUpshiftCount = 0;
+        this.viewportDynamicResolutionDownshiftArmFrames = 0;
+        this.viewportDynamicResolutionRecoverStableFrames = 0;
+        this.viewportDynamicResolutionRecoverSampleGateFrames = 0;
+        this.viewportDynamicDecisionWindowCount = 0;
+        this.viewportDynamicDecisionWindowIndex = 0;
+        this.viewportDynamicDecisionWindowSumMs = 0.0;
+        this.viewportDynamicDecisionWindowMeanMs = this.viewportSmoothedFrameMs;
+        this.viewportDynamicDecisionWindowSamplesMs = new double[30];
+        this.viewportUpshiftEvaluationFrames = 0;
+        this.viewportUpshiftBlockedByDwellCount = 0;
+        this.viewportUpshiftBlockedByArmCount = 0;
+        this.viewportUpshiftBlockedByOverloadCount = 0;
+        this.viewportUpshiftBlockedByFrameDropCount = 0;
+        this.viewportUpshiftBlockedByCriticalPressureCount = 0;
+        this.viewportUpshiftBlockedByScalePressureCount = 0;
+        this.viewportUpshiftBlockedByQualityTierCount = 0;
+        this.viewportUpshiftBlockedBySampleGateCount = 0;
+        this.viewportUpshiftLastOverloadRatio = 1.0;
+        this.viewportUpshiftLastOverloadThreshold = 0.0;
+        this.viewportUpshiftLastSampleCount = 0;
+        this.viewportUpshiftLastSampleGate = 0;
+        this.viewportUpshiftLastQualityTier = "";
+        this.viewportUpshiftLastMotionActive = false;
+        this.startupAppStartNanos = 0L;
+        this.startupWindowCreatedNanos = 0L;
+        this.startupFirstRenderedFrameNanos = 0L;
+        this.startupFirstPresentedFrameNanos = 0L;
+        this.startupFirstInteractiveFrameNanos = 0L;
+        this.startupSplashClosedNanos = 0L;
+        this.startupFocusRequestedNanos = 0L;
+        this.startupFocusAcquiredNanos = 0L;
+        this.startupInputReady = false;
+        this.startupFocusReady = false;
+        this.viewportPathGentleMotionSeconds = 0.0;
+        this.viewportPathDenoiseEnabledApplied = true;
+        this.viewportPathDenoiseProfileApplied = "QUALITY";
+        this.viewportPathDenoiseRuntimeModeApplied = "FULL_FRAME";
         this.baseWidth = 1200;
         this.baseHeight = 760;
+        this.explicitPreviewRenderWidth = 0;
+        this.explicitPreviewRenderHeight = 0;
         this.lastCanvasWidth = this.baseWidth;
         this.lastCanvasHeight = this.baseHeight;
         this.postAAEnabled = false;
@@ -442,8 +615,9 @@ public class Engine {
         this.loadedModelPath = null;
         this.loadedDiffuseTexturePath = null;
         this.smoothUpscaling = false;
+        this.escapeExitArmedUntilNanos = 0L;
         this.navigationPreset = NavigationPreset.FPS;
-        this.selectionViewMode = SelectionViewMode.FRAME_AND_FOCUS;
+        this.selectionViewMode = SelectionViewMode.SELECT_ONLY;
         this.fpsCameraMode = CameraController.Mode.FREE_LOOK;
         this.savedFpsPosition = null;
         this.savedFpsForward = null;
@@ -459,6 +633,7 @@ public class Engine {
         this.lastSelectionClickNanos = 0L;
         this.lastSelectionClickEntity = null;
         this.animationPlaybackEnabled = true;
+        this.animatedSceneElapsedSeconds = 0.0;
         this.timelineEnabled = false;
         this.timelineLoop = true;
         this.timelineStartFrame = 1;
@@ -479,15 +654,19 @@ public class Engine {
         this.outputCameraEntity = null;
         this.selectedLight = null;
         this.selectedForceField = null;
-        this.worldLightColor = new Vec3(0.18, 0.20, 0.24);
-        this.worldBackgroundColor = new Vec3(0.06, 0.08, 0.11);
-        this.worldPresetKey = "Studio Neutral";
-        this.worldSunBaseIntensity = 1.35;
-        this.worldFillBaseIntensity = 0.42;
-        this.worldWarmBaseIntensity = 0.55;
-        this.worldCoolBaseIntensity = 0.48;
-        this.worldLightStrength = 1.0;
-        this.worldLightAppliedStrength = 1.0;
+        this.worldLightColor = Vec3.ZERO;
+        this.worldBackgroundColor = Vec3.ZERO;
+        this.worldPresetKey = WorldPresetCatalog.defaultPreset().key();
+        this.worldEnvironmentYawDegrees = 0.0;
+        this.worldEnvironmentPitchDegrees = 0.0;
+        this.worldSunBaseIntensity = 0.0;
+        this.worldFillBaseIntensity = 0.0;
+        this.worldWarmBaseIntensity = 0.0;
+        this.worldCoolBaseIntensity = 0.0;
+        this.worldLightStrength = 0.0;
+        this.worldLightAppliedStrength = 0.0;
+        applyPresetState(WorldPresetCatalog.defaultPreset());
+        this.worldLightAppliedStrength = this.worldLightStrength;
         this.worldLightAnimationEnabled = false;
         this.waterSimulation = new WaterSimulation(5600);
         this.waterSimulationEnabled = true;
@@ -529,10 +708,11 @@ public class Engine {
         this.rayShadows = true;
         this.rayReflections = true;
         this.rayDenoise = true;
-        this.rayDenoiseRadius = 2;
-        this.rayDenoiseStrength = 0.52;
+        this.rayDenoiseRadius = ProgressiveRenderDefaults.RAY_VIEWPORT_DENOISE_RADIUS;
+        this.rayDenoiseStrength = ProgressiveRenderDefaults.RAY_VIEWPORT_DENOISE_STRENGTH;
+        this.rayToneMap = "FILMIC";
 
-        this.pathSamplesPerFrame = 1;
+        this.pathSamplesPerFrame = ProgressiveRenderDefaults.PATH_VIEWPORT_SAMPLES_PER_FRAME;
         this.pathTileSize = 24;
         this.pathMaxDepth = 6;
         this.pathDiffuseBounces = 6;
@@ -543,8 +723,12 @@ public class Engine {
         this.pathDirectLighting = true;
         this.pathSkyEnvironment = true;
         this.pathDenoise = true;
-        this.pathDenoiseRadius = 2;
-        this.pathDenoiseStrength = 0.58;
+        this.pathAccumulationLock = true;
+        this.pathDenoiseRadius = ProgressiveRenderDefaults.PATH_VIEWPORT_DENOISE_RADIUS;
+        this.pathDenoiseStrength = ProgressiveRenderDefaults.PATH_VIEWPORT_DENOISE_STRENGTH;
+        this.pathClampDirect = ProgressiveRenderDefaults.PATH_VIEWPORT_CLAMP_DIRECT;
+        this.pathClampIndirect = ProgressiveRenderDefaults.PATH_VIEWPORT_CLAMP_INDIRECT;
+        this.pathToneMap = "FILMIC";
 
         this.suppressObjectFieldApply = false;
         this.sceneOutlinerModel = null;
@@ -881,7 +1065,8 @@ public class Engine {
                 rayReflections,
                 rayDenoise,
                 rayDenoiseRadius,
-                rayDenoiseStrength
+                rayDenoiseStrength,
+                rayToneMap
         );
     }
 
@@ -899,7 +1084,10 @@ public class Engine {
                 pathSkyEnvironment,
                 pathDenoise,
                 pathDenoiseRadius,
-                pathDenoiseStrength
+                pathDenoiseStrength,
+                pathClampDirect,
+                pathClampIndirect,
+                pathToneMap
         );
     }
 
@@ -1085,7 +1273,6 @@ public class Engine {
                 visible = false;
             }
             if (visible && distanceCull && entity.getMesh() != null) {
-                entity.computeWorldBounds();
                 AABB bounds = entity.getWorldBounds();
                 Vec3 center = bounds != null ? bounds.center() : entity.getTransform().getPosition();
                 double radius = 0.0;
@@ -1094,7 +1281,12 @@ public class Engine {
                 } else if (entity.getMesh().getBounds() != null) {
                     radius = entity.getMesh().getBounds().getRadius();
                 }
-                if (center.sub(cameraPos).length() - radius > viewDistanceLimit) {
+                RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.VISIBILITY_CULL_TESTS, 1L);
+                double dx = center.x - cameraPos.x;
+                double dy = center.y - cameraPos.y;
+                double dz = center.z - cameraPos.z;
+                double threshold = viewDistanceLimit + radius;
+                if (dx * dx + dy * dy + dz * dz > threshold * threshold) {
                     visible = false;
                 }
             }
@@ -1104,11 +1296,66 @@ public class Engine {
             SceneItemState state = stateFor(light);
             boolean enabled = outputPass ? state.visibleInOutput : state.visibleInView;
             if (enabled && distanceCull && light instanceof PointLight point) {
-                if (point.getPosition().sub(cameraPos).length() > viewDistanceLimit) {
-                    enabled = false;
+                Vec3 pointPos = point.getPosition();
+                RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.VISIBILITY_CULL_TESTS, 1L);
+                if (pointPos != null) {
+                    double dx = pointPos.x - cameraPos.x;
+                    double dy = pointPos.y - cameraPos.y;
+                    double dz = pointPos.z - cameraPos.z;
+                    if (dx * dx + dy * dy + dz * dz > viewDistanceLimit * viewDistanceLimit) {
+                        enabled = false;
+                    }
                 }
             }
             light.setEnabled(enabled);
+        }
+    }
+
+    public void setLaunchFullscreen(boolean launchFullscreen) {
+        this.launchFullscreen = launchFullscreen;
+    }
+
+    public void setExplicitPreviewRenderResolution(int width, int height) {
+        if (width > 0 && height > 0) {
+            this.explicitPreviewRenderWidth = width;
+            this.explicitPreviewRenderHeight = height;
+            return;
+        }
+        this.explicitPreviewRenderWidth = 0;
+        this.explicitPreviewRenderHeight = 0;
+    }
+
+    public int getExplicitPreviewRenderWidth() {
+        return explicitPreviewRenderWidth;
+    }
+
+    public int getExplicitPreviewRenderHeight() {
+        return explicitPreviewRenderHeight;
+    }
+
+    private void applyPresetState(WorldPresetCatalog.Definition preset) {
+        if (preset == null) {
+            return;
+        }
+        worldPresetKey = preset.key();
+        worldLightColor = preset.ambientColor();
+        worldBackgroundColor = preset.backgroundColor();
+        worldLightStrength = preset.strength();
+        worldSunBaseIntensity = preset.sunIntensity() / preset.strength();
+        worldFillBaseIntensity = preset.fillIntensity() / preset.strength();
+        worldWarmBaseIntensity = preset.warmIntensity() / preset.strength();
+        worldCoolBaseIntensity = preset.coolIntensity() / preset.strength();
+        if (sunLight != null) {
+            sunLight.setColor(preset.sunColor());
+        }
+        if (fillLight != null) {
+            fillLight.setColor(preset.fillColor());
+        }
+        if (warmWorldLight != null) {
+            warmWorldLight.setColor(preset.warmColor());
+        }
+        if (coolWorldLight != null) {
+            coolWorldLight.setColor(preset.coolColor());
         }
     }
 
@@ -1371,10 +1618,6 @@ public class Engine {
 
     void applyRenderScale() {
         EngineRenderRuntime.applyRenderScale(this);
-    }
-
-    void applyRenderScale(boolean verboseLog) {
-        EngineRenderRuntime.applyRenderScale(this, verboseLog);
     }
 
     double effectiveRenderScale() {

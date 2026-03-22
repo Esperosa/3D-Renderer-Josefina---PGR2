@@ -104,6 +104,8 @@ final class EngineRenderPanelSupport {
                 outputSettings.denoise = engine.pathDenoise;
                 outputSettings.denoiseRadius = Math.max(1, engine.pathDenoiseRadius);
                 outputSettings.denoiseStrength = engine.pathDenoiseStrength;
+                outputSettings.pathClampDirect = Math.max(0.0, engine.pathClampDirect);
+                outputSettings.pathClampIndirect = Math.max(0.0, engine.pathClampIndirect);
             }
             default -> {
             }
@@ -125,8 +127,8 @@ final class EngineRenderPanelSupport {
             case WIREFRAME -> "Wireframe zdůrazňuje topologii a čitelnost siluet.";
             case DITHERING -> "Dither převádí scénu do stylizovaného single-pass vzhledu.";
             case TEMPORAL_NOISE -> "Temporal odhaluje formu přes animovaný noise flow a paletu.";
-            case RAY_TRACING -> "Ray Tracing je pomalejší kvalitní režim s progresivním skládáním.";
-            case PATH_TRACING -> "Path Tracing je nejvěrnější progresivní režim pro finální render.";
+            case RAY_TRACING -> "Ray Tracing je hlavní hybridní preview s RT lookem a progresivním doladěním.";
+            case PATH_TRACING -> "Path Tracing je progresivní kvalitativní preview pro klid kamery a finální look-dev.";
             case HEX_MOSAIC -> "Hex převádí obraz do buněčné stylizace s hexagonální strukturou.";
         };
     }
@@ -149,7 +151,7 @@ final class EngineRenderPanelSupport {
             case HEX_MOSAIC ->
                     "Hex má vlastní cell, outline a theme parametry dostupné ve Výstupu.";
             case RAY_TRACING ->
-                    "Viewport může při pohybu krátce spadnout na rychlejší preview. Výstup drží plné ray nastavení.";
+                    "Tohle je hlavní hybridní preview mód. Při pohybu drží stejný renderer a drahé polish složky omezuje interně.";
             case PATH_TRACING ->
                     "Viewportový Path Tracing berte jako look-dev preview. Finální kvalitu řídí panel Výstup.";
         };

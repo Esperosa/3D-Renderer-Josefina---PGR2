@@ -4,10 +4,13 @@ final class DenoiseSupport {
 
     private static final double NOISE_FLOOR = 0.025;
     private static final double NOISE_SCALE = 3.2;
-    private static final long MIN_FIREFLY_HISTORY_SAMPLES = 4L;
-    private static final double FIREFLY_BASE_LUMA = 0.18;
-    private static final double FIREFLY_HISTORY_SCALE = 4.75;
-    private static final double FIREFLY_SOFT_CLIP = 0.18;
+    private static final long MIN_FIREFLY_HISTORY_SAMPLES = 2L;
+    private static final double FIREFLY_BASE_LUMA = 0.12;
+    private static final double FIREFLY_STDDEV_FLOOR = 0.03;
+    private static final double FIREFLY_MEAN_SCALE = 1.85;
+    private static final double FIREFLY_STDDEV_SCALE = 2.25;
+    private static final double FIREFLY_STDDEV_CAP_SCALE = 1.35;
+    private static final double FIREFLY_SOFT_CLIP = 0.10;
 
     private DenoiseSupport() {
     }
@@ -37,6 +40,7 @@ final class DenoiseSupport {
                                double sampleG,
                                double sampleB,
                                double referenceLuminance,
+                               double referenceStdDev,
                                long historySampleCount) {
         if (historySampleCount < MIN_FIREFLY_HISTORY_SAMPLES || !Double.isFinite(referenceLuminance) || referenceLuminance <= 0.0) {
             return 1.0;
@@ -45,7 +49,16 @@ final class DenoiseSupport {
         if (!Double.isFinite(sampleLuminance) || sampleLuminance <= 0.0) {
             return 1.0;
         }
-        double clampLuminance = Math.max(FIREFLY_BASE_LUMA, referenceLuminance * FIREFLY_HISTORY_SCALE + FIREFLY_BASE_LUMA);
+        double boundedStdDev = referenceStdDev;
+        if (!Double.isFinite(boundedStdDev) || boundedStdDev < 0.0) {
+            boundedStdDev = 0.0;
+        }
+        boundedStdDev = Math.max(FIREFLY_STDDEV_FLOOR, boundedStdDev);
+        boundedStdDev = Math.min(boundedStdDev, FIREFLY_BASE_LUMA + referenceLuminance * FIREFLY_STDDEV_CAP_SCALE);
+
+        double clampLuminance = Math.max(
+                FIREFLY_BASE_LUMA,
+                referenceLuminance * FIREFLY_MEAN_SCALE + boundedStdDev * FIREFLY_STDDEV_SCALE + FIREFLY_BASE_LUMA);
         if (sampleLuminance <= clampLuminance) {
             return 1.0;
         }
@@ -63,6 +76,26 @@ final class DenoiseSupport {
         }
         double luminanceSum = Math.max(0.0, accumulatedLuminanceSum) + Math.max(0.0, currentBatchLuminanceSum);
         return luminanceSum / sampleCount;
+    }
+
+    static double referenceLuminanceStdDev(double accumulatedLuminanceSum,
+                                           double accumulatedLuminanceSquaredSum,
+                                           long accumulatedSampleCount,
+                                           double currentBatchLuminanceSum,
+                                           double currentBatchLuminanceSquaredSum,
+                                           int currentBatchSampleCount) {
+        long sampleCount = Math.max(0L, accumulatedSampleCount) + Math.max(0, currentBatchSampleCount);
+        if (sampleCount <= 0L) {
+            return Double.NaN;
+        }
+        double luminanceSum = Math.max(0.0, accumulatedLuminanceSum) + Math.max(0.0, currentBatchLuminanceSum);
+        double luminanceSquaredSum = Math.max(0.0, accumulatedLuminanceSquaredSum)
+                + Math.max(0.0, currentBatchLuminanceSquaredSum);
+        double invSamples = 1.0 / sampleCount;
+        double mean = luminanceSum * invSamples;
+        double meanSquared = luminanceSquaredSum * invSamples;
+        double variance = Math.max(0.0, meanSquared - mean * mean);
+        return Math.sqrt(variance);
     }
 
     static double lerp(double a, double b, double t) {

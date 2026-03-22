@@ -1,10 +1,10 @@
 package engine.core;
 
+import java.util.List;
+
 import engine.camera.CameraController;
 import engine.math.Vec3;
 import engine.scene.Entity;
-
-import java.util.List;
 
 final class EngineNavigationController {
 
@@ -12,25 +12,18 @@ final class EngineNavigationController {
     }
 
     static void cycleRenderMode(Engine engine) {
-        if (engine.activeMode == RenderMode.MODEL) {
-            engine.setRenderMode(RenderMode.BASIC);
-        } else if (engine.activeMode == RenderMode.BASIC) {
-            engine.setRenderMode(RenderMode.PHONG);
-        } else if (engine.activeMode == RenderMode.PHONG) {
-            engine.setRenderMode(RenderMode.WIREFRAME);
-        } else if (engine.activeMode == RenderMode.WIREFRAME) {
-            engine.setRenderMode(RenderMode.DITHERING);
-        } else if (engine.activeMode == RenderMode.DITHERING) {
-            engine.setRenderMode(RenderMode.TEMPORAL_NOISE);
-        } else if (engine.activeMode == RenderMode.TEMPORAL_NOISE) {
-            engine.setRenderMode(RenderMode.RAY_TRACING);
-        } else if (engine.activeMode == RenderMode.RAY_TRACING) {
-            engine.setRenderMode(RenderMode.PATH_TRACING);
-        } else if (engine.activeMode == RenderMode.PATH_TRACING) {
-            engine.setRenderMode(RenderMode.HEX_MOSAIC);
-        } else {
-            engine.setRenderMode(RenderMode.MODEL);
-        }
+        RenderMode nextMode = switch (engine.activeMode) {
+            case MODEL -> RenderMode.BASIC;
+            case BASIC -> RenderMode.PHONG;
+            case PHONG -> RenderMode.WIREFRAME;
+            case WIREFRAME -> RenderMode.DITHERING;
+            case DITHERING -> RenderMode.TEMPORAL_NOISE;
+            case TEMPORAL_NOISE -> RenderMode.RAY_TRACING;
+            case RAY_TRACING -> RenderMode.PATH_TRACING;
+            case PATH_TRACING -> RenderMode.HEX_MOSAIC;
+            default -> RenderMode.MODEL;
+        };
+        engine.setRenderMode(nextMode);
     }
 
     static void cycleCameraMode(Engine engine) {
@@ -42,11 +35,10 @@ final class EngineNavigationController {
         }
 
         CameraController.Mode mode = engine.cameraController.getMode();
-        if (mode == CameraController.Mode.FREE_LOOK) {
-            engine.cameraController.setMode(CameraController.Mode.FIRST_PERSON);
-        } else {
-            engine.cameraController.setMode(CameraController.Mode.FREE_LOOK);
-        }
+        CameraController.Mode nextMode = mode == CameraController.Mode.FREE_LOOK
+                ? CameraController.Mode.FIRST_PERSON
+                : CameraController.Mode.FREE_LOOK;
+        engine.cameraController.setMode(nextMode);
         engine.fpsCameraMode = engine.cameraController.getMode();
         System.out.println("Camera mode: " + engine.cameraController.getMode());
         engine.refreshUiIndicators();

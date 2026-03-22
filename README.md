@@ -103,16 +103,16 @@ Krátká orientace:
 
 | Metrika | Hodnota |
 | --- | ---: |
-| Java soubory v `src` | 206 |
-| Neblank Java řádky v `src` | 47 643 |
-| Java soubory v `tests` | 47 |
-| Neblank Java řádky v `tests` | 8 113 |
-| Automatické test suite entry pointy | 36 |
+| Java soubory v `src` | 225 |
+| Neblank Java řádky v `src` | 65 201 |
+| Java soubory v `tests` | 65 |
+| Neblank Java řádky v `tests` | 13 126 |
+| Automatické test suite entry pointy | 50 |
 | Render módy | 9 |
 | Node typy materiálového graphu | 24 |
 | Materiálové presety | 9 |
 | Preview primitiva | 3 |
-| Preview lighting presety | 5 |
+| Preview light presety | 5 |
 | Preview background režimy | 3 |
 | Preview render režimy | 3 |
 | Typy exportu | 4 |
@@ -123,44 +123,41 @@ Krátká orientace:
 
 | Oblast | Aktuální stav |
 | --- | --- |
-| Import filtr v UI | `OBJ`, `STL`, `glTF`, `GLB`, `FBX` |
-| Nativně obsloužené import cesty | `OBJ`, `STL`, `glTF`, `GLB` |
-| FBX větev | filtr existuje, ale čistě Java importer ji má jako unsupported |
+| Import filtr v UI | `OBJ`, `STL`, `GLTF`, `GLB`, `FBX` |
+| Nativně obsloužené import cesty | `OBJ`, `STL`, `GLTF`, `GLB` |
+| FBX větev | filtr existuje, importer ji poctivě hlásí jako unsupported |
 | Výstupní typy | `STILL`, `IMAGE_SEQUENCE`, `ANIMATED_GIF`, `ANIMATED_AVI` |
-| Session artefakty | `manifest.json`, `preview.png`, `log.txt` |
 
 ### Rozdělení automatických testů
 
 | Kategorie | Počet suite entry pointů |
 | --- | ---: |
-| Rendering | 12 |
+| Rendering | 19 |
 | Materiály | 3 |
 | Import / IO | 5 |
 | Editor / core | 7 |
 | Kvalita / prezentace | 2 |
-| Ostatní | 7 |
+| Ostatní | 14 |
 
 ### Benchmark metodika a transparentní parametry
 
 | Parametr | Hodnota |
 | --- | --- |
-| Java runtime | `17.0.9` / `Java HotSpot(TM) 64-Bit Server VM` |
+| Java runtime | `17.0.18` / `OpenJDK 64-Bit Server VM` |
 | OS | Windows 11 / `amd64` |
-| Logické procesory | `24` |
+| Logické procesory | `16` |
 | Renderer benchmark mode | `full` |
 | Izolace případů | samostatný child JVM proces pro každý case |
-| Core profily | `Single core = 1 worker`, `Half CPU = 12 worker` |
+| Core profily | `Single core = 1 worker`, `Scaled CPU (70%) = 12 worker` |
 | Viewport rozlišení | `320x180`, `640x360`, `1920x1080` |
 | Offline rozlišení | `160x90`, `320x180`, `640x360`, `1920x1080` |
-| Viewport tuning | first-frame `4` samples, steady-frame `2` warm-up + `5` běhů × `3` passy |
-| Offline tuning | first-frame `3` samples, steady-frame `1` warm-up + `3` běhy × `2` passy |
 | Workload fáze | first-frame = `init + první render` na čerstvé instanci po case primingu, steady-frame = render po warm-upu |
 | Workload profily | `static-steady` = statická scéna + statická kamera, `dynamic-sequence` = viewport sekvence s orbit kamerou a `scene.update(time)` |
-| Statistika | `min`, `median`, `mean`, `p90`, `max`, `stddev` z raw sample; žádný `median-of-medians` |
-| Kamera | perspective, `FOV 60°`, aspect podle rozlišení, pozice `(0.0, 1.3, 7.4 +/- bias)` |
-| Benchmark host JVM | `17.0.9` / `Java HotSpot(TM) 64-Bit Server VM`, `Windows 11 10.0`, runtime processors `24`, max memory `16320 MB` |
-| Benchmark CPU descriptor | `Intel64 Family 6 Model 183 Stepping 1, GenuineIntel` |
-| Per-case child metadata | `runtime_processors`, `max_memory_mb`, `java_*`, `os_*`, `cpu_descriptor` jsou v CSV po každém case; `Half CPU` child typicky vidí `13` processorů kvůli `ActiveProcessorCount` |
+| Statistika | `min`, `median`, `mean`, `p90`, `max`, `stddev` z realných sample, žádný `median-z-mediánů` |
+| Kamera | perspective, `FOV 60 deg`, aspect podle rozlišení, pozice `(0.0, 1.3, 7.4 +/- bias)` |
+| Benchmark host JVM | `17.0.18` / `OpenJDK 64-Bit Server VM`, `Windows 11 10.0`, runtime processors `16`, max memory `7120 MB` |
+| Benchmark CPU descriptor | `AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD` |
+| Per-case child metadata | `runtime_processors`, `max_memory_mb`, `java_*`, `os_*`, `cpu_descriptor` jsou v CSV po každém case; `Scaled CPU` child typicky vidí počet procesorů podle `ActiveProcessorCount` |
 | Poznámka | viewport a offline renderery mají oddělené resolution matice; interní optimalizace rendererů zůstávají zapnuté a CSV obsahuje i per-case runtime metadata |
 | Export benchmark zdroj | `8` předpřipravených PHONG frameů na daném rozlišení |
 | Export benchmark formáty | `PNG still`, `JPG still`, `PNG sequence`, `GIF`, `AVI MJPEG` |
@@ -181,18 +178,18 @@ Krátká orientace:
 
 | Renderer | Family | Core profil | Počet case | First-frame geo median [ms] | Steady-frame geo median [ms] | Worst steady median [ms] |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| Raster / PHONG | Viewport | Half CPU | 12 | 6.60 | 3.57 | 9.36 |
-| Temporal Noise | Viewport | Half CPU | 12 | 43.44 | 6.49 | 24.49 |
-| Hex Mosaic | Viewport | Half CPU | 12 | 38.31 | 7.46 | 30.48 |
-| Dithering | Viewport | Half CPU | 12 | 23.80 | 16.96 | 83.33 |
-| Path Tracing | Offline | Half CPU | 16 | 61.11 | 23.96 | 653.86 |
-| Ray Tracing | Offline | Half CPU | 16 | 63.07 | 25.36 | 661.84 |
-| Raster / PHONG | Viewport | Single core | 12 | 11.19 | 8.52 | 59.97 |
-| Temporal Noise | Viewport | Single core | 12 | 48.46 | 9.36 | 38.25 |
-| Hex Mosaic | Viewport | Single core | 12 | 42.59 | 14.24 | 106.12 |
-| Dithering | Viewport | Single core | 12 | 34.21 | 24.45 | 157.62 |
-| Path Tracing | Offline | Single core | 16 | 241.93 | 182.31 | 5 489.69 |
-| Ray Tracing | Offline | Single core | 16 | 264.22 | 201.37 | 6 337.22 |
+| Raster / PHONG | Viewport | Scaled CPU (70%) | 12 | 9.98 | 4.36 | 12.43 |
+| Hex Mosaic | Viewport | Scaled CPU (70%) | 12 | 44.32 | 7.90 | 28.51 |
+| Temporal Noise | Viewport | Scaled CPU (70%) | 12 | 67.24 | 8.72 | 28.99 |
+| Dithering | Viewport | Scaled CPU (70%) | 12 | 25.45 | 16.33 | 57.99 |
+| Ray Tracing | Offline | Scaled CPU (70%) | 16 | 71.96 | 36.00 | 561.02 |
+| Path Tracing | Offline | Scaled CPU (70%) | 16 | 183.33 | 129.00 | 2687.38 |
+| Raster / PHONG | Viewport | Single core | 12 | 14.76 | 9.82 | 63.85 |
+| Temporal Noise | Viewport | Single core | 12 | 67.13 | 11.64 | 42.61 |
+| Hex Mosaic | Viewport | Single core | 12 | 48.16 | 14.00 | 81.52 |
+| Dithering | Viewport | Single core | 12 | 35.47 | 23.93 | 120.07 |
+| Ray Tracing | Offline | Single core | 16 | 153.44 | 107.55 | 2689.46 |
+| Path Tracing | Offline | Single core | 16 | 711.32 | 625.35 | 18375.13 |
 
 ### Dynamic viewport audit pro reálnější závěr
 
@@ -200,97 +197,98 @@ Krátká orientace:
 
 | Renderer | Core profil | Scéna | Rozlišení | Static steady [ms] | Dynamic steady [ms] | Slowdown | Static first [ms] | Dynamic first [ms] |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Raster / PHONG | Half CPU | Těžká scéna / více světel | 1920x1080 | 9.36 | 10.11 | 1.08x | 13.42 | 12.07 |
-| Hex Mosaic | Half CPU | Těžká scéna / více světel | 1920x1080 | 30.48 | 30.32 | 0.99x | 170.03 | 169.95 |
-| Dithering | Half CPU | Těžká scéna / více světel | 1920x1080 | 83.33 | 83.55 | 1.00x | 79.77 | 106.68 |
-| Temporal Noise | Half CPU | Těžká scéna / více světel | 1920x1080 | 24.49 | 157.57 | 6.43x | 230.24 | 197.14 |
-| Raster / PHONG | Single core | Těžká scéna / více světel | 1920x1080 | 59.97 | 62.24 | 1.04x | 59.26 | 49.94 |
-| Hex Mosaic | Single core | Těžká scéna / více světel | 1920x1080 | 106.12 | 110.99 | 1.05x | 229.49 | 269.82 |
-| Dithering | Single core | Těžká scéna / více světel | 1920x1080 | 157.62 | 170.05 | 1.08x | 165.44 | 153.84 |
-| Temporal Noise | Single core | Těžká scéna / více světel | 1920x1080 | 36.45 | 175.79 | 4.82x | 221.04 | 213.97 |
+| Raster / PHONG | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 12.43 | 12.57 | 1.01x | 18.73 | 16.92 |
+| Hex Mosaic | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 28.51 | 28.99 | 1.02x | 171.64 | 169.22 |
+| Dithering | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 57.99 | 58.05 | 1.00x | 72.69 | 71.95 |
+| Temporal Noise | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 27.65 | 216.17 | 7.82x | 293.02 | 260.82 |
+| Raster / PHONG | Single core | Těžká scéna / více světel | 1920x1080 | 63.85 | 61.70 | 0.97x | 67.04 | 58.59 |
+| Hex Mosaic | Single core | Těžká scéna / více světel | 1920x1080 | 81.52 | 78.01 | 0.96x | 204.52 | 203.13 |
+| Dithering | Single core | Těžká scéna / více světel | 1920x1080 | 120.07 | 115.71 | 0.96x | 126.23 | 119.26 |
+| Temporal Noise | Single core | Těžká scéna / více světel | 1920x1080 | 42.48 | 242.75 | 5.71x | 308.77 | 280.54 |
 
-Poměry kolem `0.8x až 1.1x` mimo `Temporal Noise` nečti jako „pohyb kamerou pomáhá“. To je běžný rozptyl delšího CPU benchmarku. Důležitá informace je, že tyto rendery zůstávají zhruba ve stejné třídě náročnosti, zatímco `Temporal Noise` se v dynamice propadá výrazně nahoru.
+Poměry kolem `0.9x až 1.1x` mimo `Temporal Noise` nečti jako „pohyb kamerou pomáhá“. To je běžný rozptyl delšího CPU benchmarku. Důležitá informace je, že tyto rendery zůstávají zhruba ve stejné třídě náročnosti, zatímco `Temporal Noise` se v dynamice propadá výrazně nahoru.
 
 ### Stress case na maximálním rozlišení (`static-steady`, `heavy-many`)
 
-| Renderer | Family | First median [ms] | Steady median [ms] | Steady p90 [ms] |
+| Renderer | Core profil | First median [ms] | Steady median [ms] | Steady p90 [ms] |
 | --- | --- | ---: | ---: | ---: |
-| Raster / PHONG | Viewport | 13.42 | 9.36 | 10.20 |
-| Temporal Noise | Viewport | 230.24 | 24.49 | 26.69 |
-| Hex Mosaic | Viewport | 170.03 | 30.48 | 31.52 |
-| Dithering | Viewport | 79.77 | 83.33 | 87.61 |
-| Path Tracing | Offline | 753.34 | 653.86 | 656.76 |
-| Ray Tracing | Offline | 761.22 | 661.84 | 664.34 |
+| Raster / PHONG | Scaled CPU (70%) | 18.73 | 12.43 | 13.45 |
+| Temporal Noise | Scaled CPU (70%) | 293.02 | 27.65 | 29.87 |
+| Hex Mosaic | Scaled CPU (70%) | 171.64 | 28.51 | 31.04 |
+| Dithering | Scaled CPU (70%) | 72.69 | 57.99 | 58.81 |
+| Path Tracing | Scaled CPU (70%) | 2865.78 | 2687.38 | 2860.27 |
+| Ray Tracing | Scaled CPU (70%) | 574.12 | 561.02 | 588.91 |
 
 ### Graf 1: Viewport `static-steady` škálování podle rozlišení
 
-`full` mode, `Half CPU`, průměr steady median přes všechny 4 benchmark scénáře v `static-steady` workloadu.
+`full` mode, `Scaled CPU (70%)`, průměr steady median přes všechny 4 benchmark scénáře v `static-steady` workloadu.
 
 ```mermaid
 xychart-beta
-    title "Viewport static-steady median podle rozlišení"
-    x-axis ["320x180", "640x360", "1920x1080"]
-    y-axis "Median [ms]" 0 --> 90
-    line "Raster / PHONG" [3.28, 3.27, 6.29]
-    line "Temporal Noise" [3.43, 4.05, 23.12]
-    line "Hex Mosaic" [3.89, 4.42, 27.79]
-    line "Dithering" [6.05, 11.08, 79.28]
+  title "Viewport static-steady median podle rozlišení"
+  x-axis ["320x180", "640x360", "1920x1080"]
+  y-axis "Median [ms]" 0 --> 70
+  line "Raster / PHONG" [3.82, 3.69, 7.93]
+  line "Temporal Noise" [4.52, 6.19, 26.45]
+  line "Hex Mosaic" [4.41, 5.24, 24.27]
+  line "Dithering" [8.03, 11.84, 51.09]
 ```
 
 Graf ukazuje statický steady-state baseline viewport family. `Raster / PHONG` zůstává referenční minimum, `Temporal Noise` a `Hex Mosaic` se lámají hlavně ve fullHD a `Dithering` je nejcitlivější na růst počtu pixelů.
 
 ### Graf 2: Offline `static-steady` škálování podle rozlišení
 
-`full` mode, `Half CPU`, průměr steady median přes všechny 4 benchmark scénáře.
+`full` mode, `Scaled CPU (70%)`, průměr steady median přes všechny 4 benchmark scénáře.
 
 ```mermaid
 xychart-beta
-    title "Offline static-steady median podle rozlišení"
-    x-axis ["160x90", "320x180", "640x360", "1920x1080"]
-    y-axis "Median [ms]" 0 --> 360
-    line "Path Tracing" [4.81, 9.92, 37.57, 330.98]
-    line "Ray Tracing" [4.92, 11.32, 38.72, 337.22]
+  title "Offline static-steady median podle rozlišení"
+  x-axis ["160x90", "320x180", "640x360", "1920x1080"]
+  y-axis "Median [ms]" 0 --> 1700
+  line "Path Tracing" [35.11, 56.10, 172.56, 1508.33]
+  line "Ray Tracing" [9.36, 13.13, 37.10, 424.58]
 ```
 
-Tady je vidět skoro čisté násobení s počtem pixelů. `Path Tracing` zůstává v tomhle nastavení mírně levnější než `Ray Tracing`, ale oba offline renderery mají podobný řád náročnosti.
+Tady je vidět násobení s počtem pixelů a zároveň odlišný charakter obou offline rendererů v aktuální konfiguraci benchmarku. V tomhle měření vychází `Path Tracing` výrazně náročněji než `Ray Tracing`.
 
 ### Graf 3: First-frame vs. steady-frame v nejtěžším `static-steady` stress case
 
-`heavy-many`, nejvyšší rozlišení dané renderer family, `Half CPU`.
+`heavy-many`, nejvyšší rozlišení dané renderer family, `Scaled CPU (70%)`.
 
 ```mermaid
 xychart-beta
-    title "First-frame vs. steady-frame v nejtěžším static stress case"
-    x-axis ["Raster", "Temporal", "Hex", "Dither", "Path", "Ray"]
-    y-axis "Median [ms]" 0 --> 850
-    line "First-frame" [13.42, 230.24, 170.03, 79.77, 753.34, 761.22]
-    line "Steady-frame" [9.36, 24.49, 30.48, 83.33, 653.86, 661.84]
+  title "First-frame vs. steady-frame v nejtěžším static stress case"
+  x-axis ["Raster", "Temporal", "Hex", "Dither", "Path", "Ray"]
+  y-axis "Median [ms]" 0 --> 3000
+  line "First-frame" [18.73, 293.02, 171.64, 72.69, 2865.78, 574.12]
+  line "Steady-frame" [12.43, 27.65, 28.51, 57.99, 2687.38, 561.02]
 ```
 
-Tenhle graf je důležitý hlavně pro interpretaci `Temporal Noise` a `Hex Mosaic`: první snímek je výrazně dražší než ustálený běh, protože se budují pomocné mapy a analýza. Naopak u offline rendererů je rozdíl mezi first a steady menší, protože dominantní cena je samotný tracing.
+Tenhle graf je důležitý hlavně pro interpretaci `Temporal Noise` a `Hex Mosaic`: první snímek je výrazně dražší než ustálený běh, protože se budují pomocné mapy a analýza. U offline rendererů je rozdíl mezi first a steady menší, protože dominantní cena je samotný tracing.
 
 ### Graf 4: Static vs. dynamic steady-frame audit
 
-`heavy-many`, `1920x1080`, `Half CPU`, jen viewport family.
+`heavy-many`, `1920x1080`, `Scaled CPU (70%)`, jen viewport family.
 
 ```mermaid
 xychart-beta
-    title "Static vs. dynamic steady-frame audit"
-    x-axis ["Raster", "Temporal", "Hex", "Dither"]
-    y-axis "Median [ms]" 0 --> 180
-    line "Static steady" [9.36, 24.49, 30.48, 83.33]
-    line "Dynamic steady" [10.11, 157.57, 30.32, 83.55]
+  title "Static vs. dynamic steady-frame audit"
+  x-axis ["Raster", "Temporal", "Hex", "Dither"]
+  y-axis "Median [ms]" 0 --> 280
+  line "Static steady" [12.43, 27.65, 28.51, 57.99]
+  line "Dynamic steady" [12.57, 216.17, 28.99, 58.05]
 ```
 
-Tenhle graf je klíčový pro reálný závěr. Ve statickém workloadu vypadá `Temporal Noise` velmi dobře, ale jakmile benchmark mezi framy hýbe kamerou a aktualizuje scénu, steady cost vyskočí skoro na úroveň first-frame. Ostatní viewport renderery zůstávají přibližně tam, kde byly.
+Tenhle graf je klíčový pro reálný závěr. Ve statickém workloadu vypadá `Temporal Noise` velmi dobře, ale jakmile benchmark mezi framy hýbe kamerou a aktualizuje scénu, steady cost vyskočí výrazně nahoru. Ostatní viewport renderery zůstávají přibližně tam, kde byly.
 
 ### Co z benchmarku jde reálně vyvozovat
 
 - `Raster / PHONG` je referenční rychlý viewport baseline. Jedna klasická raster pipeline bez dodatečné full-screen syntézy se v datech chová přesně tak, jak odpovídá jeho složitosti.
-- `Temporal Noise` má dva legitimní režimy chování. Ve `static-steady` workloadu padá nízko díky reuse analýzy, ale `dynamic-sequence` ukazuje, že pro pohyb kamerou to není levný renderer; ve fullHD heavy-many roste steady median na `157.57 ms` (`Half CPU`) a `175.79 ms` (`Single core`).
+- `Temporal Noise` má dva legitimní režimy chování. Ve `static-steady` workloadu padá nízko díky reuse analýzy, ale `dynamic-sequence` ukazuje, že pro pohyb kamerou to není levný renderer; ve fullHD heavy-many roste steady median na `216.17 ms` (`Scaled CPU`) a `242.75 ms` (`Single core`).
 - `Hex Mosaic` a `Dithering` jsou záměrně měřené se zapnutými interními passy. Benchmark tedy neporovnává „stejný shader ve stejné pipeline“, ale reálné defaultní workloady těch rendererů.
 - `Ray Tracing` a `Path Tracing` jsou uváděné odděleně od viewport family. Jejich absolutní časy jsou ovlivněné BVH, shadow rays, přímým světlem a `1 SPP` nastavením; porovnání má smysl hlavně uvnitř offline family.
-- `Half CPU` je záměrně kompromisní profil pro reálné desktop použití. Benchmark tak netlačí počítač na plných `100 %` všech jader a výsledky jsou bližší tomu, co dává smysl pro editorový provoz.
+- V aktuálním `full` snapshotu je `Ray Tracing` levnější než `Path Tracing`, zejména ve vyšších rozlišeních.
+- `Scaled CPU (70%)` je záměrně kompromisní profil pro reálné desktop použití. Benchmark tak netlačí počítač na plných `100 %` všech jader a výsledky jsou bližší tomu, co dává smysl pro editorový provoz.
 - To pořád není laboratorní benchmark. Není tu affinity pinning, multi-machine cross-check ani thermal governance. Na závěr v rámci tohoto repa to ale už stačí: statický baseline, dynamický audit i per-case runtime metadata jsou transparentní a reprodukovatelné.
 
 ### Hrubá matematická a výpočetní složitost
@@ -310,7 +308,7 @@ Použité symboly:
 | Temporal Noise | first-frame přibližně `O(Raster_unlit + P + neighborhood analysis)`, steady ve statické scéně blíž k `O(Raster_unlit + P)`, v dynamice zase blíž k first-frame cost | statická kamera ho zvýhodní, dynamická sekvence odhalí skutečnou cenu re-analýzy |
 | Hex Mosaic | `O(Raster + P + C)` | base raster + per-pixel akumulace do buněk + compose; roste víc s pixely než čistý raster |
 | Ray Tracing | first-frame přibližně `O(T log T + P * D * (BVH + L * shadowBVH))`, steady bez rebuildů hlavně `O(P * D * (BVH + L * shadowBVH))` | světla a shadow rays bolí víc než samotný růst geometrie |
-| Path Tracing | `O(T log T + P * E[D] * (BVH + L * shadowBVH))` | stejný řád jako ray tracer, ale často o něco levnější díky sampling branchím a Russian roulette |
+| Path Tracing | `O(T log T + P * E[D] * (BVH + L * shadowBVH))` | stejný řád jako ray tracer; v aktuálním full benchmarku vychází náročněji |
 
 Tyhle tvary nejsou formální důkaz přesné complexity každého řádku kódu; jsou to zjednodušené dominantní modely, které odpovídají tomu, co renderery v téhle codebase skutečně dělají a co benchmark naměřil.
 
@@ -320,11 +318,11 @@ Tato tabulka měří čistě zápis formátu nad připravenými snímky. Nejde t
 
 | Formát | 640x360 median [ms] | 640x360 velikost | 1280x720 median [ms] | 1280x720 velikost | 1920x1080 median [ms] | 1920x1080 velikost |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PNG still | 11.63 | 0.02 MB | 19.00 | 0.08 MB | 44.82 | 0.20 MB |
-| JPG still | 9.57 | 0.01 MB | 13.44 | 0.02 MB | 24.65 | 0.04 MB |
-| PNG sequence | 46.90 | 0.12 MB | 158.68 | 0.62 MB | 353.96 | 1.64 MB |
-| GIF | 151.62 | 0.31 MB | 588.03 | 0.91 MB | 1302.12 | 1.87 MB |
-| AVI MJPEG | 29.67 | 0.06 MB | 96.10 | 0.18 MB | 192.99 | 0.35 MB |
+| PNG still | 19.25 | 0.02 MB | 45.33 | 0.08 MB | 61.85 | 0.20 MB |
+| JPG still | 16.32 | 0.01 MB | 23.06 | 0.02 MB | 34.75 | 0.04 MB |
+| PNG sequence | 77.30 | 0.12 MB | 220.01 | 0.62 MB | 466.52 | 1.64 MB |
+| GIF | 206.09 | 0.31 MB | 724.14 | 0.91 MB | 1610.70 | 1.87 MB |
+| AVI MJPEG | 56.12 | 0.06 MB | 152.85 | 0.18 MB | 288.72 | 0.35 MB |
 
 > Benchmark tabulka je určená jako reprodukovatelný referenční údaj pro tento repozitář, ne jako absolutní srovnání s jinými enginy. Smysl tabulek je ukázat relativní náklad rendererů v rámci stejné codebase, stejného runneru a transparentně popsaných workloadů.
 
@@ -1212,7 +1210,7 @@ Pravý panel obsahuje karty:
 | `S` | sphere |
 | `P` | plane |
 | `Y` | cylinder |
-| `N` | cone |
+| `N` | cone (jen při otevřeném add menu) |
 | `T` | torus |
 | `H` | capsule |
 | `R` | pyramid |
@@ -1237,7 +1235,7 @@ Pravý panel obsahuje karty:
 | `F2` | upscale filter |
 | `F3` | post AA |
 | `B` | debug overlay |
-| `N` | editor overlay |
+| `N` | editor overlay (globálně; při otevřeném add menu zároveň potvrdí `cone`) |
 | `H` | help |
 
 ## Import, primitiva a asset workflow

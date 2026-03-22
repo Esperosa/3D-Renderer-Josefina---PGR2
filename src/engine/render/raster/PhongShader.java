@@ -29,6 +29,8 @@ public class PhongShader {
     private PointLight[] pointLightRefs;
     private int dirCount;
     private int pointCount;
+    private boolean previewDiffuseOnlyLighting;
+    private boolean previewPointLightsDiffuseOnly;
 
     public PhongShader() {
         this.ambientColor = new Vec3(0.1, 0.1, 0.1);
@@ -49,6 +51,8 @@ public class PhongShader {
         this.pointLightRefs = new PointLight[0];
         this.dirCount = 0;
         this.pointCount = 0;
+        this.previewDiffuseOnlyLighting = false;
+        this.previewPointLightsDiffuseOnly = false;
     }
 
     /**
@@ -63,6 +67,11 @@ public class PhongShader {
         this.ambientIntensity = ambientIntensity;
         this.lights = lights == null ? new Light[0] : lights;
         rebuildLightCache();
+    }
+
+    public void setPreviewProfile(boolean diffuseOnlyLighting, boolean pointLightsDiffuseOnly) {
+        this.previewDiffuseOnlyLighting = diffuseOnlyLighting;
+        this.previewPointLightsDiffuseOnly = pointLightsDiffuseOnly;
     }
 
     /**
@@ -198,21 +207,23 @@ public class PhongShader {
             outG += diffuseG * lg * ndotl;
             outB += diffuseB * lb * ndotl;
 
-            double hx = lx + viewX;
-            double hy = ly + viewY;
-            double hz = lz + viewZ;
-            double hLen2 = hx * hx + hy * hy + hz * hz;
-            if (hLen2 > 1e-20) {
-                double invH = 1.0 / Math.sqrt(hLen2);
-                hx *= invH;
-                hy *= invH;
-                hz *= invH;
-                double ndoth = nx * hx + ny * hy + nz * hz;
-                if (ndoth > 0.0) {
-                    double specPower = Math.pow(ndoth, Math.max(1.0, shininess));
-                    outR += specR * lr * specPower;
-                    outG += specG * lg * specPower;
-                    outB += specB * lb * specPower;
+            if (!previewDiffuseOnlyLighting) {
+                double hx = lx + viewX;
+                double hy = ly + viewY;
+                double hz = lz + viewZ;
+                double hLen2 = hx * hx + hy * hy + hz * hz;
+                if (hLen2 > 1e-20) {
+                    double invH = 1.0 / Math.sqrt(hLen2);
+                    hx *= invH;
+                    hy *= invH;
+                    hz *= invH;
+                    double ndoth = nx * hx + ny * hy + nz * hz;
+                    if (ndoth > 0.0) {
+                        double specPower = Math.pow(ndoth, Math.max(1.0, shininess));
+                        outR += specR * lr * specPower;
+                        outG += specG * lg * specPower;
+                        outB += specB * lb * specPower;
+                    }
                 }
             }
         }
@@ -249,21 +260,23 @@ public class PhongShader {
             outG += diffuseG * lg * ndotl;
             outB += diffuseB * lb * ndotl;
 
-            double hx = lx + viewX;
-            double hy = ly + viewY;
-            double hz = lz + viewZ;
-            double hLen2 = hx * hx + hy * hy + hz * hz;
-            if (hLen2 > 1e-20) {
-                double invH = 1.0 / Math.sqrt(hLen2);
-                hx *= invH;
-                hy *= invH;
-                hz *= invH;
-                double ndoth = nx * hx + ny * hy + nz * hz;
-                if (ndoth > 0.0) {
-                    double specPower = Math.pow(ndoth, Math.max(1.0, shininess));
-                    outR += specR * lr * specPower;
-                    outG += specG * lg * specPower;
-                    outB += specB * lb * specPower;
+            if (!(previewDiffuseOnlyLighting || previewPointLightsDiffuseOnly)) {
+                double hx = lx + viewX;
+                double hy = ly + viewY;
+                double hz = lz + viewZ;
+                double hLen2 = hx * hx + hy * hy + hz * hz;
+                if (hLen2 > 1e-20) {
+                    double invH = 1.0 / Math.sqrt(hLen2);
+                    hx *= invH;
+                    hy *= invH;
+                    hz *= invH;
+                    double ndoth = nx * hx + ny * hy + nz * hz;
+                    if (ndoth > 0.0) {
+                        double specPower = Math.pow(ndoth, Math.max(1.0, shininess));
+                        outR += specR * lr * specPower;
+                        outG += specG * lg * specPower;
+                        outB += specB * lb * specPower;
+                    }
                 }
             }
         }

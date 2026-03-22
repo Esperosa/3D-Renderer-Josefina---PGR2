@@ -1,6 +1,7 @@
 package engine.ui;
 
 import engine.core.RenderMode;
+import engine.core.WorldPresetCatalog;
 
 public final class UiStrings {
 
@@ -52,6 +53,12 @@ public final class UiStrings {
         public static final String LIGHTS = "Světla";
         public static final String FORCE_FIELDS = "Síly";
         public static final String SIMULATION = "Částicové efekty";
+        public static final String QUICK_ADD_HINT = "Rychlé přidání a výběr hlavních položek scény.";
+        public static final String SELECT_PREVIOUS = "Vybrat předchozí";
+        public static final String SELECT_NEXT = "Vybrat další";
+        public static final String FOCUS_SELECTION = "Zaměřit výběr (F)";
+        public static final String CLEAR_SELECTION = "Zrušit výběr";
+        public static final String SELECTION_CLEARED_MSG = "Výběr zrušen.";
 
         private Scene() {
         }
@@ -61,10 +68,24 @@ public final class UiStrings {
         public static final String HEADER_TITLE = "Prostředí";
         public static final String HEADER_SUBTITLE = "Světlo prostředí, pozadí a celková nálada scény.";
         public static final String LIGHT = "Světlo prostředí";
-        public static final String PRESET_STUDIO = "Neutrální studio";
-        public static final String PRESET_SUNSET = "Teplý západ";
-        public static final String PRESET_NIGHT = "Chladná noc";
-        public static final String PRESET_CONTRAST = "Vysoký kontrast";
+        public static final String PRESET_CLOUDY = WorldPresetCatalog.CLOUDY_DAY.label();
+        public static final String PRESET_SUNSET = WorldPresetCatalog.WARM_SUNSET.label();
+        public static final String PRESET_DAY = WorldPresetCatalog.CLASSIC_DAY.label();
+        public static final String PRESET_STUDIO = WorldPresetCatalog.STUDIO_SOFT.label();
+        public static final String PRESET_NIGHT = WorldPresetCatalog.COOL_NIGHT.label();
+        public static final String AMBIENT_COLOR = "Ambientní barva";
+        public static final String HISTORY_CHANGE_AMBIENT_COLOR = "Změna barvy prostředí";
+        public static final String STRENGTH = "Síla";
+        public static final String HISTORY_CHANGE_STRENGTH = "Změna síly prostředí";
+        public static final String BACKGROUND = "Pozadí";
+        public static final String HISTORY_CHANGE_BACKGROUND_COLOR = "Změna barvy pozadí";
+        public static final String ENVIRONMENT_YAW = "HDRI otočení (yaw)";
+        public static final String HISTORY_CHANGE_ENV_YAW = "Změna otočení HDRI";
+        public static final String ENVIRONMENT_PITCH = "HDRI náklon (pitch)";
+        public static final String HISTORY_CHANGE_ENV_PITCH = "Změna náklonu HDRI";
+        public static final String PRESET = "Předvolba";
+        public static final String ANIMATE_WORLD_LIGHT = "Animovat světlo prostředí";
+        public static final String HISTORY_TOGGLE_ANIMATION = "Přepnutí animace prostředí";
 
         private World() {
         }
@@ -88,6 +109,15 @@ public final class UiStrings {
         public static final String HEADER_SUBTITLE = "Navigace kamery, projekce a citlivost práce ve viewportu.";
         public static final String NAVIGATION = "Navigace";
         public static final String MOTION = "Pohyb";
+        public static final String FPS_MODE = "FPS režim (Q)";
+        public static final String BLENDER_MODE = "Blender režim (E)";
+        public static final String TOGGLE_CURSOR_CAPTURE = "Zachytit / uvolnit kurzor";
+        public static final String CYCLE_CAMERA_MODE = "Přepnout režim kamery (Tab)";
+        public static final String TOGGLE_PROJECTION = "Persp / ortho (F4)";
+        public static final String MOVE_SPEED = "Rychlost pohybu";
+        public static final String ROTATE_SENSITIVITY = "Citlivost rozhlížení";
+        public static final String ANIMATION_PLAYBACK = "Přehrávání animace";
+        public static final String PHYSICS = "Fyzika";
 
         private View() {
         }
@@ -99,6 +129,14 @@ public final class UiStrings {
         public static final String TRANSFORM = "Transformace";
         public static final String OPERATIONS = "Operace objektu";
         public static final String NONE_SELECTED = "Vybraný objekt: žádný";
+        public static final String POSITION = "Pozice";
+        public static final String ROTATION = "Rotace (stupně)";
+        public static final String SCALE = "Měřítko";
+        public static final String APPLY_TRANSFORM = "Použít transformaci";
+        public static final String FOCUS_SELECTION_ACTION = "Zaměřit výběr";
+        public static final String RELEASE_FOCUS = "Uvolnit fokus";
+        public static final String ADD_RELEASE_KEY = "Přidat release klíč";
+        public static final String REMOVE_RELEASE_KEY = "Smazat release klíč";
 
         private Object() {
         }
@@ -262,26 +300,10 @@ public final class UiStrings {
     }
 
     public static String worldPresetLabel(String presetKey) {
-        if (presetKey == null) {
-            return World.PRESET_STUDIO;
-        }
-        return switch (presetKey.trim().toLowerCase()) {
-            case "warm sunset", "teplý západ" -> World.PRESET_SUNSET;
-            case "cool night", "chladná noc" -> World.PRESET_NIGHT;
-            case "high contrast", "vysoký kontrast" -> World.PRESET_CONTRAST;
-            default -> World.PRESET_STUDIO;
-        };
+        return WorldPresetCatalog.resolveLabel(presetKey);
     }
 
     public static String worldPresetKey(String label) {
-        if (label == null) {
-            return "Studio Neutral";
-        }
-        return switch (label.trim().toLowerCase()) {
-            case "teplý západ", "warm sunset" -> "Warm Sunset";
-            case "chladná noc", "cool night" -> "Cool Night";
-            case "vysoký kontrast", "high contrast" -> "High Contrast";
-            default -> "Studio Neutral";
-        };
+        return WorldPresetCatalog.resolveKey(label);
     }
 }

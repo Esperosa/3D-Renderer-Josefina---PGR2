@@ -1,11 +1,8 @@
 package engine.core;
 
-import engine.io.FileUtil;
-import engine.ui.UiTheme;
-import engine.ui.WrapLayout;
-
-import java.awt.BorderLayout;
+import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
+import java.awt.BorderLayout;
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Component;
@@ -15,8 +12,10 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.IllegalComponentStateException;
+import java.awt.Image;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -24,7 +23,6 @@ import java.awt.RenderingHints;
 import java.awt.Stroke;
 import java.awt.Taskbar;
 import java.awt.Toolkit;
-import java.awt.AlphaComposite;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
@@ -42,18 +40,23 @@ import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.Icon;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
-import javax.swing.Scrollable;
 import javax.swing.JTabbedPane;
+import javax.swing.Scrollable;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
+
+import engine.io.FileUtil;
+import engine.ui.UiTheme;
+import engine.ui.WrapLayout;
+import engine.util.RuntimeInstrumentation;
 
 /**
  * Tady držím hlavní AWT okno s canvasem, toolbarem a postranními panely.
@@ -87,7 +90,11 @@ public class Window {
     private final Cursor defaultCursor;
     private final Cursor hiddenCursor;
     private final Font overlayFont;
+    private final Font modeSwitchOverlayFont;
+    private final Font modeSwitchOverlaySubFont;
+    private final GraphicsDevice fullscreenDevice;
     private volatile String[] overlayLines;
+    private final boolean fullscreen;
     private boolean cursorCaptured;
     private boolean smoothUpscaling;
     private volatile boolean closeRequested;
@@ -98,6 +105,9 @@ public class Window {
     private volatile double worldAxisUpX;
     private volatile double worldAxisUpY;
     private volatile double worldAxisUpZ;
+    private volatile boolean renderModeSwitchOverlayActive;
+    private volatile double renderModeSwitchOverlayAlpha;
+    private volatile String renderModeSwitchOverlayLabel;
     private int timelineDockHeight;
     private boolean timelineDockManuallyResized;
     private boolean timelineResizeDragging;
@@ -112,19 +122,33 @@ public class Window {
      * @param height sem předám počáteční výšku v pixelech
      */
     public Window(String title, int width, int height) {
+        this(title, width, height, false);
+    }
+
+    public Window(String title, int width, int height, boolean fullscreen) {
         this.width = width;
         this.height = height;
         this.closeRequested = false;
         this.rightTabContents = new LinkedHashMap<>();
         this.rightTabIndices = new LinkedHashMap<>();
+        this.fullscreen = fullscreen;
+        this.fullscreenDevice = fullscreen ? resolveFullscreenDevice() : null;
+        this.renderModeSwitchOverlayActive = false;
+        this.renderModeSwitchOverlayAlpha = 0.0;
+        this.renderModeSwitchOverlayLabel = "";
 
         frame = new JFrame(title);
+        if (fullscreen) {
+            frame.setUndecorated(true);
+            frame.setResizable(false);
+        }
         installAppIcon();
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
                 closeRequested = true;
+                exitFullscreenIfNeeded();
                 frame.dispose();
             }
         });
@@ -173,12 +197,12 @@ public class Window {
         contextMenu.addPopupMenuListener(new PopupMenuListener() {
             @Override
             public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-                // Tady nic navÃ­c nepotÅ™ebuju, callback volÃ¡m tÄ›snÄ› pÅ™ed show().
+                // A tady nic navic nedelam, callback volam tesne pred show().
             }
 
             @Override
             public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                // Tady schvÃ¡lnÄ› nic nedÄ›lÃ¡m, potvrzenÃ© akce Å™eÅ¡Ã­ jejich vlastnÃ­ callback.
+                // A tady schvalne nic nedelam, potvrzene akce resi jejich vlastni callback.
             }
 
             @Override
@@ -204,14 +228,36 @@ public class Window {
         frame.pack();
         frame.setMinimumSize(new Dimension(1060, 700));
         syncResponsiveLayout();
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
+        if (fullscreen) {
+            Rectangle bounds = fullscreenDevice != null
+                    ? fullscreenDevice.getDefaultConfiguration().getBounds()
+                    : GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .getDefaultScreenDevice()
+                    .getDefaultConfiguration()
+                    .getBounds();
+            frame.setBounds(bounds);
+            frame.setVisible(true);
+            if (fullscreenDevice != null && fullscreenDevice.isFullScreenSupported()) {
+                try {
+                    fullscreenDevice.setFullScreenWindow(frame);
+                } catch (RuntimeException ignored) {
+                    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                }
+            } else {
+                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+            }
+        } else {
+            frame.setLocationRelativeTo(null);
+            frame.setVisible(true);
+        }
 
         backBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         defaultCursor = Cursor.getDefaultCursor();
         BufferedImage blank = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
         hiddenCursor = Toolkit.getDefaultToolkit().createCustomCursor(blank, new Point(0, 0), "hidden");
-        overlayFont = new Font(Font.MONOSPACED, Font.BOLD, 18);
+        overlayFont = new Font(Font.MONOSPACED, Font.BOLD, 13);
+        modeSwitchOverlayFont = new Font(Font.SANS_SERIF, Font.BOLD, 64);
+        modeSwitchOverlaySubFont = new Font(Font.SANS_SERIF, Font.PLAIN, 20);
         overlayLines = new String[0];
         cursorCaptured = false;
         smoothUpscaling = true;
@@ -244,7 +290,7 @@ public class Window {
                 taskbar.setIconImage(icon);
             }
         } catch (UnsupportedOperationException | SecurityException ex) {
-            // Tady tiše ignoruju platformy, které nepovolí integraci ikony do taskbaru.
+            // A tady tise ignoruju platformy, ktere nepovoli integraci ikony do taskbaru.
         }
     }
 
@@ -253,7 +299,7 @@ public class Window {
             try {
                 return ImageIO.read(new File(APP_ICON_PNG_PATH));
             } catch (IOException ex) {
-                // Tady spadnu na ICO asset níž, když PNG načtení selže.
+                // A tady prechazim na ICO asset nize, kdyz nacteni PNG selze.
             }
         }
         if (FileUtil.exists(APP_ICON_ICO_PATH)) {
@@ -296,6 +342,9 @@ public class Window {
         if (backBuffer.getWidth() != srcWidth || backBuffer.getHeight() != srcHeight) {
             backBuffer = new BufferedImage(srcWidth, srcHeight, BufferedImage.TYPE_INT_ARGB);
         }
+        RuntimeInstrumentation.addCounter(
+                RuntimeInstrumentation.Counter.BYTES_COPIED,
+                Math.max(0L, (long) srcWidth * (long) srcHeight * 4L));
         backBuffer.setRGB(0, 0, srcWidth, srcHeight, pixels, 0, srcWidth);
 
         BufferStrategy strategy = ensureBufferStrategy();
@@ -320,6 +369,7 @@ public class Window {
                     g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
                 }
                 g2.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
+                long hudStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.HUD_UI);
                 if (drawViewportChrome && cursorCaptured) {
                     drawCrosshair(g2, canvas.getWidth(), canvas.getHeight());
                 }
@@ -327,16 +377,22 @@ public class Window {
                     drawWorldAxisWidget(g2, canvas.getWidth(), canvas.getHeight());
                 }
                 drawOverlayText(g2);
+                drawRenderModeSwitchOverlay(g2, canvas.getWidth(), canvas.getHeight());
+                RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.HUD_UI, hudStage);
                 g2.dispose();
             } while (strategy.contentsRestored());
             try {
+                long presentStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.WINDOW_PRESENT);
                 strategy.show();
+                RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.WINDOW_PRESENT, presentStage);
             } catch (IllegalStateException ex) {
                 return;
             }
         } while (strategy.contentsLost());
 
+        long presentStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.WINDOW_PRESENT);
         Toolkit.getDefaultToolkit().sync();
+        RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.WINDOW_PRESENT, presentStage);
     }
 
     /**
@@ -364,8 +420,41 @@ public class Window {
         return canvas;
     }
 
+    public boolean requestCanvasFocus() {
+        if (frame == null || canvas == null || !frame.isDisplayable() || !canvas.isDisplayable()) {
+            return false;
+        }
+        try {
+            frame.toFront();
+            frame.requestFocus();
+            canvas.requestFocus();
+            return canvas.requestFocusInWindow();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    public boolean isCanvasFocusOwner() {
+        return canvas != null && canvas.isFocusOwner();
+    }
+
+    public boolean isInputReady() {
+        return frame != null
+                && canvas != null
+                && frame.isDisplayable()
+                && frame.isVisible()
+                && canvas.isDisplayable()
+                && canvas.isShowing()
+                && canvas.getWidth() > 0
+                && canvas.getHeight() > 0;
+    }
+
     public JFrame getFrame() {
         return frame;
+    }
+
+    public boolean isFullscreen() {
+        return fullscreen;
     }
 
     /** @return vrátím aktuální šířku okna */
@@ -396,6 +485,7 @@ public class Window {
     /** Tady uvolním AWT prostředky. */
     public void dispose() {
         closeRequested = true;
+        exitFullscreenIfNeeded();
         if (frame != null) {
             frame.dispose();
         }
@@ -403,6 +493,14 @@ public class Window {
 
     public boolean isCloseRequested() {
         return closeRequested || frame == null || !frame.isDisplayable();
+    }
+
+    public void requestClose() {
+        closeRequested = true;
+        exitFullscreenIfNeeded();
+        if (frame != null) {
+            frame.dispose();
+        }
     }
 
     public void setTitle(String title) {
@@ -559,6 +657,53 @@ public class Window {
         worldAxisUpZ = upZ;
     }
 
+    public void setRenderModeSwitchOverlay(String label, double alpha, boolean active) {
+        renderModeSwitchOverlayLabel = label == null ? "" : label.trim();
+        renderModeSwitchOverlayAlpha = Math.max(0.0, Math.min(1.0, alpha));
+        renderModeSwitchOverlayActive = active && renderModeSwitchOverlayAlpha > 0.0;
+    }
+
+    public void presentRenderModeSwitchOverlayNow(String label, double alpha) {
+        setRenderModeSwitchOverlay(label, alpha, true);
+        if (canvas == null || frame == null || !canvas.isDisplayable() || !frame.isDisplayable()) {
+            return;
+        }
+        if (canvas.getWidth() <= 0 || canvas.getHeight() <= 0) {
+            return;
+        }
+        BufferStrategy strategy = ensureBufferStrategy();
+        if (strategy == null) {
+            return;
+        }
+
+        do {
+            do {
+                Graphics g;
+                try {
+                    g = strategy.getDrawGraphics();
+                } catch (IllegalStateException ex) {
+                    return;
+                }
+                Graphics2D g2 = (Graphics2D) g;
+                if (backBuffer != null && backBuffer.getWidth() > 0 && backBuffer.getHeight() > 0) {
+                    g2.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
+                } else {
+                    g2.setColor(Color.BLACK);
+                    g2.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+                }
+                drawRenderModeSwitchOverlay(g2, canvas.getWidth(), canvas.getHeight());
+                g2.dispose();
+            } while (strategy.contentsRestored());
+            try {
+                strategy.show();
+            } catch (IllegalStateException ex) {
+                return;
+            }
+        } while (strategy.contentsLost());
+
+        Toolkit.getDefaultToolkit().sync();
+    }
+
     public boolean isCursorCaptured() {
         return cursorCaptured;
     }
@@ -570,6 +715,23 @@ public class Window {
         } catch (IllegalComponentStateException ex) {
             return null;
         }
+    }
+
+    public Point getCapturePointOnScreen() {
+        Point canvasCenter = getCanvasCenterOnScreen();
+        if (canvasCenter != null) {
+            return canvasCenter;
+        }
+        try {
+            Point p = frame.getLocationOnScreen();
+            return new Point(p.x + frame.getWidth() / 2, p.y + frame.getHeight() / 2);
+        } catch (IllegalComponentStateException ex) {
+            return null;
+        }
+    }
+
+    public boolean isViewportFocusActive() {
+        return frame.isFocused() && canvas.isDisplayable() && canvas.isShowing();
     }
 
     private void drawCrosshair(Graphics g, int w, int h) {
@@ -650,38 +812,148 @@ public class Window {
         g2.setFont(overlayFont);
         g2.setComposite(AlphaComposite.SrcOver);
         g2.setPaintMode();
-        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
-        g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_OFF);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
 
         FontMetrics metrics = g2.getFontMetrics(overlayFont);
         int x = 14;
-        int y = 18 + metrics.getAscent();
-        int lineStep = metrics.getHeight() + 2;
-        int maxChars = 0;
-        for (String line : lines) {
-            if (line != null) {
-                maxChars = Math.max(maxChars, line.length());
-            }
-        }
-        int clipW = Math.max(32, Math.min(canvas.getWidth() - x - 4, metrics.charWidth('W') * maxChars + 8));
-        int clipH = Math.max(16, Math.min(canvas.getHeight() - 8, lines.length * lineStep + 6));
-        if (clipW <= 0 || clipH <= 0) {
+        int y = 16;
+        int rowH = Math.max(16, metrics.getHeight() + 2);
+        int maxRows = Math.max(4, (canvas.getHeight() - y - 10) / rowH);
+        int rowCount = Math.min(lines.length, maxRows);
+        if (rowCount <= 0) {
             return;
         }
-        g2.setClip(x - 2, 8, clipW, clipH);
 
-        for (String line : lines) {
-            if (line == null || line.isEmpty()) {
-                y += lineStep;
-                continue;
-            }
-            g2.setColor(OVERLAY_SHADOW);
-            g2.drawString(line, x + 1, y + 1);
-            g2.setColor(OVERLAY_FG);
-            g2.drawString(line, x, y);
-            y += lineStep;
+        int maxKeyW = 0;
+        for (int i = 0; i < rowCount; i++) {
+            String key = extractOverlayKey(lines[i]);
+            maxKeyW = Math.max(maxKeyW, metrics.stringWidth(key));
         }
-        g2.setClip(null);
+        int railX = x;
+        int keyX = x + 8;
+        int colGap = 10;
+        int keyColW = Math.max(46, maxKeyW + 4);
+        int valueX = keyX + keyColW + colGap;
+        int valueColW = Math.max(120, canvas.getWidth() - valueX - 14);
+
+        int top = y - 2;
+        int bottom = y + rowCount * rowH - 5;
+        g2.setColor(new Color(110, 156, 198, 185));
+        g2.fillRect(railX - 1, top, 2, Math.max(10, bottom - top));
+
+        for (int i = 0; i < rowCount; i++) {
+            String raw = lines[i] == null ? "" : lines[i];
+            String key = extractOverlayKey(raw);
+            String value = extractOverlayValue(raw);
+
+            int baseY = y + i * rowH + metrics.getAscent();
+            Color accent = resolveLineColor(key);
+
+            g2.setColor(accent);
+            g2.drawString(key, keyX, baseY);
+
+            String clippedValue = clipTextToWidth(value, metrics, valueColW);
+            g2.setColor(new Color(220, 231, 244, 238));
+            g2.drawString(clippedValue, valueX, baseY);
+        }
+    }
+
+    private void drawRenderModeSwitchOverlay(Graphics2D g2, int w, int h) {
+        if (!renderModeSwitchOverlayActive || renderModeSwitchOverlayAlpha <= 0.0 || w <= 0 || h <= 0) {
+            return;
+        }
+        double alpha = Math.max(0.0, Math.min(1.0, renderModeSwitchOverlayAlpha));
+        String label = renderModeSwitchOverlayLabel == null || renderModeSwitchOverlayLabel.isBlank()
+                ? "RENDER"
+                : renderModeSwitchOverlayLabel;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) alpha));
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, w, h);
+
+        int titleSize = Math.max(42, Math.min(96, (int) Math.round(Math.min(w, h) * 0.13)));
+        Font titleFont = modeSwitchOverlayFont.deriveFont((float) titleSize);
+        g2.setFont(titleFont);
+        FontMetrics titleMetrics = g2.getFontMetrics();
+        int titleX = (w - titleMetrics.stringWidth(label)) / 2;
+        int titleY = (h / 2) - Math.max(8, titleSize / 10);
+
+        g2.setColor(new Color(34, 0, 56));
+        g2.drawString(label, titleX + 4, titleY + 4);
+        g2.setColor(new Color(187, 72, 255));
+        g2.drawString(label, titleX, titleY);
+
+        String sub = "Načítám další render režim...";
+        int subSize = Math.max(16, Math.min(30, (int) Math.round(titleSize * 0.36)));
+        Font subFont = modeSwitchOverlaySubFont.deriveFont((float) subSize);
+        g2.setFont(subFont);
+        FontMetrics subMetrics = g2.getFontMetrics();
+        int subX = (w - subMetrics.stringWidth(sub)) / 2;
+        int subY = titleY + Math.max(36, (int) Math.round(titleSize * 0.9));
+        g2.setColor(new Color(228, 221, 236));
+        g2.drawString(sub, subX, subY);
+    }
+
+    private String extractOverlayKey(String line) {
+        if (line == null) {
+            return "";
+        }
+        int idx = line.indexOf(':');
+        if (idx > 0) {
+            return line.substring(0, idx).trim();
+        }
+        return line.trim();
+    }
+
+    private String extractOverlayValue(String line) {
+        if (line == null) {
+            return "";
+        }
+        int idx = line.indexOf(':');
+        if (idx >= 0 && idx + 1 < line.length()) {
+            return line.substring(idx + 1).trim();
+        }
+        return "";
+    }
+
+    private Color resolveLineColor(String key) {
+        if (key == null) {
+            return OVERLAY_FG;
+        }
+        if ("FBK".equals(key) || "AUT".equals(key)) {
+            return new Color(255, 188, 108);
+        }
+        if ("FPS".equals(key) || "FT".equals(key) || "SPP".equals(key)) {
+            return new Color(147, 228, 171);
+        }
+        if ("CAM".equals(key) || "POS".equals(key)) {
+            return new Color(138, 198, 255);
+        }
+        if ("GEO".equals(key) || "RT".equals(key) || "PT".equals(key) || "RST".equals(key)) {
+            return new Color(205, 222, 238);
+        }
+        return OVERLAY_FG;
+    }
+
+    private String clipTextToWidth(String value, FontMetrics metrics, int maxWidth) {
+        if (value == null) {
+            return "";
+        }
+        if (metrics.stringWidth(value) <= maxWidth) {
+            return value;
+        }
+        String ellipsis = "...";
+        int keep = Math.max(0, value.length() - 1);
+        while (keep > 0) {
+            String candidate = value.substring(0, keep) + ellipsis;
+            if (metrics.stringWidth(candidate) <= maxWidth) {
+                return candidate;
+            }
+            keep--;
+        }
+        return ellipsis;
     }
 
     private void maybeShowContextMenu(MouseEvent e) {
@@ -700,6 +972,27 @@ public class Window {
     private void runContextMenuCallback(Runnable callback) {
         if (callback != null) {
             callback.run();
+        }
+    }
+
+    private GraphicsDevice resolveFullscreenDevice() {
+        try {
+            return GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private void exitFullscreenIfNeeded() {
+        if (fullscreenDevice == null) {
+            return;
+        }
+        try {
+            if (fullscreenDevice.getFullScreenWindow() == frame) {
+                fullscreenDevice.setFullScreenWindow(null);
+            }
+        } catch (RuntimeException ignored) {
+            // A tady platformni fullscreen fallback nechavam tise odeznit.
         }
     }
 

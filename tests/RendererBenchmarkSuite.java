@@ -199,6 +199,7 @@ final class RendererBenchmarkSuite {
             renderer.render(bundle.scene, camera, fb, time);
             firstFrameSamples[sample] = nanosToMillis(System.nanoTime() - started);
             shutdownRenderer(renderer);
+            cleanupBenchmarkResources();
         }
 
         List<Double> steadySamples = new ArrayList<>(spec.steadyPasses * spec.steadyRuns);
@@ -222,6 +223,7 @@ final class RendererBenchmarkSuite {
                 time += spec.timeStep;
             }
             shutdownRenderer(renderer);
+            cleanupBenchmarkResources();
         }
 
         return new BenchmarkCaseResult(
@@ -258,6 +260,7 @@ final class RendererBenchmarkSuite {
         prepareFrameState(spec, bundle, camera, spec.startTime, 1);
         renderer.render(bundle.scene, camera, fb, spec.startTime);
         shutdownRenderer(renderer);
+        cleanupBenchmarkResources();
     }
 
     private static void prepareFrameState(BenchmarkCaseSpec spec,
@@ -295,6 +298,11 @@ final class RendererBenchmarkSuite {
         } catch (RuntimeException ignored) {
             // Some renderers do not use an explicit shutdown flag.
         }
+    }
+
+    private static void cleanupBenchmarkResources() {
+        System.gc();
+        System.runFinalization();
     }
 
     private static Renderer createRenderer(String rendererId, int workerCount) {
@@ -550,11 +558,34 @@ final class RendererBenchmarkSuite {
     private static List<CoreProfile> buildCoreProfiles(int availableProcessors) {
         List<CoreProfile> profiles = new ArrayList<>();
         profiles.add(new CoreProfile("single", "Single core", 1));
-        int halfWorkers = Math.max(1, Math.min(ThreadPool.recommendedWorkerCount(), availableProcessors / 2));
-        if (halfWorkers != 1) {
-            profiles.add(new CoreProfile("half-cpu", "Half CPU", halfWorkers));
+        double cpuScale = resolveCpuScale();
+        int scaledWorkers = Math.max(1, Math.min(ThreadPool.recommendedWorkerCount(),
+                (int) Math.ceil(availableProcessors * cpuScale)));
+        if (scaledWorkers != 1) {
+            profiles.add(new CoreProfile("scaled-cpu", "Scaled CPU " + formatPercent(cpuScale), scaledWorkers));
         }
         return profiles;
+    }
+
+    private static double resolveCpuScale() {
+        String raw = System.getProperty("metrics.cpu.scale");
+        if (raw == null || raw.isBlank()) {
+            return 0.7;
+        }
+        try {
+            double value = Double.parseDouble(raw.trim());
+            if (!Double.isFinite(value)) {
+                return 0.7;
+            }
+            return Math.max(0.1, Math.min(1.0, value));
+        } catch (NumberFormatException ex) {
+            return 0.7;
+        }
+    }
+
+    private static String formatPercent(double value) {
+        long percent = Math.round(value * 100.0);
+        return "(" + percent + "%)";
     }
 
     private static BenchmarkTuning viewportTuning(BenchmarkMode mode) {
