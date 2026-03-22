@@ -3,40 +3,42 @@ package engine.render.ray.bvh;
 import engine.math.Ray;
 
 /**
- * Spatial acceleration structure contract used by ray and path tracing renderers.
- * The default implementation in this module is BVH.
+ * Tady je společný kontrakt pro prostorové akcelerační struktury
+ * používané v ray traceru i path traceru.
+ * Výchozí implementace v tomto modulu je BVH.
  */
 public interface AccelerationStructure {
 
- /**
- * Builds or rebuilds the structure from scene mesh data.
- *
- * @param positions per-mesh vertex position arrays
- * @param indices per-mesh triangle index arrays
- * @param modelMats per-mesh world transforms in flattened double[16] form
- * @param meshCount number of meshes to process
- */
+    /**
+     * Tady se struktura sestaví nebo znovu přestaví ze scénových mesh dat.
+     *
+     * @param positions pole pozic po jednotlivých meshích
+     * @param indices indexová pole po jednotlivých meshích
+     * @param modelMats světové transformace meshí jako ploché double[16]
+     * @param meshCount počet meshí, které se mají zpracovat
+     */
     void build(float[][] positions, int[][] indices, double[][] modelMats, int meshCount);
 
- /**
- * Finds the nearest hit between the ray and scene geometry.
- *
- * @param ray tested ray
- * @param tMin lower parametric bound
- * @param tMax upper parametric bound
- * @param record output hit record populated on hit
- * @return true when an intersection is found
- */
+    /**
+     * Tady se hledá nejbližší průsečík paprsku se scénovou geometrií.
+     *
+     * @param ray testovaný paprsek
+     * @param tMin spodní parametrická mez
+     * @param tMax horní parametrická mez
+     * @param record výstupní hit record vyplněný při zásahu
+     * @return true, když je nalezen průsečík
+     */
     boolean intersect(Ray ray, double tMin, double tMax, HitRecord record);
 
- /**
- * Tests whether any geometry occludes the ray, typically for shadow rays.
- * Implementations may early-out without producing a full hit record.
- *
- * @param ray tested shadow ray
- * @param tMin lower distance bound
- * @param tMax upper distance bound
- * @return true when any intersection exists
- */
+    /**
+     * Tady se testuje, jestli je paprsek zakrytý nějakou geometrií,
+     * typicky pro stínové paprsky.
+     * Implementace může skončit dřív bez dopočtu plného hit recordu.
+     *
+     * @param ray testovaný stínový paprsek
+     * @param tMin spodní mez vzdálenosti
+     * @param tMax horní mez vzdálenosti
+     * @return true, když existuje libovolný průsečík
+     */
     boolean intersectAny(Ray ray, double tMin, double tMax);
 }

@@ -41,7 +41,8 @@ public final class ScreenProjectionUtil {
         if (Math.abs(clip.w) < 1e-10 || clip.w <= 1e-6) {
             return false;
         }
-        Vec3 ndc = clip.perspectiveDivide();
+        double invW = 1.0 / clip.w;
+        Vec3 ndc = new Vec3(clip.x * invW, clip.y * invW, clip.z * invW);
         if (ndc.x < -1.2 || ndc.x > 1.2 || ndc.y < -1.2 || ndc.y > 1.2 || ndc.z < -0.2 || ndc.z > 1.2) {
             return false;
         }
@@ -73,7 +74,8 @@ public final class ScreenProjectionUtil {
         if (clip.w <= 1e-6 || Math.abs(clip.w) < 1e-10) {
             return false;
         }
-        Vec3 ndc = clip.perspectiveDivide();
+        double invW = 1.0 / clip.w;
+        Vec3 ndc = new Vec3(clip.x * invW, clip.y * invW, clip.z * invW);
         if (!Double.isFinite(ndc.x) || !Double.isFinite(ndc.y) || !Double.isFinite(ndc.z)) {
             return false;
         }

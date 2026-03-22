@@ -80,7 +80,8 @@ public class WireframeRenderer implements Renderer {
                         break;
                     }
 
-                    Vec3 ndc = clip.perspectiveDivide();
+                    double invW = 1.0 / clip.w;
+                    Vec3 ndc = new Vec3(clip.x * invW, clip.y * invW, clip.z * invW);
                     sx[k] = (float) ((ndc.x * 0.5 + 0.5) * (fb.getWidth() - 1));
                     sy[k] = (float) ((1.0 - (ndc.y * 0.5 + 0.5)) * (fb.getHeight() - 1));
                     sz[k] = (float) (ndc.z * 0.5 + 0.5);

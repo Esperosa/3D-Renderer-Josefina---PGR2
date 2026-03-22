@@ -1,9 +1,6 @@
 package engine.render.ray.core;
 
 import engine.render.ray.preview.ProgressiveRenderDefaults;
-
-
-import engine.render.ray.preview.*;
 import engine.render.ray.bvh.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -41,7 +38,8 @@ import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
 
 /**
- * Progressive CPU ray tracer with BVH acceleration, tiled rendering, and optional denoising.
+ * Progresivni CPU ray tracer s BVH akceleraci,
+ * tiled renderovanim a volitelnym denoisingem.
  */
 public class RayTracerRenderer implements Renderer {
 
@@ -2765,7 +2763,7 @@ public class RayTracerRenderer implements Renderer {
             return false;
         }
 
- // Keep environment reflections visible even for dielectric materials with low F0.
+     // Tady drzim odrazy prostredi viditelne i u dielektrik s nizkym F0.
         double reflectionCarryBoost = previewMotionActive
             ? MOTION_REFLECTION_CARRY_BOOST
             : STILL_CINEMATIC_REFLECTION_CARRY_BOOST;
@@ -3194,7 +3192,7 @@ public class RayTracerRenderer implements Renderer {
 
             lastSpecularEvent = ctx.surface.roughness <= 0.22 || ctx.surface.clearcoatFactor > 0.2;
 
- // Keep environment reflections visible even for dielectric materials with low F0.
+            // Tady drzim odrazy prostredi viditelne i u dielektrik s nizkym F0.
                 double reflectionCarryBoost = previewMotionActive
                     ? MOTION_REFLECTION_CARRY_BOOST
                     : STILL_CINEMATIC_REFLECTION_CARRY_BOOST;
@@ -3238,6 +3236,9 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private void sampleSurface(RayTriangle tri, RayHit RayHit, double dx, double dy, double dz, RaySurfaceState out, RayTraceContext ctx) {
+        if (tri == null || RayHit == null || out == null) {
+            return;
+        }
         double w0 = 1.0 - RayHit.u - RayHit.v;
         double geomNx = tri.faceNx;
         double geomNy = tri.faceNy;
@@ -3277,6 +3278,45 @@ public class RayTracerRenderer implements Renderer {
         }
 
         PhongMaterial material = tri.material;
+        if (material == null) {
+            out.discard = false;
+            out.smoothNx = nx;
+            out.smoothNy = ny;
+            out.smoothNz = nz;
+            out.nx = nx;
+            out.ny = ny;
+            out.nz = nz;
+            out.geomNx = geomNx;
+            out.geomNy = geomNy;
+            out.geomNz = geomNz;
+            out.baseR = tri.baseR;
+            out.baseG = tri.baseG;
+            out.baseB = tri.baseB;
+            out.opacity = 1.0;
+            out.roughness = clamp01(tri.roughness);
+            out.specR = clamp01(tri.specR);
+            out.specG = clamp01(tri.specG);
+            out.specB = clamp01(tri.specB);
+            out.reflectivity = clamp01(tri.reflectivity);
+            out.transmission = 0.0;
+            out.refractiveIndex = 1.0;
+            out.dispersion = 0.0;
+            out.emissionR = 0.0;
+            out.emissionG = 0.0;
+            out.emissionB = 0.0;
+            out.mediumR = 1.0;
+            out.mediumG = 1.0;
+            out.mediumB = 1.0;
+            out.density = 0.0;
+            out.thickness = 1.0;
+            out.sheenR = 0.0;
+            out.sheenG = 0.0;
+            out.sheenB = 0.0;
+            out.sheenRoughness = 0.0;
+            out.clearcoatFactor = 0.0;
+            out.clearcoatRoughness = 0.0;
+            return;
+        }
         double uv0U = tri.hasUV ? tri.u0 * w0 + tri.u1 * RayHit.u + tri.u2 * RayHit.v : 0.0;
         double uv0V = tri.hasUV ? tri.v0 * w0 + tri.v1 * RayHit.u + tri.v2 * RayHit.v : 0.0;
         double uv1U = tri.hasUV2 ? tri.u0b * w0 + tri.u1b * RayHit.u + tri.u2b * RayHit.v : 0.0;
@@ -3417,7 +3457,7 @@ public class RayTracerRenderer implements Renderer {
         }
         switch (materialProfile) {
             case "RT" -> {
- // Keep general RT look slightly punchy, but make transmissive materials read as clear glass.
+                // Tady nechavam RT vzhled lehce kontrastni, ale transmisivni materialy drzim jako ciste sklo.
                 out.roughness = clamp01(out.roughness * 0.90);
                 out.reflectivity = clamp01(out.reflectivity * 1.02);
                 out.transmission = clamp01(out.transmission * 1.18);
@@ -3438,7 +3478,7 @@ public class RayTracerRenderer implements Renderer {
                 out.transmission = clamp01(out.transmission * 0.58);
             }
             default -> {
- // PHONG/AUTO/default: keep extracted values unchanged.
+                // Tady u PHONG/AUTO/default nechavam extrahovane hodnoty beze zmeny.
             }
         }
     }
@@ -4864,8 +4904,8 @@ public class RayTracerRenderer implements Renderer {
         if (!previewQualityLadderEnabled) {
             return true;
         }
- // Keep full-frame updates during motion to avoid tile desync artifacts
- // (black flicker/ghosting) in hybrid base + polish composition.
+     // Tady v pohybu drzim full-frame update, aby se nerozjely tiles
+     // a nevznikal black flicker/ghosting v hybrid base + polish kompozici.
         return true;
     }
 
@@ -5137,8 +5177,8 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private boolean shouldUseHybridMovingBaseLayer(PreviewQualityTierPlan plan) {
- // Hybrid moving base currently introduces visible correctness artifacts in motion
- // (flipped faces and missing environment/floor). Keep motion on pure RT carrier path.
+     // Tady hybrid moving base v pohybu stale dela viditelne chyby korektnosti
+     // (flipped faces a chybejici environment/floor), proto drzim pohyb na ciste RT carrier ceste.
         return false;
     }
 
@@ -5424,8 +5464,8 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private void softResetMotionCarrierPreserveAccumulation() {
- // Motion-phase camera updates must not retain stale carrier accumulation,
- // otherwise previous camera samples leak as visible ghosting trails.
+     // Tady pri pohybove fazi kamery nesmim drzet zastaralou carrier akumulaci,
+        // jinak predchozi vzorky unikaji do obrazu jako ghosting stopy.
         softResetAccumulationPreserveHistory();
     }
 
@@ -5549,7 +5589,7 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private void resetStillReferenceHandoff() {
- // Still-reference handoff path was removed; keep a no-op to preserve call sites.
+    // Tady je still-reference handoff odstraneny; nechavam no-op kvuli stabilite call site mist.
     }
 
     private void ensureHybridBaseResources(int targetWidth, int targetHeight) {
@@ -5867,7 +5907,8 @@ public class RayTracerRenderer implements Renderer {
                 double blendCoverage = (double) blendCount / (double) Math.max(1, candidateCount);
                 double tileCoverage = (double) blendCount / (double) Math.max(1, activeTilePixels);
                 if (blendCoverage < 0.35 || tileCoverage < 0.22) {
- // On sparse partial frames, disable cached polish contribution to avoid visible tile breakup.
+                    // Tady pri ridkych partial frame vypinam cached polish prispevek,
+                    // aby nebyl viditelny rozpad obrazu po tilech.
                     polishContribution = 0.0;
                 } else if (blendCoverage < 0.75 || tileCoverage < 0.45) {
                     double blendRamp = (blendCoverage - 0.35) / 0.40;

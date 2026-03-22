@@ -1,9 +1,6 @@
 package engine.render.ray.core;
 
 import engine.render.ray.preview.ProgressiveRenderDefaults;
-
-
-import engine.render.ray.preview.*;
 import engine.render.ray.bvh.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -41,7 +38,8 @@ import engine.util.RuntimeInstrumentation;
 import engine.util.ThreadPool;
 
 /**
- * Progressive CPU path tracer with BVH acceleration and tiled multithreading.
+ * Progresivni CPU path tracer s BVH akceleraci
+ * a tiled multithreadingem.
  */
 public class PathTracerRenderer implements Renderer {
 
@@ -2659,8 +2657,8 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
- // Získám náhodný směr ze kterého přijde světlo z prostředí.
- // Pro HDRI mapu to použije importance sampling, takže preferuje jasné pixely.
+     // Tady vzorkuju nahodny smer, odkud prijde svetlo z prostredi.
+     // U HDRI mapy se pouzije importance sampling, aby se preferovaly jasne pixely.
         double lightPdf = sampleEnvironmentBackgroundDirection(rng, ctx);
         double wiX = ctx.sampleDx;
         double wiY = ctx.sampleDy;
@@ -2674,7 +2672,7 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
- // Zkontroluju jestli není směr k vybranému světlu zablokovaný.
+     // Tady kontroluju, jestli smer k vybranemu svetlu neni zablokovany.
         prepareShadowRay(hit, surface, wiX, wiY, wiZ, ctx);
         if (intersectAny(
                 ctx.shadowOx, ctx.shadowOy, ctx.shadowOz,
@@ -2683,7 +2681,7 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
- // Získám barvu světla z prostředí pro daný směr.
+     // Tady ziskam barvu svetla z prostredi pro dany smer.
         sampleEnvironmentBackground(wiX, wiY, wiZ, ctx);
         if (ctx.spectralHeroBand >= 0) {
             spectralHeroProjectRgb(ctx.envR, ctx.envG, ctx.envB, ctx.spectralHeroBand, ctx.spectralCompanionBand, ctx.spectralScratch0, ctx.spectralRgb0);
@@ -2701,7 +2699,7 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
- // Vynásobím světlo BRDF funkcí a pak vydělím PDF, abych získal správný příspěvek.
+     // Tady nasobim svetlo BRDF funkci a deleni PDF drzi energeticky spravny prispevek.
         double lightScale = misWeight / lightPdf;
         accumulatePreviewBsdfLight(
                 surface,
@@ -4397,7 +4395,7 @@ public class PathTracerRenderer implements Renderer {
         }
         switch (materialProfile) {
             case "PT" -> {
- // Keep PT profile physically neutral by default.
+                // Tady PT profil nechavam ve vychozim fyzikalne neutralnim nastaveni.
             }
             case "RT" -> {
                 out.roughness = clamp01(out.roughness * 0.92);
@@ -4410,7 +4408,7 @@ public class PathTracerRenderer implements Renderer {
                 out.transmission = clamp01(out.transmission * 0.54);
             }
             default -> {
- // PHONG/AUTO/default: keep extracted values unchanged.
+                // Tady u PHONG/AUTO/default nechavam extrahovane hodnoty beze zmeny.
             }
         }
     }
@@ -6017,7 +6015,8 @@ public class PathTracerRenderer implements Renderer {
             return true;
         }
         if (previewPhase == PreviewPhase.MOTION_STEADY) {
- // Keep all tiles phase-aligned during motion to prevent per-tile temporal drift.
+            // Tady v pohybu drzim vsechny tiles ve stejne fazi,
+            // aby nevznikal temporal drift po jednotlivych tilech.
             return true;
         }
         return true;

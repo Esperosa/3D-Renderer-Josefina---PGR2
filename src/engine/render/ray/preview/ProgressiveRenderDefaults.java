@@ -2,7 +2,7 @@ package engine.render.ray.preview;
 
 import engine.render.ray.bvh.*;
 /**
- * Centralni vychozi kvalita pro progresivni ray/path rendering.
+ * Centralni vychozi konfigurace kvality pro progresivni ray/path rendering.
  */
 public final class ProgressiveRenderDefaults {
 

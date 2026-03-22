@@ -3,8 +3,9 @@ package engine.render.ray.bvh;
 import engine.math.AABB;
 
 /**
- * Bounding volume hierarchy node.
- * Internal nodes store bounds with two children; leaf nodes store a triangle range.
+ * Tady je uzel bounding volume hierarchy.
+ * Interní uzly drží obálku a dva potomky,
+ * listové uzly drží rozsah trojúhelníků.
  */
 public class BVHNode {
 
@@ -40,7 +41,7 @@ public class BVHNode {
         return triangleCount > 0;
     }
 
- // Accessors.
+    // Tady jsou přístupové metody.
     public AABB getBounds() {
         return bounds;
     }

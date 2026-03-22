@@ -855,7 +855,9 @@ public class RasterRenderer implements Renderer {
             if (clip.w <= CLIP_EPS) {
                 return;
             }
-            Vec3 ndc = clip.perspectiveDivide(ndcScratch);
+            double invW = 1.0 / clip.w;
+            Vec3 ndc = (ndcScratch != null) ? ndcScratch : new Vec3();
+            ndc.set(clip.x * invW, clip.y * invW, clip.z * invW);
             sx[k] = (float) ((ndc.x * 0.5 + 0.5) * (fb.getWidth() - 1));
             sy[k] = (float) ((1.0 - (ndc.y * 0.5 + 0.5)) * (fb.getHeight() - 1));
             sz[k] = (float) (ndc.z * 0.5 + 0.5);

@@ -9,7 +9,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Resolves and validates production runtime package location for denoiser metadata.
+ * Resi a overuje umisteni produkcniho runtime balicku pro metadata denoiseru.
  */
 public final class DenoiserRuntimePackageBridge {
 

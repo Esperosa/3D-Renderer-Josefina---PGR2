@@ -9,8 +9,9 @@ import engine.math.Ray;
 import engine.math.Vec3;
 
 /**
- * Builds BVH from triangle data and performs ray traversal/intersection queries.
- * Node splitting uses a surface-area-based heuristic.
+ * Tady se staví BVH z trojúhelníkových dat
+ * a provádí průchod paprsku i průsečíkové dotazy.
+ * Dělení uzlů používá heuristiku podle povrchu obálek.
  */
 public class BVHBuilder implements AccelerationStructure {
 
@@ -229,7 +230,7 @@ public class BVHBuilder implements AccelerationStructure {
         return false;
     }
 
- // Internal helpers.
+    // Tady jsou interní pomocné metody.
     private BVHNode buildRecursive(int start, int end, int depth) {
         if (start >= end) {
             return null;

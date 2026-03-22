@@ -941,8 +941,13 @@ public class Engine {
             return null;
         }
 
-        Vec3 nearPoint = invVp.transform(new Vec4(ndcX, ndcY, -1.0, 1.0)).perspectiveDivide();
-        Vec3 farPoint = invVp.transform(new Vec4(ndcX, ndcY, 1.0, 1.0)).perspectiveDivide();
+        Vec4 nearClip = invVp.transform(new Vec4(ndcX, ndcY, -1.0, 1.0));
+        Vec4 farClip = invVp.transform(new Vec4(ndcX, ndcY, 1.0, 1.0));
+        if (Math.abs(nearClip.w) < 1e-10 || Math.abs(farClip.w) < 1e-10) {
+            return null;
+        }
+        Vec3 nearPoint = new Vec3(nearClip.x / nearClip.w, nearClip.y / nearClip.w, nearClip.z / nearClip.w);
+        Vec3 farPoint = new Vec3(farClip.x / farClip.w, farClip.y / farClip.w, farClip.z / farClip.w);
         Vec3 direction = farPoint.sub(nearPoint).normalize();
         if (direction.lengthSquared() < 1e-10) {
             return null;

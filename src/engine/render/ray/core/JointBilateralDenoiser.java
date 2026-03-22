@@ -1080,7 +1080,7 @@ final class JointBilateralDenoiser {
                 / DETAIL_RECOVERY_SAMPLE_RANGE);
         double baseRecovery = DETAIL_RECOVERY_BASE * balancedSurfaceFactor(roughness) * smartDetailScale;
         if (context.guideRoughness == null) {
- // Without roughness guides keep conservative but still allow mild texture recovery.
+            // Bez guide roughness drzi filtr konzervativni profil, ale stale povoli mirne obnoveni textury.
             baseRecovery *= 0.60;
         }
         return DenoiseSupport.clamp01(stability * baseRecovery * (1.0 + DETAIL_RECOVERY_SAMPLE_BOOST * sampleBoost));

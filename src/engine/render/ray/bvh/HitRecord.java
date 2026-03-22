@@ -4,7 +4,8 @@ import engine.math.Ray;
 import engine.math.Vec3;
 
 /**
- * Ray-scene intersection payload used during shading.
+ * Tady jsou data o průsečíku paprsku se scénou,
+ * která se používají při shadingu.
  */
 public class HitRecord {
 

@@ -5,7 +5,7 @@ import engine.math.Vec2;
 import engine.math.Vec3;
 
 /**
- * Random sampling utilities for Monte Carlo ray tracing.
+ * Nahodne vzorkovaci utility pro Monte Carlo ray tracing.
  */
 public class Sampler {
 
@@ -19,7 +19,7 @@ public class Sampler {
         state = seed == 0L ? 0x9E3779B97F4A7C15L : seed;
     }
 
- // Hemisphere sampling.
+     // Vzorkovani hemisfery.
     public Vec3 cosineWeightedHemisphere(Vec3 normal) {
         Vec3 n = safeNormal(normal);
         Vec3[] onb = buildOnb(n);
@@ -57,7 +57,7 @@ public class Sampler {
         return dir.normalize();
     }
 
- // Disk and pixel sampling.
+     // Vzorkovani disku a pixelu.
     public Vec2 uniformDisk() {
         double u = randomDouble() * 2.0 - 1.0;
         double v = randomDouble() * 2.0 - 1.0;
@@ -81,7 +81,7 @@ public class Sampler {
         return new Vec2(randomDouble(), randomDouble());
     }
 
- // Utility methods.
+     // Pomocne utility.
     public double randomDouble() {
         long z = nextLong();
         return ((z >>> 11) & ((1L << 53) - 1)) * 0x1.0p-53;

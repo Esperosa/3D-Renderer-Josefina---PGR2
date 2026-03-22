@@ -1,5 +1,9 @@
 package engine.render.ray.bvh;
 
+/**
+ * Tady jsou pomocne utility pro SAH deleni BVH uzlu,
+ * partitioning a trideni trojuhelniku podle os.
+ */
 public final class SahBvhUtil {
 
     private static final double EPS = 1e-9;
