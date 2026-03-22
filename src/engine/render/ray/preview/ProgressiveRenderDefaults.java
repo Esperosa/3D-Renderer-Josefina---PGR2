@@ -1,4 +1,4 @@
-package engine.render.ray.core;
+package engine.render.ray.preview;
 
 import engine.render.ray.bvh.*;
 /**

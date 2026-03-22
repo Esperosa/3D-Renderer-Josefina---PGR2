@@ -7,7 +7,7 @@ import engine.render.Renderer;
 import engine.render.post.DitherRenderer;
 import engine.render.post.TemporalNoiseRenderer;
 import engine.render.ray.core.PathTracerRenderer;
-import engine.render.ray.core.ProgressiveRenderDefaults;
+import engine.render.ray.preview.ProgressiveRenderDefaults;
 import engine.render.ray.core.RayTracerRenderer;
 import engine.util.FastAAUtil;
 import engine.util.RuntimeInstrumentation;

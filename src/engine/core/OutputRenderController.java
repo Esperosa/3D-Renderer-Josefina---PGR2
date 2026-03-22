@@ -20,7 +20,7 @@ import engine.render.post.TemporalNoiseRenderer;
 import engine.render.post.WireframeRenderer;
 import engine.render.raster.RasterRenderer;
 import engine.render.ray.core.PathTracerRenderer;
-import engine.render.ray.core.ProgressiveRenderDefaults;
+import engine.render.ray.preview.ProgressiveRenderDefaults;
 import engine.render.ray.core.RayTracerRenderer;
 import engine.scene.Scene;
 import engine.sim.water.WaterParticleRenderer;
