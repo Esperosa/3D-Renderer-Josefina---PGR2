@@ -6,8 +6,8 @@ import engine.material.PhongMaterial;
 import engine.math.Vec3;
 import engine.render.FrameBuffer;
 import engine.render.Renderer;
-import engine.render.ray.PathTracerRenderer;
-import engine.render.ray.ProgressiveRenderDefaults;
+import engine.render.ray.core.PathTracerRenderer;
+import engine.render.ray.core.ProgressiveRenderDefaults;
 import engine.scene.Entity;
 import engine.scene.Scene;
 

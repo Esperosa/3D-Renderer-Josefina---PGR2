@@ -8,8 +8,8 @@ import engine.render.post.HexMosaicRenderer;
 import engine.render.post.TemporalNoiseRenderer;
 import engine.render.post.WireframeRenderer;
 import engine.render.raster.RasterRenderer;
-import engine.render.ray.PathTracerRenderer;
-import engine.render.ray.RayTracerRenderer;
+import engine.render.ray.core.PathTracerRenderer;
+import engine.render.ray.core.RayTracerRenderer;
 
 public final class EngineSafetyRendererCoverageTests {
 

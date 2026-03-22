@@ -5,8 +5,8 @@ import engine.math.Vec3;
 import engine.render.FrameBuffer;
 import engine.render.Texture;
 import engine.render.raster.RasterRenderer;
-import engine.render.ray.PathTracerRenderer;
-import engine.render.ray.RayTracerRenderer;
+import engine.render.ray.core.PathTracerRenderer;
+import engine.render.ray.core.RayTracerRenderer;
 import engine.scene.Entity;
 import engine.scene.Scene;
 

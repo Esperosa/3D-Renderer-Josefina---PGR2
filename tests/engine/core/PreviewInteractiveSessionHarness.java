@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import engine.render.ray.PathTracerRenderer;
-import engine.render.ray.RayTracerRenderer;
+import engine.render.ray.core.PathTracerRenderer;
+import engine.render.ray.core.RayTracerRenderer;
 import engine.util.RuntimeInstrumentation;
 
 public final class PreviewInteractiveSessionHarness {

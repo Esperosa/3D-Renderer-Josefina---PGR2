@@ -6,8 +6,8 @@ import engine.geometry.Mesh;
 import engine.material.PhongMaterial;
 import engine.math.Vec3;
 import engine.render.FrameBuffer;
-import engine.render.ray.PathTracerRenderer;
-import engine.render.ray.RayTracerRenderer;
+import engine.render.ray.core.PathTracerRenderer;
+import engine.render.ray.core.RayTracerRenderer;
 import engine.scene.DirectionalLight;
 import engine.scene.Entity;
 import engine.scene.Scene;
@@ -26,15 +26,15 @@ public final class ShadowTerminatorRegressionTests {
         assertRayKeepsLighting(scene, camera);
         assertPathKeepsLighting(scene, camera);
         assertShadowOriginPushesPastPlane(
-                "engine.render.ray.RayTracerRenderer",
-                "engine.render.ray.RayHit",
-                "engine.render.ray.RaySurfaceState",
-                "engine.render.ray.RayTraceContext");
+                "engine.render.ray.core.RayTracerRenderer",
+                "engine.render.ray.core.RayHit",
+                "engine.render.ray.core.RaySurfaceState",
+                "engine.render.ray.core.RayTraceContext");
         assertShadowOriginPushesPastPlane(
-                "engine.render.ray.PathTracerRenderer",
-                "engine.render.ray.Hit",
-                "engine.render.ray.SurfaceState",
-                "engine.render.ray.PathTracerRenderer$TraceContext");
+                "engine.render.ray.core.PathTracerRenderer",
+                "engine.render.ray.core.Hit",
+                "engine.render.ray.core.SurfaceState",
+                "engine.render.ray.core.PathTracerRenderer$TraceContext");
 
         System.out.println("ShadowTerminatorRegressionTests: ALL TESTS PASSED");
     }
