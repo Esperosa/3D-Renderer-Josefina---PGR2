@@ -489,66 +489,145 @@ flowchart LR
     Path --> Output
 ```
 
-  ## Svetla, stiny, sklo a materialova odezva
+## Svetla, stiny, sklo a materialova odezva
 
-  Tato sekce je zamerena na to nejdulezitejsi pro lookdev: jak se v projektu realne sklada svetlo, stin, odraz, prenos a materialova odezva.
+Tato cast je implementacni a datova: popisuje pravidla, ktera renderery realne pouzivaji pri vyhodnoceni svetla, stinu a materialu.
 
-  ### Typy svetel a jejich role
+### 1. Zakladni svetelna rovnice v projektu
 
-  | Typ svetla | Co ovlivnuje nejvic | Poznamka v praxi |
-  | --- | --- | --- |
-  | Directional | globalni smerove osvetleni, cistota tvaru | vhodne pro citelny key light bez silneho utlumeni |
-  | Point | lokalni modelace objemu a detailu | rychle odhali roughness/normal map artefakty |
-  | Area | mekkost stinu a prirozenejsi highlighty | drazsi na vypocet, ale nejlepsi pro realisticky kontakt stinu |
-  | Emissive material | lokalni svitici plochy | vyrazne pomaha u stylizovanych i filmovych setupu |
-  | Sky/environment | globalni naplneni sceny energií | dulezite pro glass/transmission a celkovou tonalitu |
+Pro ray/path vetve je vystupni radiance skladana jako prubezne scitani prispevku po bounce:
 
-  ### Jak se lisi stiny podle rendereru
+$$
+\mathbf{L} \leftarrow \mathbf{L} + \mathbf{T}\odot\left(\mathbf{L}_{direct}+\mathbf{L}_{emission}+\mathbf{L}_{env}\right)
+$$
 
-  | Oblast | Raster (PHONG) | Ray Tracing | Path Tracing |
-  | --- | --- | --- | --- |
-  | Zakladni stinovani | preview aproximace | fyzikalnejsi primy stin | fyzikalnejsi primy + neprimy prispevek |
-  | Mekkost stinu | omezeny preview model | area-sample podle quality tieru | nejvernejsi chovani s Monte Carlo sumem |
-  | Kontaktni stiny | orientacni | stabilni pri dostatku vzorku | nejpresnejsi, ale nejdrazsi |
-  | Chovani pri pohybu kamery | preferuje rychlost | motion tier omezi cast detailu | motion tier omezi bounce/sampling, po zastaveni dorovna kvalitu |
+$$
+\mathbf{T}_{k+1}=\mathbf{T}_k\odot\mathbf{w}_{branch}
+$$
 
-  ### Sklo, transparentnost a prenos svetla
+Luminance pro rozhodovani o ukonceni vetve je v kodu vedena jako:
 
-  | Materialova oblast | Raster | Ray | Path |
-  | --- | --- | --- | --- |
-  | Glass BSDF | aproximace | pouzitelne pro lookdev | nejpresnejsi interpretace v projektu |
-  | Transparent BSDF | aproximace | pouzitelne | pouzitelne |
-  | Fresnel a odraz/lom | zjednodusene | realnejsi vyhodnoceni | nejkompletnejsi vyhodnoceni |
-  | Prace s tloustkou a volumem | omezena | castena podpora homogeniho media | nejlepsi homogeni volume varianta |
+$$
+Y = 0.2126R + 0.7152G + 0.0722B
+$$
 
-  Prakticky dopad:
+### 2. BRDF pravidla, ktera jsou realne pouzita
 
-  - Pokud ladis sklo a jemne odrazy, prepinat z rasteru alespon do Ray Preview.
-  - Pokud ladis finalni materialovou energii (hlavne transmission + volume), pouzij Path Preview nebo output path render.
+| Pravidlo | Implementacni chovani |
+| --- | --- |
+| Fresnel | Schlick varianta (`schlickFresnel` a `schlickFresnelColor`) |
+| Specular lobe | GGX (`ggxSpecularTerm`) |
+| Clearcoat | samostatny GGX lobe + Fresnel s F0 = 0.04 |
+| Sheen | samostatny `sheenLobeTerm` (lze vypnout v motion carrier profilu) |
+| Multi-scatter kompenzace | path ma `GGX_MULTISCATTER_STRENGTH = 0.55` |
 
-  ### Klicove UI parametry pro svetlo a material
+Schlick Fresnel forma:
 
-  | Skupina | Parametry | Co delaji |
-  | --- | --- | --- |
-  | Ray Tracing | directLighting, shadows, reflections, samplesPerFrame, maxDepth, denoise | rychly pomer mezi cistotou stinu a casem framu |
-  | Path Tracing | directLighting, sky, samplesPerFrame, maxDepth, denoise | hlavni ovladani konvergence a realismu |
-  | Motion quality | preview motion cadence, tile subset cadence, depth/samples limit | drzi odezvu pri pohybu kamery |
-  | Material graph | Principled/Glass/Transparent/Mix/Volume | urcuje povrchovou i objemovou odezvu |
+$$
+F(\cos\theta)=F_0+(1-F_0)(1-\cos\theta)^5
+$$
 
-  ### Doporuceny workflow pro lookdev svetel a materialu
+### 3. Fyzikalni branch pravidla pro sklo a material
 
-  1. Blokovani sceny a svetel v PHONG modu pro rychly feedback.
-  2. Kontrola tvaru stinu v Ray Tracing modu (stability check).
-  3. Ladeni skla, roughness a transmission v Path Preview.
-  4. Finalni validace v output path renderu s cilovymi samples.
-  5. Porovnani staticke kamery vs pohybu kamery, aby se odhalilo, jestli nastaveni funguje i mimo idealni still frame.
+Path tracer stavi branch pravdepodobnosti explicitne (preview transport):
 
-  ### Nejcastejsi chyby pri ladeni svetla a skla
+$$
+p_t = clamp01(transmission\cdot(1-fresnel))
+$$
 
-  - Prilis nizky sample budget a rychly zaver, ze je material "spatne".
-  - Ladeni glassu jen v raster preview bez kontroly v ray/path.
-  - Ignorovani sky/environment prispevku, ktery meni vnimani roughness a specular.
-  - Hodnoceni kvality jen za pohybu kamery; po zastaveni muze renderer prepnout do vyssi quality faze a obraz vypada jinak.
+$$
+p_c = clamp01(clearcoatFactor),\quad
+p_s = clamp01(max(reflectivity,fresnel))\cdot(1-p_c)
+$$
+
+$$
+p_d = clamp01(1-p_t-p_c-p_s)
+$$
+
+To je presne duvod, proc glass/transmission odezva v path modu neni jen "efekt", ale branch-driven integrace s vazbou na IOR, roughness a Fresnel.
+
+### 4. Stiny a area svetla: konkretni datove chovani
+
+Ray tracer ma explicitni pravidlo pro area shadow samples (`resolveAreaShadowSamples`):
+
+- v klidu kamery: min `12`, max `64`, navyseni proti base vzorkovani,
+- pri pohybu: redukce area samples na priblizne `65 %` (pokud je vzorku vice nez 1).
+
+To je duvod, proc pri pohybu klesa mekkost/cistota stinu a po zastaveni se opet vraci.
+
+### 5. Russian roulette a ukonceni drah
+
+Path tracer pouziva RR pro delsi drahy; survival pravdepodobnost je svazana s throughputem:
+
+$$
+rr = clamp\left(max(T_r,T_g,T_b),\ 0.05,\ 0.98\right)
+$$
+
+$$
+P(continue)=rr,\qquad \mathbf{T}\leftarrow\mathbf{T}/rr
+$$
+
+Krome RR existuje i explicitni motion ukonceni vetve podle luminance throughputu:
+
+$$
+Y(\mathbf{T}) \le \tau_{motion} \Rightarrow \text{terminate path}
+$$
+
+kde $\tau_{motion}$ odpovida `previewMotionThroughputTermination`.
+
+### 6. Volume a Beer-Lambert chovani
+
+Renderer pracuje s homogenim volumem (ne plny heterogenni solver). V kodu se projevi pres transmittance faktor `tr` a prispevek `1-tr`:
+
+$$
+L_{vol,emit} \propto (1-tr),\qquad
+\mathbf{T}\leftarrow\mathbf{T}\cdot tr
+$$
+
+Konceptualne odpovida Beer-Lambert zakonitosti:
+
+$$
+tr \approx e^{-\sigma_t d}
+$$
+
+### 7. Presne rozsahy parametru (z implementace)
+
+| Parametr | Ray | Path |
+| --- | --- | --- |
+| `samplesPerFrame` | `1..64` | `1..64` |
+| `maxDepth` / `maxBounces` | `1..32` | `1..32` |
+| `previewMotionSamplesPerFrameLimit` | `0..64` | `0..64` |
+| `previewMotionMaxDepth/Bounces` | `0..32` | `0..32` |
+| `previewMotionSecondaryCadence` | `1..8` | `1..8` |
+| `previewMotionTileSubsetCadence` | `1..16` | `1..16` |
+| `previewMotionDenoiseCadence` | `1..8` | `1..8` |
+| `previewMotionMaxLocalLights` | `-1..16` | `-1..16` |
+| `previewMotionMaxShadowedLocalLights` | `-1..16` | `-1..16` |
+| `previewMotionThroughputTermination` | `0.0..1.0` | `0.0..1.0` |
+| `previewMotionRoughnessSecondarySkip` | `0.0..1.0` | `0.0..1.0` |
+
+Ray ma navic implementacni rozsahy:
+
+- `previewMotionPolishScale`: `0.08..1.0`
+- `previewMotionBaseShadingScale`: `0.18..1.0`
+
+### 8. Datove defaulty relevantni pro svetlo/stin/material
+
+| Oblast | Default v kodu |
+| --- | --- |
+| Ray `maxDepth` | `3` |
+| Path `maxBounces` | `4` |
+| Ray `directLighting` | `true` |
+| Path `directLighting` | `true` |
+| Ray `shadowsEnabled` | `true` |
+| Ray `reflectionsEnabled` | `true` |
+
+### 9. Co to znamena pro prakticky lookdev
+
+1. Pro validni cteni stinu a odrazu nehodnotit jen motion frame; still faze ma jiny quality profil.
+2. U skla kontrolovat branch chovani (transmission/spec/clearcoat), ne jen jednu statickou screenshot hodnotu.
+3. Pri ladeni materialu drzet oddelene cile: viewport rychlost (motion tier) a fyzikalni vernost (still/reference tier).
+4. Finalni rozhodnuti o svetelnem setupu delat az po kontrole path konvergence (RR + throughput + depth budget).
 
 ## Matematické jádro
 
