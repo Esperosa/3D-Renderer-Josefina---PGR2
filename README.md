@@ -2,12 +2,44 @@
 
 ![3D Render Physics banner](docs/readme-assets/banner.svg)
 
+[![Java](https://img.shields.io/badge/Java-17%2B-2f7ed8?logo=openjdk&logoColor=white)](README.md#rychlý-start)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-3a9f6f)](README.md#build-spuštění-a-testy)
+[![Render Modes](https://img.shields.io/badge/Render%20modes-9-8a4bd6)](README.md#rychlý-přehled)
+[![Tests](https://img.shields.io/badge/Automatické%20testy-50-cc7a00)](README.md#tvrdá-data-a-ověřené-statistiky)
+
 Čistě Java desktop editor a render sandbox zaměřený na počítačovou grafiku, CPU renderery, node-based materiály, editorové workflow a experimentální stylizované režimy. Program je navržený jako technický studentský projekt z grafiky: nesnaží se imitovat produkční DCC nebo produkční render engine, ale propojuje větší množství grafických subsystémů do jednoho konzistentního celku.
 
 Autor: **Jiří Pelikán**
 
-> **Přesnost README**
-> Build a test postup nahoře odpovídá aktuálním skriptům v repu. Rychle ověřitelné počty v části statistik průběžně odpovídají aktuální codebase; výkonové tabulky níže jsou reprodukovatelný `full` snapshot z `tests/run-project-metrics.*` a po větších renderer změnách je vhodné je přegenerovat.
+> [!NOTE]
+> Build a test postup odpovídá aktuálním skriptům v repu. Výkonové tabulky níže jsou reprodukovatelný full snapshot z tests run-project-metrics skriptů[^bench].
+
+> [!TIP]
+> Pokud chceš jen rychlé pochopení projektu, jdi přes sekce Rychlý start, Rychlý přehled a Co program aktuálně umí.
+
+> [!IMPORTANT]
+> README je navržené jako hlavní čtecí plocha repozitáře: klíčová technická fakta jsou on-page bez nutnosti otevírat další soubory.
+
+## GitHub README feature vrstva
+
+| GitHub feature | K čemu slouží | Jak je použita zde |
+| --- | --- | --- |
+| Badges (Shields) | okamžitá orientace | Java, platformy, počet režimů, testy |
+| Alert blocks | zvýraznění kritických informací | NOTE, TIP, IMPORTANT bloky nahoře |
+| Anchor navigace | rychlý pohyb po dokumentu | skokové odkazy na sekce |
+| Tabulky | kompaktní data | capability matrixe, benchmark přehledy |
+| Mermaid diagramy | pipeline a workflow mapy | render a temporal noise diagramy |
+| Math (KaTeX) | přesná formulace modelů | transformace, tracing, BRDF části |
+| Code blocks | copy-paste workflow | build, test a benchmark příkazy |
+| Task checklist | roadmap orientace | stav funkčních vrstev projektu |
+| Footnotes | čistší text + zdrojové poznámky | metodika benchmarku a scope tvrzení |
+
+### Rychlé skoky
+
+| Start | Technologie | Data | Runtime |
+| --- | --- | --- | --- |
+| [Rychlý start](#rychlý-start) | [Renderery a stylizované režimy](#renderery-a-stylizované-režimy) | [Tvrdá data a ověřené statistiky](#tvrdá-data-a-ověřené-statistiky) | [UI a workflow editoru](#ui-a-workflow-editoru) |
+| [Projekt v kostce](#projekt-v-kostce) | [Materiálový systém](#materiálový-systém) | [Výstup a export](#výstup-a-export) | [Ovládání a zkratky](#ovládání-a-zkratky) |
 
 ## Jak číst README
 
@@ -51,6 +83,16 @@ README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na deskto
 | Největší síla | Jedna codebase propojuje editor, více rendererů, materiálový graph a export workflow |
 | Co není cílem | Produkční DCC náhrada ani filmový render engine |
 | Aktuální stav | Stabilní editor + raster/ray/path základ, experimentální vrstvy u stylizací a simulací |
+
+### Stav projektu jako checklist
+
+- [x] Editorové workflow stabilní
+- [x] Raster viewport stabilní
+- [x] Ray tracer stabilní
+- [x] Path tracer stabilní
+- [x] Materiálový graph produkčně použitelný v rámci projektu
+- [ ] Část simulací je stále výzkumná vrstva
+- [ ] Galaxy subsystém je zatím scaffold
 
 ## Rychlý start
 
@@ -1388,6 +1430,8 @@ Tato README verze drží důležité technické informace přímo na hlavní str
 | Output | export režimy, metadata, session struktura a benchmark exportu |
 | Roadmap témata | materiály, water částice, galaxy scaffold |
 | Java CPU denoiser | inference pravidla, tensor layout, tiled postup |
+
+[^bench]: Benchmark tabulky jsou navázané na test runner skripty a mají reprodukovatelné workflow v sekci Build, spuštění a testy.
 
 ---
 
