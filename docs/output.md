@@ -1,17 +1,17 @@
-# Output / export workflow
+# Výstupní / exportní workflow
 
 ## Cíl
 
-Output vrstva je navržená jako samostatný render workflow mimo realtime viewport.
+Výstupní vrstva je navržená jako samostatný render workflow mimo realtime viewport.
 
 ## Podporované výstupy
 
-- still image,
-- image sequence,
-- animated GIF,
+- statický snímek,
+- obrazová sekvence,
+- animovaný GIF,
 - AVI (MJPEG).
 
-## Session folders
+## Session složky
 
 Každý export může vytvořit vlastní session složku, do které se ukládají:
 
@@ -27,15 +27,15 @@ Typicky jde o lokální ignorovanou složku `renders/` nebo jiný uživatelem zv
 
 Manifest zachycuje:
 
-- export type,
+- typ exportu,
 - renderer,
 - rozlišení,
-- sampling / depth nastavení,
-- frame range,
+- nastavení samplingu / hloubky,
+- rozsah snímků,
 - fps,
-- generated files,
-- duration,
-- cancelled / success stav.
+- vygenerované soubory,
+- délka,
+- stav zrušeno / úspěch.
 
 ## AVI bez externích knihoven
 

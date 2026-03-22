@@ -1,64 +1,64 @@
-# Java CPU Inference Specification (Production Pilot)
+# Specifikace Java CPU inference (produkční pilot)
 
-## Scope
-Manual CPU implementation in Java, no ML runtime dependencies.
+## Rozsah
+Ruční CPU implementace v Javě bez závislosti na externím ML runtime.
 
-## Tensor Layout
-- Inference tensors use NCHW float32.
-- Input channels order: beauty.R, beauty.G, beauty.B, albedo.R, albedo.G, albedo.B, normal.X, normal.Y, normal.Z.
-- Output channels order: denoised beauty RGB.
+## Rozložení tenzorů
+- Inference tensory používají NCHW float32.
+- Pořadí vstupních kanálů: beauty.R, beauty.G, beauty.B, albedo.R, albedo.G, albedo.B, normal.X, normal.Y, normal.Z.
+- Pořadí výstupních kanálů: denoised beauty RGB.
 
-## Input Preprocess
-- beauty channels: log1p(max(x, 0)).
-- albedo channels: unchanged linear [0, 1] guidance values.
-- normal channels: unchanged world-space guidance in approximately [-1, 1].
+## Předzpracování vstupu
+- beauty kanály: log1p(max(x, 0)).
+- albedo kanály: beze změny jako lineární guidance hodnoty v [0, 1].
+- normal kanály: beze změny jako world-space guidance přibližně v [-1, 1].
 
-## Convolution Definition
-For output channel o at pixel (y, x):
+## Definice konvoluce
+Pro výstupní kanál o na pixelu (y, x):
 out[o,y,x] = bias[o] + sum_i sum_ky sum_kx weight[o,i,ky,kx] * in[i, y+ky-pad, x+kx-pad]
-- Kernel size: 3x3.
-- Padding: zero padding, 1 pixel on all sides.
-- Stride: 1 except downsample convs with stride 2.
+- Velikost kernelu: 3x3.
+- Padding: zero padding, 1 pixel na všech stranách.
+- Stride: 1, pouze downsample konvoluce mají stride 2.
 
-## Activation
-- LeakyReLU with negative_slope = 0.1.
-- Definition: f(x)=x when x>=0 else 0.1*x.
+## Aktivace
+- LeakyReLU s negative_slope = 0.1.
+- Definice: f(x)=x když x>=0, jinak 0.1*x.
 
-## Downsampling and Upsampling
-- Downsample: stride-2 convolution.
-- Upsample: bilinear 2x (align_corners=false behavior), then 3x3 conv.
+## Downsampling a upsampling
+- Downsample: konvoluce se stride 2.
+- Upsample: bilineární 2x (chování align_corners=false), potom 3x3 konvoluce.
 
-## Skip Connections
-- U-Net skip merge uses channel concat, then 3x3 conv fusion.
-- Residual blocks: x + conv2(leaky_relu(conv1(x))) then LeakyReLU.
-- Final residual output: output = beauty_log_space + residual_pred.
+## Skip connections
+- U-Net skip merge používá channel concat a následně fúzi přes 3x3 konvoluci.
+- Residual bloky: x + conv2(leaky_relu(conv1(x))) a potom LeakyReLU.
+- Finální residual výstup: output = beauty_log_space + residual_pred.
 
-## Output Conversion
-- Predicted output is in log-compressed domain.
-- Convert back to linear HDR with expm1(max(x, 0)).
-- Clamp only at file format/output stage if needed, not inside model math.
+## Převod výstupu
+- Predikovaný výstup je v log-komprimované doméně.
+- Převod zpět do lineárního HDR přes expm1(max(x, 0)).
+- Clamp provádět jen ve fázi file formátu/výstupu, ne uvnitř modelové matematiky.
 
-## Tiled Inference
-- Use tile size T and overlap O (O < T/2).
+## Tiled inference
+- Použít velikost tile T a overlap O (O < T/2).
 - Step = T - 2*O.
-- Blend with separable feather window multiplied in XY.
-- Accumulate weighted sum and divide by weight sum per pixel.
+- Blend přes separovatelné feather okno násobené v osách XY.
+- Akumulovat weighted sum a dělit weight sum po jednotlivých pixelech.
 
-## Weight Files
-- Format: raw float32 binary per tensor + JSON manifest.
+## Soubory vah
+- Formát: raw float32 binární data pro každý tenzor + JSON manifest.
 - Endianness: little-endian.
-- Conv weights layout: OIHW.
-- Manifest path: C:\Users\jirka\Documents\GitHub\3D-Render-Physics\runtime\denoiser-package\java_weights\weights_manifest.json
+- Layout konvolučních vah: OIHW.
+- Cesta k manifestu: C:\Users\jirka\Documents\GitHub\3D-Render-Physics\runtime\denoiser-package\java_weights\weights_manifest.json
 
-## Model Summary
-- Name: JavaCpuMiniUNet
-- Parameters: 340595
-- Receptive field estimate: {'rf_h': 69, 'rf_w': 69}
+## Shrnutí modelu
+- Název: JavaCpuMiniUNet
+- Počet parametrů: 340595
+- Odhad receptive field: {'rf_h': 69, 'rf_w': 69}
 
-## Java Implementation Checklist
-1. Load all tensors from manifest files as float32 arrays.
-2. Implement NCHW conv kernel with zero padding and stride 1/2.
-3. Implement bilinear upsample (align_corners=false equivalent).
-4. Implement LeakyReLU and residual adds exactly.
-5. Implement tiled inference blend to avoid seams.
-6. Verify parity with a fixed reference output on one fixed EXR sample.
+## Checklist Java implementace
+1. Načíst všechny tensory z manifest souborů jako float32 pole.
+2. Implementovat NCHW conv kernel se zero padding a stride 1/2.
+3. Implementovat bilineární upsample (ekvivalent align_corners=false).
+4. Implementovat LeakyReLU a residual add přesně podle specifikace.
+5. Implementovat tiled inference blend bez seam artefaktů.
+6. Ověřit paritu s fixním referenčním výstupem na jednom fixním EXR vzorku.

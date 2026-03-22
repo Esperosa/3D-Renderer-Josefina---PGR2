@@ -1,6 +1,6 @@
-# Rendering
+# Renderování
 
-## Render stack
+## Přehled render větví
 
 Projekt obsahuje tři hlavní render větve:
 

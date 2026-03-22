@@ -13,11 +13,13 @@ Autor: **Jiří Pelikán**
 
 ## Jak číst README
 
-- Chci projekt rychle spustit: [Rychlý start](#rychlý-start) a [Build, spuštění a testy](#build-spuštění-a-testy)
-- Chci rychlý produktový přehled: [Rychlý přehled](#rychlý-přehled), [Co program aktuálně umí](#co-program-aktuálně-umí) a [UI a workflow editoru](#ui-a-workflow-editoru)
-- Chci technický rozbor: [Architektura programu](#architektura-programu), [Renderery a stylizované režimy](#renderery-a-stylizované-režimy), [Materiálový systém](#materiálový-systém) a [Temporal Noise](#temporal-noise)
-- Chci čísla a benchmarky: [Tvrdá data a ověřené statistiky](#tvrdá-data-a-ověřené-statistiky)
-- Chci reference a limity: [Ovládání a zkratky](#ovládání-a-zkratky), [Struktura repozitáře](#struktura-repozitáře), [Omezení a skutečný stav projektu](#omezení-a-skutečný-stav-projektu) a [Další technická dokumentace](#další-technická-dokumentace)
+| Karta | Pro koho | Otevřít |
+| --- | --- | --- |
+| Spuštění projektu | Chci rychlý build, run a testy | [Rychlý start](#rychlý-start) · [Build, spuštění a testy](#build-spuštění-a-testy) |
+| Produktový přehled | Chci během minuty vědět, co projekt umí | [Rychlý přehled](#rychlý-přehled) · [Co program aktuálně umí](#co-program-aktuálně-umí) · [UI a workflow editoru](#ui-a-workflow-editoru) |
+| Technický rozbor | Chci architekturu, renderery a materiály | [Architektura programu](#architektura-programu) · [Renderery a stylizované režimy](#renderery-a-stylizované-režimy) · [Materiálový systém](#materiálový-systém) · [Temporal Noise](#temporal-noise) |
+| Data a benchmarky | Chci čísla a reprodukovatelná měření | [Tvrdá data a ověřené statistiky](#tvrdá-data-a-ověřené-statistiky) |
+| Limity a reference | Chci ovládání, strukturu repa a limity | [Ovládání a zkratky](#ovládání-a-zkratky) · [Struktura repozitáře](#struktura-repozitáře) · [Omezení a skutečný stav projektu](#omezení-a-skutečný-stav-projektu) · [Další technická dokumentace](#další-technická-dokumentace) |
 
 README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na desktopu i na telefonu. Dlouhé benchmarky a hlubší technické rozbory jsou schované do rozbalovacích sekcí, takže se v něm lépe hledá i na menším displeji.
 
@@ -44,6 +46,27 @@ README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na deskto
 - [Další technická dokumentace](#další-technická-dokumentace)
 
 </details>
+
+## Projekt v kostce
+
+| Oblast | Co to znamená v praxi |
+| --- | --- |
+| Co to je | Java desktop editor a render sandbox pro výuku a experimenty v počítačové grafice |
+| Pro koho | Pro technický lookdev, test render pipeline, materiály a CPU benchmarky v jednom projektu |
+| Největší síla | Jedna codebase propojuje editor, více rendererů, materiálový graph a export workflow |
+| Co není cílem | Produkční DCC náhrada ani filmový render engine |
+| Aktuální stav | Stabilní editor + raster/ray/path základ, experimentální vrstvy u stylizací a simulací |
+
+<table>
+  <tr>
+    <td><strong>Karta: Renderery</strong><br/>Raster pro rychlý viewport, Ray/Path pro kvalitnější offline výstup.</td>
+    <td><strong>Karta: Materiály</strong><br/>Node graph je zdroj pravdy, kompatibilně propojený s renderery.</td>
+  </tr>
+  <tr>
+    <td><strong>Karta: Workflow</strong><br/>Editor, timeline, output panel a session export v jednom prostředí.</td>
+    <td><strong>Karta: Limity</strong><br/>CPU-only projekt, část simulací a stylizací je výzkumná vrstva.</td>
+  </tr>
+</table>
 
 ## Rychlý start
 
@@ -1386,10 +1409,14 @@ build/           lokální build artefakty
 
 ## Další technická dokumentace
 
-- [docs/architecture.md](docs/architecture.md)
-- [docs/rendering.md](docs/rendering.md)
-- [docs/materials.md](docs/materials.md)
-- [docs/output.md](docs/output.md)
+| Dokumentační karta | Obsah | Otevřít |
+| --- | --- | --- |
+| Architektura | Modulární členění a odpovědnosti balíků | [docs/architecture.md](docs/architecture.md) |
+| Rendering | Přehled rendererů, rozdíly a limity | [docs/rendering.md](docs/rendering.md) |
+| Materiálový systém | Graph workflow, evaluace a praktická omezení | [docs/materials.md](docs/materials.md) |
+| Output workflow | Export typy, metadata a session struktura | [docs/output.md](docs/output.md) |
+| Rozšířené roadmap poznámky | Materiály, water částice a galaxy scaffold | [docs/materials-water-galaxy-roadmap.md](docs/materials-water-galaxy-roadmap.md) |
+| Java CPU inference specifikace | Implementační pravidla pro offline denoiser inferenci | [docs/offline-cnn-java-cpu-inference-spec.md](docs/offline-cnn-java-cpu-inference-spec.md) |
 
 ---
 
