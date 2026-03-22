@@ -1,5 +1,6 @@
 package engine.render.ray.core;
 
+import engine.render.ray.bvh.*;
 final class DenoiseSchedule {
 
     private static final long MIN_ACTIVE_SAMPLES = 1L;

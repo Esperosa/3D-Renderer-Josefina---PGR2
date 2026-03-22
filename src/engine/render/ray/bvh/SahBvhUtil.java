@@ -1,6 +1,6 @@
-package engine.render.ray.core;
+package engine.render.ray.bvh;
 
-final class SahBvhUtil {
+public final class SahBvhUtil {
 
     private static final double EPS = 1e-9;
 
@@ -8,24 +8,24 @@ final class SahBvhUtil {
     }
 
     @FunctionalInterface
-    interface AxisAccessor {
+    public interface AxisAccessor {
         double axis(int itemIndex, int axis);
     }
 
     @FunctionalInterface
-    interface BoundsAccessor {
+    public interface BoundsAccessor {
         void bounds(int itemIndex, Bounds out);
     }
 
-    static final class Bounds {
-        double minX;
-        double minY;
-        double minZ;
-        double maxX;
-        double maxY;
-        double maxZ;
+    public static final class Bounds {
+        public double minX;
+        public double minY;
+        public double minZ;
+        public double maxX;
+        public double maxY;
+        public double maxZ;
 
-        Bounds set(double minX, double minY, double minZ,
+        public Bounds set(double minX, double minY, double minZ,
                    double maxX, double maxY, double maxZ) {
             this.minX = minX;
             this.minY = minY;
@@ -36,7 +36,7 @@ final class SahBvhUtil {
             return this;
         }
 
-        Bounds reset() {
+        public Bounds reset() {
             minX = Double.POSITIVE_INFINITY;
             minY = Double.POSITIVE_INFINITY;
             minZ = Double.POSITIVE_INFINITY;
@@ -46,7 +46,7 @@ final class SahBvhUtil {
             return this;
         }
 
-        int longestAxis() {
+        public int longestAxis() {
             double ex = maxX - minX;
             double ey = maxY - minY;
             double ez = maxZ - minZ;
@@ -60,28 +60,28 @@ final class SahBvhUtil {
         }
     }
 
-    static final class Split {
-        final int axis;
-        final double position;
-        final double cost;
+    public static final class Split {
+        public final int axis;
+        public final double position;
+        public final double cost;
 
-        Split(int axis, double position, double cost) {
+        public Split(int axis, double position, double cost) {
             this.axis = axis;
             this.position = position;
             this.cost = cost;
         }
 
-        boolean isValid() {
+        public boolean isValid() {
             return axis >= 0 && Double.isFinite(cost);
         }
     }
 
-    static Split findBestSplit(int[] order,
-                               int start,
-                               int end,
-                               int binCount,
-                               AxisAccessor centroidAccessor,
-                               BoundsAccessor boundsAccessor) {
+    public static Split findBestSplit(int[] order,
+                                      int start,
+                                      int end,
+                                      int binCount,
+                                      AxisAccessor centroidAccessor,
+                                      BoundsAccessor boundsAccessor) {
         int bins = Math.max(4, binCount);
         int bestAxis = -1;
         double bestPosition = 0.0;
@@ -112,12 +112,12 @@ final class SahBvhUtil {
         return new Split(bestAxis, bestPosition, bestCost);
     }
 
-    static int partitionByAxis(int[] order,
-                               int start,
-                               int end,
-                               int axis,
-                               double split,
-                               AxisAccessor centroidAccessor) {
+    public static int partitionByAxis(int[] order,
+                                      int start,
+                                      int end,
+                                      int axis,
+                                      double split,
+                                      AxisAccessor centroidAccessor) {
         int left = start;
         int right = end - 1;
         while (left <= right) {
@@ -138,7 +138,7 @@ final class SahBvhUtil {
         return left;
     }
 
-    static void sortByAxis(int[] order, int low, int high, int axis, AxisAccessor centroidAccessor) {
+    public static void sortByAxis(int[] order, int low, int high, int axis, AxisAccessor centroidAccessor) {
         if (low >= high) {
             return;
         }

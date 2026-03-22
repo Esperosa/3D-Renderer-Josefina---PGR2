@@ -1,4 +1,4 @@
-package engine.render.ray.core;
+package engine.render.ray.bvh;
 
 import engine.math.Ray;
 

@@ -1,12 +1,12 @@
-package engine.render.ray.core;
-
-import engine.math.AABB;
-import engine.math.Ray;
-import engine.math.Vec3;
+package engine.render.ray.bvh;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+
+import engine.math.AABB;
+import engine.math.Ray;
+import engine.math.Vec3;
 
 /**
  * Builds BVH from triangle data and performs ray traversal/intersection queries.

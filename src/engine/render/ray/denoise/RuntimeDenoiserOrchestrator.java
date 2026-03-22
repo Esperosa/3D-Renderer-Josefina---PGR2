@@ -1,5 +1,6 @@
 package engine.render.ray.core;
 
+import engine.render.ray.bvh.*;
 public final class RuntimeDenoiserOrchestrator {
 
     private static final double FRAME_BUDGET_720_MS = 1000.0;
