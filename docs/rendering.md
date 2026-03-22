@@ -1,29 +1,55 @@
 # Renderovani
 
-Tento dokument je aktualni technicky popis rendereru podle soucasne implementace v kodu.
+Tento dokument popisuje aktualni renderer stack, jeho runtime logiku a rozdily mezi viewport preview a output renderem.
 
-## Aktualni prehled render rezimu
+## Render atlas
 
-Rezimy odpovidaji enumu RenderMode:
+| Rezim | Trida | Charakter | Typicky use-case |
+| --- | --- | --- | --- |
+| MODEL | RasterRenderer (modelPreviewMode) | ultra lehky unlit preview | rychla navigace v scene |
+| BASIC | RasterRenderer (flat/unlit) | technicky prehled bez fyziky | blokovani kompozice |
+| PHONG | RasterRenderer + PhongShader | realtime osvetleni | bezna editace a animace |
+| WIREFRAME | WireframeRenderer | topologie + siluety + skryte hrany | kontrola meshe |
+| DITHERING | DitherRenderer | stylizace (blue noise, pattern, ascii) | lookdev styl |
+| TEMPORAL_NOISE | TemporalNoiseRenderer | casove rizeny sum na zaklade G-bufferu | atmosfericky efekt |
+| HEX_MOSAIC | HexMosaicRenderer | bunecna stylizace | graficky look |
+| RAY_TRACING | RayTracerRenderer | carrier offline preview | kvalitni iterace materialu a svetel |
+| PATH_TRACING | PathTracerRenderer | Monte Carlo integrace | referencni fyzikalni vystup |
 
-| Rezim | Trida/pipeline | Typ pouziti |
+## Pipeline mapa (od scene po pixel)
+
+```mermaid
+flowchart LR
+	A[Scene + Materials + Lights] --> B[Render mode select]
+	B --> C1[Raster branch]
+	B --> C2[RayTracing branch]
+	B --> C3[PathTracing branch]
+	C1 --> D[Framebuffer resolve]
+	C2 --> D
+	C3 --> D
+	D --> E[Denoise or temporal blend]
+	E --> F[Tone map]
+	F --> G[Viewport preview publish]
+	F --> H[Output image encode]
+```
+
+## Viewport vs output render
+
+| Oblast | Viewport (interaktivni) | Output (offline export) |
 | --- | --- | --- |
-| MODEL | RasterRenderer (modelPreviewMode) | extremne lehky navigacni nahled |
-| BASIC | RasterRenderer (unlit/flat profil) | rychly technicky nahled bez plne svetelne odezvy |
-| PHONG | RasterRenderer + PhongShader | hlavni realtime viewport rezim |
-| WIREFRAME | WireframeRenderer | topologie, siluety, skryte hrany |
-| DITHERING | DitherRenderer (BLUE_NOISE/PATTERN/ASCII) | stylizovany post proces |
-| TEMPORAL_NOISE | TemporalNoiseRenderer | regionalne rizeny casovy sum |
-| HEX_MOSAIC | HexMosaicRenderer | bunecna stylizace do hex mrizky |
-| RAY_TRACING | RayTracerRenderer | kvalitnejsi offline carrier tracing |
-| PATH_TRACING | PathTracerRenderer | referencni Monte Carlo vystup |
+| Ridici smycka | frame-by-frame live loop | cilove vzorky na frame |
+| Reakce na pohyb kamery | motion tiers, cadence gate, subset tile update | kamera je typicky stabilni na frame; pocita se do targetSamples |
+| Worker/tile policy | auto tuning muze bezet | v outputu se obvykle fixuje workerCount a tileSize |
+| Denoise | muze byt adaptivni podle faze | QUALITY profil, FULL_FRAME runtime |
+| Ukonceni | kontinuum do dalsiho frame | smycka konci po targetSamples + finalize |
 
-## Matematicky zaklad spolecny rendererum
+## Spolecny matematicky zaklad
 
-### Prostorove transformace
+### Transformace
 
 $$
-\mathbf{p}_{world} = M\,\begin{bmatrix}x\\y\\z\\1\end{bmatrix},\qquad
+\mathbf{p}_{world} = M\,\begin{bmatrix}x\\y\\z\\1\end{bmatrix},
+\qquad
 \mathbf{p}_{clip} = VP\,\mathbf{p}_{world}
 $$
 
@@ -32,307 +58,270 @@ $$
 $$
 
 $$
-x_{screen}=\left(\frac{x_{ndc}}{2}+\frac{1}{2}\right)(W-1),\quad
+x_{screen}=\left(\frac{x_{ndc}}{2}+\frac{1}{2}\right)(W-1),
+\quad
 y_{screen}=\left(1-\left(\frac{y_{ndc}}{2}+\frac{1}{2}\right)\right)(H-1)
 $$
 
-Normala se prevadi pres inverse-transpose cast modelove matice.
-
-### Paprsek (ray/path)
+### Paprsek
 
 $$
-\mathbf{r}(t)=\mathbf{o}+t\mathbf{d}
+\mathbf{r}(t) = \mathbf{o} + t\mathbf{d}
 $$
 
-## Raster vetev (MODEL, BASIC, PHONG)
+## Raster branch (MODEL, BASIC, PHONG)
 
-### Vypocetni logika
-
-1. Frustum culling entity.
-2. Prevod vrcholu do clip/NDC/screen prostoru.
-3. Rasterizace trojuhelniku po dlazdicich.
+1. Frustum culling entit.
+2. Vertex transform do clip/NDC/screen.
+3. Tile rasterizace trojuhelniku.
 4. Z-buffer test.
-5. Fragment shading podle aktivniho profilu.
+5. Material + svetelna evaluace.
 
-### Svetelny model PHONG
-
-V PhongShader se pouziva ambient + Lambert + Blinn-Phong:
+Phong cast pouziva ambient + Lambert + Blinn-Phong:
 
 $$
-L = L_{ambient} + \sum_{lights}\left(L_d + L_s\right)
+L = L_{ambient} + \sum_{lights}(L_d + L_s)
 $$
 
-$$
-L_d \propto \max(0,\mathbf{n}\cdot\mathbf{l})
-$$
+## Stylized branch (WIREFRAME, DITHERING, TEMPORAL_NOISE, HEX_MOSAIC)
+
+Tyto rezimy jsou urcene pro citelnost a vizualni charakter, ne pro fyzikalni referenci.
+
+- WIREFRAME: kontura + depth-hidden logika + silhouette emphasis.
+- DITHERING: luminance kvantizace, threshold mapy, ascii matching.
+- TEMPORAL_NOISE: regionalni casovy sum z G-buffer signalu.
+- HEX_MOSAIC: agregace do hex bunek + quantized luminance + edge styl.
+
+## Ray tracing deep dive (RAY_TRACING)
+
+### Co je cil rendereru
+
+Ray tracer v tomto projektu neni cisty brute-force path tracer. Je to hybridni carrier pipeline navrzena tak, aby:
+
+1. Dala stabilni a cisty obraz i pri nizsim poctu vzorku.
+2. Udrzela vysokou odezvu pri pohybu kamery.
+3. Po zastaveni kamery rychle prepla do kvalitnejsiho still rezimu.
+
+### Stavovy automat pro pohyb kamery
+
+Ray tracing i path tracing pouzivaji stejnou logiku fazi preview:
+
+| Faze | Co ji aktivuje | Co dela pipeline |
+| --- | --- | --- |
+| STILL_STEADY | kamera je stabilni | plna kvalita podle still tieru |
+| MOTION_ENTER | detekovan zacatek pohybu | okamzity downgrade kvality, reset handoff stavu |
+| MOTION_STEADY | kamera se stale hybe | reduced cadence, subset dlazdice, agresivnejsi limity |
+| MOTION_EXIT_RESYNC | kamera se zastavila | kratka resynchronizace temporal historie |
+| STILL_WARMUP | po exit resync | nekolik warmup framu pred navratem do STILL_STEADY |
+
+Konstanty still quality ladderu maji stejne sample prahy v obou tracerech:
+
+- tier1 od 12 samples
+- tier2 od 28 samples
+- tier3 od 48 samples
+- tier4 od 72 samples
+- tier5 od 100 samples
+
+### Kamera stoji vs kamera se hybe (ray tracing)
+
+| Stav kamery | Aktivni chovani |
+| --- | --- |
+| Kamera stoji | vyssi quality tier, vice sekundarnich jevu, silnejsi reflection carry boost, plnejsi denoise cadence |
+| Kamera se hybe | motion tier profil, omezeni secondary contribution, nizsi sampling budget na frame, subset tile update |
+
+Konfigurovatelne motion ridice zahrnuji:
+
+- previewMotionSecondaryCadence
+- previewMotionTileSubsetCadence
+- previewMotionDenoiseCadence
+- previewMotionBaseCompositeCadence
+- previewMotionSamplesPerFrameLimit
+- previewMotionDepthLimit
+- previewMotionMaxLocalLights
+- previewMotionMaxShadowedLocalLights
+- previewMotionThroughputTermination
+- previewMotionRoughnessSecondarySkip
+- previewMotionPolishScale
+- previewMotionBaseShadingScale
+
+### Camera reset a akumulace
+
+Kamera neni jen binary "zmenila se / nezmenila".
+
+1. Vypocita se camera snapshot a motion delta.
+2. Porovna se plny signature hash.
+3. Pri zmene se urci reset kind (soft/hard podle typu zmeny).
+4. applyCameraReset rozhodne, zda zachovat cast akumulace nebo vynutit reset.
+
+To je dulezite hlavne pri jemnem pohybu, kde cilem neni kazdy frame zahodit celou historii.
+
+### Ray tracing frame pipeline
+
+1. Signature pass: geometry, lighting, camera.
+2. Pripadne rebuild geometry/light cache.
+3. Preview phase update (still/motion state machine).
+4. Resolve quality plan a efektivni samplesPerFrame.
+5. Tile scheduling a worker dispatch.
+6. BVH traversal + local lighting + secondary branch.
+7. Prubezna akumulace do runtime bufferu.
+8. Denoise gate (podle faze a cadence).
+9. Temporal blend / composite.
+10. Tone map + zapis do framebufferu.
+
+### Ray tracing v output pipeline
+
+V output kontroleru se pro ray tracing explicitne nastavuje:
+
+- fixed workerCount, tileSize, samplesPerStep
+- maxDepth, directLighting, shadows, reflections, sky
+- adaptiveSampling + adaptive threshold
+- denoise profile QUALITY + runtime FULL_FRAME
+
+Smycka renderu pak bezi, dokud accumulatedSamples nedosahnou targetSamples. Mezi kroky se publikuje prubezny preview snimek, po dokonceni finalize preview + shutdown rendereru.
+
+## Path tracing deep dive (PATH_TRACING)
+
+### Dve transport cesty: preview a reference
+
+Path tracer ma dva vykonove i kvalitativne odlisne behy:
+
+1. Preview mode: optimalizovany pro interaktivitu, muze omezit cast jevu podle faze.
+2. Reference mode: cilem je vernost, vypina cast preview heuristik a drzi konzervativnejsi integraci.
+
+Output controller prepina referenceMode podle render jobu a soucasne ridi historyFireflyClamp tak, aby reference render nebyl zbytecne orezan preview clampem.
+
+### Integracni jadro
+
+Path tracing je Monte Carlo estimator radiance:
 
 $$
-\mathbf{h}=\frac{\mathbf{l}+\mathbf{v}}{\|\mathbf{l}+\mathbf{v}\|},\qquad
-L_s \propto \max(0,\mathbf{n}\cdot\mathbf{h})^{shininess}
+L_o = \int_{\Omega} f_r(\omega_i, \omega_o)\,L_i(\omega_i)\,(\mathbf{n}\cdot\omega_i)\,d\omega_i
 $$
 
-Pro bodova svetla se navic nasobi vzdalenostni a uhlove zeslabeni.
-
-### Proc je takto navrzeny
-
-- Je stabilni a rychly pro editor.
-- Pouziva sdilenou evaluaci materialu, takze prechod na ray/path drzi stejny autorsky zdroj.
-- Je to preview renderer, ne fyzikalne referencni integrator.
-
-## WIREFRAME renderer
-
-### Vypocetni logika
-
-- Hrany se kresli z trojuhelniku po projekci do screen prostoru.
-- Volitelne bezi depth test (depthHiddenLines).
-- Jas hrany se moduluje vzdalenosti a siluetou.
-
-### Matematika
+Prakticka diskretni forma v implementaci:
 
 $$
-t = clamp01\left(inverseLerp(d_{near}, d_{far}, d)\right)
-$$
-
-$$
-brightness = lerp(maxBrightness,\ minBrightness,\ t)
-$$
-
-$$
-silhouette = 1-|\mathbf{n}\cdot\mathbf{v}|,
-\quad emphasis = 1 + silhouette\cdot silhouetteBoost
-$$
-
-$$
-\mathbf{c}_{edge}=\mathbf{base}\cdot brightness\cdot emphasis
-$$
-
-### Proc je takto navrzeny
-
-- Citelna topologie bez potreby plneho shadingu.
-- Silueta zvyrazni tvar i na hustych modelech.
-- Prerusovane hrany usnadni technicke debug pohledy.
-
-## DITHERING renderer (BLUE_NOISE / PATTERN / ASCII)
-
-### Vypocetni logika
-
-1. Zakladni obraz pripravi interni RasterRenderer.
-2. Pripravi se luminance a adaptivni kontrast.
-3. Podle stylu se provede kvantizace pres threshold mapu nebo ASCII matching.
-
-### Matematika
-
-Luminance:
-
-$$
-Y = 0.2126R + 0.7152G + 0.0722B
-$$
-
-Kvantizace do N tonu:
-
-$$
-q = \frac{round\left(clamp(Y+\tau,0,1)(N-1)\right)}{N-1}
-$$
-
-kde $\tau$ je threshold z blue-noise nebo Bayer mapy.
-
-ASCII rezim vybira glyph s minimalni chybou mezi blokem a bitmapou znaku:
-
-$$
-g^* = \arg\min_g \|B - G_g\|_2^2
-$$
-
-### Proc je takto navrzeny
-
-- Blue-noise/pattern davaji rychlou stylizaci bez tezke geometrie.
-- ASCII porovnava skutecny blok proti glyph bitmapam.
-- Sdileny kontrastni pipeline drzi konzistentni vzhled napric styly.
-
-## TEMPORAL_NOISE renderer
-
-### Vypocetni logika
-
-1. Z G-bufferu (objectId, faceId, depth, normal, worldPos) se vytvori regionalni motion parametry.
-2. Pro region se spocita osovy smer, rychlost a faze.
-3. Finalni obraz pouziva integer posuv stabilniho 2D zrna po bunecne mrizce.
-4. Hrany se blenduji pres edgeMask, ne pres globalni blur.
-
-### Matematika
-
-$$
-grazing = 1 - facing
-$$
-
-$$
-speed \approx
-0.45 + 1.20\left(
-0.90\,depthNearContribution\,depthNear +
-1.02\,grazingContribution\,grazing +
-0.46\,orientationContrast +
-c\,perspectiveContrast
-\right)+regionBias
-$$
-
-$$
-shift(t)=\left\lfloor t\cdot temporalTickRate\cdot speed + phase \right\rfloor
-$$
-
-$$
-signal = 0.72\,a + 0.28\,b
-$$
-
-Signal se kvantizuje do palety paletteLevels a mapuje na grayscale interval.
-
-### Proc je takto navrzeny
-
-- Je levnejsi nez ray/path, protoze re-useuje hotovy raster G-buffer.
-- Integer posuv drzi zrno stabilni bez subpixel deformaci.
-- Regionalni parametry zmensuji shimmering a rozpady na hranach.
-
-## HEX_MOSAIC renderer
-
-### Vypocetni logika
-
-1. Vezme raster base frame.
-2. Rozdeli pixely do hex bunek (axial koordinaty).
-3. V kazde bunce akumuluje barvu + hloubku.
-4. Kvantizuje luminanci, vrati barvu se stejnou energii.
-5. Prida outline/edge styl a volitelny wow mod (classic, prism, neon).
-
-### Matematika
-
-Prevod pixelu do axial souradnic:
-
-$$
-q = \frac{\frac{\sqrt{3}}{3}x - \frac{1}{3}y}{r},\qquad
-r_a = \frac{\frac{2}{3}y}{r}
-$$
-
-Luminance bunky:
-
-$$
-Y = 0.2126R + 0.7152G + 0.0722B
-$$
-
-Kvantizace:
-
-$$
-Y_q = \frac{round(clamp(Y,0,1)(L-1))}{L-1}
-$$
-
-Zachovani pomeru barev pres gain:
-
-$$
-gain = \frac{Y_q}{Y + \varepsilon},\qquad
-\mathbf{c}_{out}=clamp(\mathbf{c}_{avg}\cdot gain)
-$$
-
-Hex edge sila ma v kodu explicitni nabeh od edgeStart = 0.86.
-
-### Proc je takto navrzeny
-
-- Bunecna akumulace dava citelny styl i pri pohybu kamery.
-- Kvantizace pres luminanci drzi konzistentni kontrast.
-- Depth-aware hrany zvyrazni strukturu bez slozitych segmentacnich passu.
-
-## RAY_TRACING renderer
-
-### Vypocetni logika
-
-- BVH akcelerace pruseciku.
-- Prime svetlo pres directional/point/area/emissive/environment vetve.
-- Sekundarni paprsek pokracuje dominantni vetvi (odraz/prenos) do maxDepth.
-- Duraz na stabilni offline preview s mensi stochastickou variabilitou.
-
-### Matematika
-
-Lokalni BRDF cast pouziva Lambert + GGX + Fresnel/clearcoat/sheen:
-
-$$
-L_o = L_d + L_{ggx}\cdot F + L_{clearcoat}\cdot F_c + L_{sheen}
-$$
-
-Fresnel (Schlick):
-
-$$
-F(\cos\theta)=F_0 + (1-F_0)(1-\cos\theta)^5
-$$
-
-Akumulace sekundarni vetve:
-
-$$
-L \leftarrow L + T\odot L_{local},\qquad
-T \leftarrow T\odot w_{secondary}
-$$
-
-### Proc je takto navrzeny
-
-- Oproti path traceru je mene nahodny a rychlejsi v interaktivnim preview.
-- Drzi kvalitni interpretaci reflektivnich/transmisivnich materialu.
-- Carrier profil umozni skalovat kvalitu pri pohybu bez vypnuti klicovych jevu.
-
-## PATH_TRACING renderer
-
-### Vypocetni logika
-
-1. Monte Carlo integrace po bounce krocich do maxBounces.
-2. Vetveni mezi transmission/specular/diffuse/clearcoat podle pravdepodobnosti.
-3. Throughput se kompenzuje pres branch ratio.
-4. Prime svetlo + environment/emissive sampling.
-5. Russian roulette od vyssich bounce urovni.
-
-### Matematika
-
-Pravdepodobnosti vetvi (konceptualne):
-
-$$
-p_t = transmissionProbability,\quad
-p_s = specProbability,\quad
-p_d = 1 - p_t - p_s - p_c
-$$
-
-Throughput update:
-
-$$
-\mathbf{T}_{k+1}=\mathbf{T}_k \odot \frac{\mathbf{w}_{branch}}{p_{branch}}
-$$
-
-Primy prispevek:
-
-$$
-\mathbf{L} \leftarrow \mathbf{L} + \mathbf{T}\odot \mathbf{L}_{direct}
-$$
-
-Russian roulette (v implementaci od bounce >= 2):
-
-$$
-rr = clamp(\max(T_r,T_g,T_b),\ 0.05,\ 0.98)
+\mathbf{L} \leftarrow \mathbf{L} + \mathbf{T}\odot\mathbf{L}_{direct}
 $$
 
 $$
-\text{continue with prob. } rr,\qquad
-\mathbf{T} \leftarrow \frac{\mathbf{T}}{rr}
+\mathbf{T}_{k+1} = \mathbf{T}_k \odot \frac{\mathbf{w}_{branch}}{p_{branch}}
 $$
 
-### Proc je takto navrzeny
+Branching je rizene pravdepodobnostmi prenos/specular/diffuse/clearcoat. Kompenzace pres $1/p_{branch}$ drzi estimator unbiased.
 
-- Je to referencni mod pro vernejsi svetelnou odezvu.
-- Branch-PDF kompenzace drzi estimator bliz fyzikalne spravne integraci.
-- Russian roulette zkracuje dlouhe drahy bez systematickeho biasu.
+Russian roulette (typicky od vyssich bounce) ukoncuje dlouhe trasy:
 
-## Presnost vs. vykon: prakticke rozhodnuti
+$$
+rr = clamp(\max(T_r,T_g,T_b), 0.05, 0.98)
+$$
 
-| Rezim | Fyzikalni vernost | Casova cena | Typicky ucel |
+$$
+P(continue)=rr, \qquad \mathbf{T}\leftarrow\mathbf{T}/rr
+$$
+
+### Kamera stoji vs kamera se hybe (path tracing)
+
+Path tracer ma stejnou preview phase mechaniku, ale jina rozhodnuti uvnitr integratoru.
+
+| Stav | Co se uvnitr meni |
+| --- | --- |
+| Kamera stoji | aktivuji se still quality plany, muze rust effectiveMaxBounces, direct lighting a transmission drzi plny profil |
+| Kamera se hybe | motion tier redukuje bounce budget, muze omezit throughput a subset coverage, denoise bezi v motion cadence |
+
+Konkretni motion ridice v path traceru:
+
+- previewMotionSecondaryCadence
+- previewMotionDenoiseCadence
+- previewMotionTileSubsetCadence
+- previewMotionSamplesPerFrameLimit
+- previewMotionMaxDepth (alias maxBounces)
+- previewMotionThroughputTermination
+
+Path tracer navic drzi aktivni quality identifikatory:
+
+- activePreviewQualityTier
+- activeMotionQualityTier
+- activeStillMaxBounces
+- activeStillDirectLightingEnabled
+
+### Priame svetlo, environment, emisivni vetve
+
+Pri tracePath se pro kazdy bounce rozhoduje, ktere prispevky se pocitaji:
+
+1. directLightingActive
+2. transmissionEnabled
+3. environmentSampleCount
+4. emissiveSampleCount
+
+Volba zavisi na kombinaci:
+
+- previewMotionActive
+- referenceMode
+- aktivni still tier
+
+Tzn. pri pohybu se cast cesty zjednodusi kvuli stabilite frame time, po zastaveni kamery se pipeline vraci k plnejsimu modelu.
+
+### DOF a motion blur v path traceru
+
+Path tracer ma interni camera optiku:
+
+- cameraDofEnabled
+- cameraMotionBlurEnabled
+- cameraShutterFraction
+
+DOF/motion blur se do camera state promita pres feature weighting. Pri velmi agresivnim motion tieru muze byt efektivne potlaceno, aby se stabilizoval noise profil.
+
+### Denoise a firefly management
+
+Path tracer ma vicestupnovy denoise stack:
+
+1. Guide capture (normal/depth/albedo related signal).
+2. Runtime orchestrator (AUTO/FULL_FRAME/tile profile podle nastaveni).
+3. History firefly clamp v preview modu.
+4. Volitelny reference clamp v referencnim modu.
+
+To je hlavni duvod, proc path tracing v preview a v output reference muze mit odlisny charakter sumu i konvergence.
+
+### Path tracing frame pipeline
+
+1. Signature check + reset rozhodnuti.
+2. Preview phase update.
+3. Resolve effectiveSamplesPerFrame + effectiveMaxBounces.
+4. Build camera state (vcetne motion blur source snapshot).
+5. Tile schedule + parallel trace.
+6. tracePath (preview nebo reference transport).
+7. Accumulation + optional firefly clamp.
+8. Denoise and resolve (cadence aware).
+9. Temporal blend and final compose.
+10. Tone map + framebuffer write.
+
+### Path tracing v output pipeline
+
+Output path renderer dostava navic parametry:
+
+- referenceMode
+- historyFireflyClamp (typicky vypnuto v reference)
+- clampDirect / clampIndirect
+- referenceClamp
+
+Stejne jako ray tracing bezi smycka do targetSamples, s prubeznym publish viewport preview a final publish po dokonceni.
+
+## Presnost vs vykon
+
+| Rezim | Fyzikalni vernost | Casova cena | Poznamka |
 | --- | --- | --- | --- |
-| MODEL, BASIC | nizka | velmi nizka | navigace, blokovani sceny |
-| PHONG | stredni | nizka | bezna prace ve viewportu |
-| WIREFRAME | nerelevantni (diagnosticky) | nizka | topologie a silueta |
-| DITHERING, TEMPORAL_NOISE, HEX_MOSAIC | stylizovana, ne-fyzikalni | stredni | vytvarny look |
-| RAY_TRACING | vyssi | vysoka | kvalitni offline preview |
-| PATH_TRACING | nejvyssi v projektu | nejvyssi | finalni referencni vystup |
+| MODEL/BASIC | nizka | velmi nizka | editor orientace |
+| PHONG | stredni | nizka | hlavni realtime rezim |
+| Stylized (wireframe/dither/temporal/hex) | cilene ne-fyzikalni | nizka az stredni | look a diagnostika |
+| RAY_TRACING | vyssi | vysoka | stabilni quality preview |
+| PATH_TRACING preview | vysoka | velmi vysoka | interaktivni fyzikalni nahled |
+| PATH_TRACING reference | nejvyssi | nejvyssi | finalni export |
 
-## Shrnuti
+## Prakticky zaver
 
-- Prehled rendereru je aktualizovany na vsechny soucasne rezimy.
-- Dokument obsahuje samostatnou matematickou sekci a vzorce pro kazdy renderer.
-- U kazdeho rendereru je explicitne popsana logika i duvod navrhu.
+Nejdulezitejsi architektonicky bod je stavovy prechod mezi "kamera se hybe" a "kamera stoji".
+
+- Pri pohybu oba tracery zjednodusuji pipeline, aby udrzely odezvu.
+- Pri stabilni kamere oba tracery vraci plnejsi svetelnou logiku a vyssi quality tier.
+- Output render tento mechanismus pouziva jako deterministickou sample smycku do targetSamples, aby sel reprodukovatelne do finalu.

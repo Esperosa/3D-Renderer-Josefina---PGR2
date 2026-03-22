@@ -50,7 +50,7 @@ out[o,y,x] = bias[o] + sum_i sum_ky sum_kx weight[o,i,ky,kx] * in[i, y+ky-pad, x
 - Layout konvolučních vah: OIHW.
 - Cesta k manifestu: C:\Users\jirka\Documents\GitHub\3D-Render-Physics\runtime\denoiser-package\java_weights\weights_manifest.json
 
-## Shrnutí modelu
+## Model
 - Název: JavaCpuMiniUNet
 - Počet parametrů: 340595
 - Odhad receptive field: {'rf_h': 69, 'rf_w': 69}

@@ -6,8 +6,6 @@
 
 Autor: **Jiří Pelikán**
 
-![Project snapshot](docs/readme-assets/project-snapshot.svg)
-
 > **Přesnost README**
 > Build a test postup nahoře odpovídá aktuálním skriptům v repu. Rychle ověřitelné počty v části statistik průběžně odpovídají aktuální codebase; výkonové tabulky níže jsou reprodukovatelný `full` snapshot z `tests/run-project-metrics.*` a po větších renderer změnách je vhodné je přegenerovat.
 
@@ -21,10 +19,9 @@ Autor: **Jiří Pelikán**
 | Data a benchmarky | Chci čísla a reprodukovatelná měření | [Tvrdá data a ověřené statistiky](#tvrdá-data-a-ověřené-statistiky) |
 | Limity a reference | Chci ovládání, strukturu repa a limity | [Ovládání a zkratky](#ovládání-a-zkratky) · [Struktura repozitáře](#struktura-repozitáře) · [Omezení a skutečný stav projektu](#omezení-a-skutečný-stav-projektu) · [Další technická dokumentace](#další-technická-dokumentace) |
 
-README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na desktopu i na telefonu. Dlouhé benchmarky a hlubší technické rozbory jsou schované do rozbalovacích sekcí, takže se v něm lépe hledá i na menším displeji.
+README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na desktopu i na telefonu. Technické bloky jsou na stránce rozepsané přímo, aby nebylo nutné nic rozbalovat ani odcházet do files zobrazení.
 
-<details>
-<summary>Seznam všech sekcí</summary>
+### Seznam všech sekcí
 
 - [Rychlý přehled](#rychlý-přehled)
 - [Rychlý start](#rychlý-start)
@@ -45,8 +42,6 @@ README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na deskto
 - [Omezení a skutečný stav projektu](#omezení-a-skutečný-stav-projektu)
 - [Další technická dokumentace](#další-technická-dokumentace)
 
-</details>
-
 ## Projekt v kostce
 
 | Oblast | Co to znamená v praxi |
@@ -56,17 +51,6 @@ README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na deskto
 | Největší síla | Jedna codebase propojuje editor, více rendererů, materiálový graph a export workflow |
 | Co není cílem | Produkční DCC náhrada ani filmový render engine |
 | Aktuální stav | Stabilní editor + raster/ray/path základ, experimentální vrstvy u stylizací a simulací |
-
-<table>
-  <tr>
-    <td><strong>Karta: Renderery</strong><br/>Raster pro rychlý viewport, Ray/Path pro kvalitnější offline výstup.</td>
-    <td><strong>Karta: Materiály</strong><br/>Node graph je zdroj pravdy, kompatibilně propojený s renderery.</td>
-  </tr>
-  <tr>
-    <td><strong>Karta: Workflow</strong><br/>Editor, timeline, output panel a session export v jednom prostředí.</td>
-    <td><strong>Karta: Limity</strong><br/>CPU-only projekt, část simulací a stylizací je výzkumná vrstva.</td>
-  </tr>
-</table>
 
 ## Rychlý start
 
@@ -117,10 +101,7 @@ Krátká orientace:
 
 - Pokud tě zajímá jen stav projektu, stačí [Rychlý přehled](#rychlý-přehled) a [Co program aktuálně umí](#co-program-aktuálně-umí)
 - Pokud tě zajímá výkon, benchmarky níže jsou reprodukovatelné a navázané na skripty v `tests/`
-- Pokud čteš README na telefonu, následující blok je záměrně sbalený
-
-<details>
-<summary>Rozbalit benchmarky, metodiku, grafy a export statistiky</summary>
+- Pokud čteš README na telefonu, benchmarky níže jsou seřazené od stručných tabulek po detailní grafy
 
 ### Statistika codebase
 
@@ -349,8 +330,6 @@ Tato tabulka měří čistě zápis formátu nad připravenými snímky. Nejde t
 
 > Benchmark tabulka je určená jako reprodukovatelný referenční údaj pro tento repozitář, ne jako absolutní srovnání s jinými enginy. Smysl tabulek je ukázat relativní náklad rendererů v rámci stejné codebase, stejného runneru a transparentně popsaných workloadů.
 
-</details>
-
 ## Co program aktuálně umí
 
 - Blender-like rozložení editoru: toolbar nahoře, viewport uprostřed, properties vpravo, spodní workspace dock.
@@ -472,9 +451,6 @@ flowchart LR
 ## Matematické jádro
 
 Tato sekce shrnuje hlavní matematické vztahy, které program skutečně používá nebo které přímo odpovídají aktuální implementaci.
-
-<details>
-<summary>Rozbalit matematický rozbor transformací, ray/path traceru a preview modelu</summary>
 
 ### 1. Transformace vrcholů
 
@@ -699,8 +675,6 @@ $$
 
 Tangenciální složky se tlumí přes `surfaceDamping`.
 
-</details>
-
 ## Materiálový systém
 
 ### Source of truth
@@ -740,7 +714,7 @@ Materiálový workspace obsahuje:
 - lookdev preview,
 - node canvas,
 - node inspector,
-- shrnutí podpory rendererů.
+- prehled podpory rendereru.
 
 Preview podporuje:
 
@@ -792,9 +766,6 @@ flowchart LR
 - objekty posouvají stabilní grain po integer mřížce,
 - grain se nikdy nedeformuje subpixelovou interpolací,
 - zrno lze přepnout mezi `1x1`, `2x2`, `4x4`.
-
-<details>
-<summary>Rozbalit detailní rozbor pipeline, vzorců a debug view</summary>
 
 ### Přesná pipeline
 
@@ -1031,8 +1002,6 @@ Tyto pohledy pomáhají kontrolovat:
 - regionální fázi,
 - depth metriku,
 - stabilitu grainu.
-
-</details>
 
 ## Simulace a experimentální subsystémy
 
@@ -1409,14 +1378,16 @@ build/           lokální build artefakty
 
 ## Další technická dokumentace
 
-| Dokumentační karta | Obsah | Otevřít |
-| --- | --- | --- |
-| Architektura | Modulární členění a odpovědnosti balíků | [docs/architecture.md](docs/architecture.md) |
-| Rendering | Přehled rendererů, rozdíly a limity | [docs/rendering.md](docs/rendering.md) |
-| Materiálový systém | Graph workflow, evaluace a praktická omezení | [docs/materials.md](docs/materials.md) |
-| Output workflow | Export typy, metadata a session struktura | [docs/output.md](docs/output.md) |
-| Rozšířené roadmap poznámky | Materiály, water částice a galaxy scaffold | [docs/materials-water-galaxy-roadmap.md](docs/materials-water-galaxy-roadmap.md) |
-| Java CPU inference specifikace | Implementační pravidla pro offline denoiser inferenci | [docs/offline-cnn-java-cpu-inference-spec.md](docs/offline-cnn-java-cpu-inference-spec.md) |
+Tato README verze drží důležité technické informace přímo na hlavní stránce repozitáře, aby nebylo nutné přecházet do files zobrazení.
+
+| Dokumentační oblast | Co je zahrnuto zde |
+| --- | --- |
+| Architektura | modulární členění, odpovědnosti balíků, runtime workflow |
+| Rendering | přehled režimů, pipeline, matematické jádro, výkonové charakteristiky |
+| Materiály | graph workflow, evaluace uzlů, mapování textur a closure |
+| Output | export režimy, metadata, session struktura a benchmark exportu |
+| Roadmap témata | materiály, water částice, galaxy scaffold |
+| Java CPU denoiser | inference pravidla, tensor layout, tiled postup |
 
 ---
 
