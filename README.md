@@ -20,19 +20,7 @@ Autor: **Jiří Pelikán**
 > [!IMPORTANT]
 > README je navržené jako hlavní čtecí plocha repozitáře: klíčová technická fakta jsou on-page bez nutnosti otevírat další soubory.
 
-## GitHub README feature vrstva
-
-| GitHub feature | K čemu slouží | Jak je použita zde |
-| --- | --- | --- |
-| Badges (Shields) | okamžitá orientace | Java, platformy, počet režimů, testy |
-| Alert blocks | zvýraznění kritických informací | NOTE, TIP, IMPORTANT bloky nahoře |
-| Anchor navigace | rychlý pohyb po dokumentu | skokové odkazy na sekce |
-| Tabulky | kompaktní data | capability matrixe, benchmark přehledy |
-| Mermaid diagramy | pipeline a workflow mapy | render a temporal noise diagramy |
-| Math (KaTeX) | přesná formulace modelů | transformace, tracing, BRDF části |
-| Code blocks | copy-paste workflow | build, test a benchmark příkazy |
-| Task checklist | roadmap orientace | stav funkčních vrstev projektu |
-| Footnotes | čistší text + zdrojové poznámky | metodika benchmarku a scope tvrzení |
+![3D Render Physics banner](docs/readme-assets/still.png)
 
 ### Rychlé skoky
 
@@ -40,18 +28,6 @@ Autor: **Jiří Pelikán**
 | --- | --- | --- | --- |
 | [Rychlý start](#rychlý-start) | [Renderery a stylizované režimy](#renderery-a-stylizované-režimy) | [Tvrdá data a ověřené statistiky](#tvrdá-data-a-ověřené-statistiky) | [UI a workflow editoru](#ui-a-workflow-editoru) |
 | [Projekt v kostce](#projekt-v-kostce) | [Materiálový systém](#materiálový-systém) | [Výstup a export](#výstup-a-export) | [Ovládání a zkratky](#ovládání-a-zkratky) |
-
-## Jak číst README
-
-| Karta | Pro koho | Otevřít |
-| --- | --- | --- |
-| Spuštění projektu | Chci rychlý build, run a testy | [Rychlý start](#rychlý-start) · [Build, spuštění a testy](#build-spuštění-a-testy) |
-| Produktový přehled | Chci během minuty vědět, co projekt umí | [Rychlý přehled](#rychlý-přehled) · [Co program aktuálně umí](#co-program-aktuálně-umí) · [UI a workflow editoru](#ui-a-workflow-editoru) |
-| Technický rozbor | Chci architekturu, renderery a materiály | [Architektura programu](#architektura-programu) · [Renderery a stylizované režimy](#renderery-a-stylizované-režimy) · [Materiálový systém](#materiálový-systém) · [Temporal Noise](#temporal-noise) |
-| Data a benchmarky | Chci čísla a reprodukovatelná měření | [Tvrdá data a ověřené statistiky](#tvrdá-data-a-ověřené-statistiky) |
-| Limity a reference | Chci ovládání, strukturu repa a limity | [Ovládání a zkratky](#ovládání-a-zkratky) · [Struktura repozitáře](#struktura-repozitáře) · [Omezení a skutečný stav projektu](#omezení-a-skutečný-stav-projektu) · [Další technická dokumentace](#další-technická-dokumentace) |
-
-README je rozdělené tak, aby nahoře fungovalo jako rychlý přehled na desktopu i na telefonu. Technické bloky jsou na stránce rozepsané přímo, aby nebylo nutné nic rozbalovat ani odcházet do files zobrazení.
 
 ### Seznam všech sekcí
 
