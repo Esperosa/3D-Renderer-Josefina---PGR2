@@ -20,7 +20,38 @@ Autor: **Jiří Pelikán**
 > [!IMPORTANT]
 > README je navržené jako hlavní čtecí plocha repozitáře: klíčová technická fakta jsou on-page bez nutnosti otevírat další soubory.
 
-![3D Render Physics banner](docs/readme-assets/still.png)
+## Vizuální ukázky
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme-assets/still.png" alt="Materiálový lookdev" width="100%">
+      <br>
+      <strong>Materiálový lookdev</strong><br>
+      Referenční studie čtyř materiálových odpovědí na jednotném studio setupu.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme-assets/showcase-model.gif" alt="Model render" width="100%">
+      <br>
+      <strong>Model render</strong><br>
+      Rychlý stylizovaný průlet scénou pro tvar, siluetu a timing.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme-assets/showcase-raytrace.gif" alt="Ray tracing render" width="100%">
+      <br>
+      <strong>Ray tracing</strong><br>
+      Offline sekvence s odrazy, stíny a čitelnou materiálovou separací.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme-assets/showcase-pathtrace.gif" alt="Path tracing render" width="100%">
+      <br>
+      <strong>Path tracing</strong><br>
+      Referenční výstup pro finální lookdev, měkké světlo a globální iluminaci.
+    </td>
+  </tr>
+</table>
 
 ### Rychlé skoky
 
@@ -31,6 +62,7 @@ Autor: **Jiří Pelikán**
 
 ### Seznam všech sekcí
 
+- [Vizuální ukázky](#vizuální-ukázky)
 - [Rychlý přehled](#rychlý-přehled)
 - [Rychlý start](#rychlý-start)
 - [Tvrdá data a ověřené statistiky](#tvrdá-data-a-ověřené-statistiky)
