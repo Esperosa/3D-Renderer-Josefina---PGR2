@@ -1551,18 +1551,35 @@ public class PathTracerRenderer implements Renderer {
                         }
                         sheenTerm = sheenLobeTerm(vDotH, ctx.surface.sheenRoughness);
                     }
-                        ctx.lightR += light.r * nDotL * (baseR * diffuseProbability * INV_PI
+                    specularTerm = finiteOrZero(specularTerm);
+                    clearcoatTerm = finiteOrZero(clearcoatTerm);
+                    fresnelR = clamp01(finiteOrZero(fresnelR));
+                    fresnelG = clamp01(finiteOrZero(fresnelG));
+                    fresnelB = clamp01(finiteOrZero(fresnelB));
+                    clearcoatFresnel = clamp01(finiteOrZero(clearcoatFresnel));
+                    sheenTerm = finiteOrZero(sheenTerm);
+
+                    double directR = light.r * nDotL * (baseR * diffuseProbability * INV_PI
                             + specularTerm * fresnelR * specLightingWeight
                             + clearcoatTerm * clearcoatFresnel * clearcoatProbability
                             + ctx.surface.sheenR * INV_PI * sheenTerm);
-                        ctx.lightG += light.g * nDotL * (baseG * diffuseProbability * INV_PI
+                    double directG = light.g * nDotL * (baseG * diffuseProbability * INV_PI
                             + specularTerm * fresnelG * specLightingWeight
                             + clearcoatTerm * clearcoatFresnel * clearcoatProbability
                             + ctx.surface.sheenG * INV_PI * sheenTerm);
-                        ctx.lightB += light.b * nDotL * (baseB * diffuseProbability * INV_PI
+                    double directB = light.b * nDotL * (baseB * diffuseProbability * INV_PI
                             + specularTerm * fresnelB * specLightingWeight
                             + clearcoatTerm * clearcoatFresnel * clearcoatProbability
                             + ctx.surface.sheenB * INV_PI * sheenTerm);
+                    if (Double.isFinite(directR)) {
+                        ctx.lightR += directR;
+                    }
+                    if (Double.isFinite(directG)) {
+                        ctx.lightG += directG;
+                    }
+                    if (Double.isFinite(directB)) {
+                        ctx.lightB += directB;
+                    }
                     if (metrics != null) {
                         directionalLightNanos += System.nanoTime() - lightStart;
                     }
@@ -3728,12 +3745,13 @@ public class PathTracerRenderer implements Renderer {
         }
         double d = ggxDistribution(nDotH, alphaSq);
         double g = ggxSmithG(nDotV, nDotL, roughness);
-        return d * g / Math.max(1e-8, 4.0 * nDotV * nDotL);
+        double value = d * g / Math.max(1e-8, 4.0 * nDotV * nDotL);
+        return finiteOrZero(value);
     }
 
     private static double ggxDistribution(double nDotH, double alphaSq) {
         double denom = nDotH * nDotH * (alphaSq - 1.0) + 1.0;
-        return alphaSq / Math.max(1e-8, Math.PI * denom * denom);
+        return finiteOrZero(alphaSq / Math.max(1e-8, Math.PI * denom * denom));
     }
 
     private static double ggxSmithG(double nDotV, double nDotL, double roughness) {
@@ -3741,7 +3759,7 @@ public class PathTracerRenderer implements Renderer {
         k = (k * k) / 8.0;
         double gv = nDotV / Math.max(1e-8, nDotV * (1.0 - k) + k);
         double gl = nDotL / Math.max(1e-8, nDotL * (1.0 - k) + k);
-        return gv * gl;
+        return finiteOrZero(gv * gl);
     }
 
     private static double roughnessToAlpha(double roughness) {
@@ -4645,7 +4663,14 @@ public class PathTracerRenderer implements Renderer {
     }
 
     static double clamp01(double value) {
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
         return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static double finiteOrZero(double value) {
+        return Double.isFinite(value) ? value : 0.0;
     }
 
     boolean isPreviewStillFullTierActive() {
@@ -4734,6 +4759,22 @@ public class PathTracerRenderer implements Renderer {
         return a + (b - a) * clamp01(t);
     }
 
+    private int pushNode(TraceContext ctx, int sp, PathTracerBVHNode node) {
+        if (node == null) {
+            return sp;
+        }
+        if (sp >= ctx.nodeStack.length) {
+            int current = ctx.nodeStack.length;
+            int grown = current < 1024 ? 1024 : current + (current >> 1);
+            if (grown <= current) {
+                grown = current + 1;
+            }
+            ctx.nodeStack = Arrays.copyOf(ctx.nodeStack, grown);
+        }
+        ctx.nodeStack[sp] = node;
+        return sp + 1;
+    }
+
     boolean intersectClosest(double ox, double oy, double oz,
                                      double dx, double dy, double dz,
                                      double tMin, double tMax,
@@ -4747,7 +4788,7 @@ public class PathTracerRenderer implements Renderer {
         double invDz = Math.abs(dz) < 1e-14 ? Double.POSITIVE_INFINITY : 1.0 / dz;
 
         int sp = 0;
-        ctx.nodeStack[sp++] = bvhRoot;
+        sp = pushNode(ctx, sp, bvhRoot);
         boolean hitAnything = false;
         double closest = tMax;
 
@@ -4776,17 +4817,17 @@ public class PathTracerRenderer implements Renderer {
 
             if (tLeft < tRight) {
                 if (tRight < INF_T) {
-                    ctx.nodeStack[sp++] = right;
+                    sp = pushNode(ctx, sp, right);
                 }
                 if (tLeft < INF_T) {
-                    ctx.nodeStack[sp++] = left;
+                    sp = pushNode(ctx, sp, left);
                 }
             } else {
                 if (tLeft < INF_T) {
-                    ctx.nodeStack[sp++] = left;
+                    sp = pushNode(ctx, sp, left);
                 }
                 if (tRight < INF_T) {
-                    ctx.nodeStack[sp++] = right;
+                    sp = pushNode(ctx, sp, right);
                 }
             }
         }
@@ -4807,7 +4848,7 @@ public class PathTracerRenderer implements Renderer {
         double invDz = Math.abs(dz) < 1e-14 ? Double.POSITIVE_INFINITY : 1.0 / dz;
 
         int sp = 0;
-        ctx.nodeStack[sp++] = bvhRoot;
+        sp = pushNode(ctx, sp, bvhRoot);
 
         while (sp > 0) {
             PathTracerBVHNode node = ctx.nodeStack[--sp];
@@ -4825,10 +4866,10 @@ public class PathTracerRenderer implements Renderer {
                 continue;
             }
             if (node.left != null) {
-                ctx.nodeStack[sp++] = node.left;
+                sp = pushNode(ctx, sp, node.left);
             }
             if (node.right != null) {
-                ctx.nodeStack[sp++] = node.right;
+                sp = pushNode(ctx, sp, node.right);
             }
         }
         return false;
@@ -6068,6 +6109,35 @@ public class PathTracerRenderer implements Renderer {
         return scale;
     }
 
+    private boolean shouldApplyPreviewTemporalHistory() {
+        if (!temporalHistoryValid || accumulatedSamples <= 0L) {
+            return false;
+        }
+        if (!previewQualityLadderEnabled || referenceMode) {
+            return true;
+        }
+        if (previewMotionActive) {
+            return false;
+        }
+        if (previewPhase == PreviewPhase.MOTION_EXIT_RESYNC || previewPhase == PreviewPhase.STILL_WARMUP) {
+            return false;
+        }
+        return accumulatedSamples >= 2L;
+    }
+
+    private boolean shouldUpdatePreviewTemporalHistory() {
+        if (accumulatedSamples <= 0L) {
+            return false;
+        }
+        if (!previewQualityLadderEnabled || referenceMode) {
+            return true;
+        }
+        if (previewMotionActive) {
+            return false;
+        }
+        return previewPhase == PreviewPhase.STILL_STEADY;
+    }
+
     private void sampleEnvironment(double dx, double dy, double dz, TraceContext ctx) {
         if (!hasVisibleEnvironment()) {
             ctx.envR = 0.0;
@@ -6079,13 +6149,13 @@ public class PathTracerRenderer implements Renderer {
         if (environmentMap == null) {
             addEnvironmentSunGlow(dx, dy, dz, ctx);
         }
-        ctx.envR = Math.max(0.0, ctx.envR);
-        ctx.envG = Math.max(0.0, ctx.envG);
-        ctx.envB = Math.max(0.0, ctx.envB);
+        ctx.envR = Math.max(0.0, finiteOrZero(ctx.envR));
+        ctx.envG = Math.max(0.0, finiteOrZero(ctx.envG));
+        ctx.envB = Math.max(0.0, finiteOrZero(ctx.envB));
     }
 
     private void sampleEnvironmentBackground(double dx, double dy, double dz, TraceContext ctx) {
-        double envScale = effectiveEnvironmentScale();
+        double envScale = Math.max(0.0, finiteOrZero(effectiveEnvironmentScale()));
         if (environmentMap != null) {
             EnvironmentMap.Sample sample = ctx.environmentSample;
             sample.r = 0.0;
@@ -6093,9 +6163,9 @@ public class PathTracerRenderer implements Renderer {
             sample.b = 0.0;
             rotateToEnvironment(dx, dy, dz, ctx);
             environmentMap.sample(ctx.environmentDirX, ctx.environmentDirY, ctx.environmentDirZ, sample);
-            ctx.envR = sample.r * envScale;
-            ctx.envG = sample.g * envScale;
-            ctx.envB = sample.b * envScale;
+            ctx.envR = finiteOrZero(sample.r) * envScale;
+            ctx.envG = finiteOrZero(sample.g) * envScale;
+            ctx.envB = finiteOrZero(sample.b) * envScale;
             return;
         }
 
@@ -6766,7 +6836,7 @@ public class PathTracerRenderer implements Renderer {
             return;
         }
 
-        if (temporalHistoryValid && accumulatedSamples > 0L) {
+        if (shouldApplyPreviewTemporalHistory()) {
             long temporalStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.TEMPORAL);
             TemporalReprojectionDenoiser.apply(
                     count,
@@ -6826,7 +6896,11 @@ public class PathTracerRenderer implements Renderer {
         if (!lowConfidenceReason.isEmpty()) {
             denoiserTelemetry.onLowConfidence(lowConfidenceReason, invalidGuideRatio, effectiveSpp);
         }
-        updateTemporalHistory(count, temporalMask);
+        if (shouldUpdatePreviewTemporalHistory()) {
+            updateTemporalHistory(count, temporalMask);
+        } else {
+            invalidateTemporalHistory();
+        }
         denoiserTelemetry.onDenoiseLatency(latencyMs, energyRatio, invalidGuideRatio, effectiveSpp);
     }
 
@@ -6847,7 +6921,7 @@ public class PathTracerRenderer implements Renderer {
             denoiseNoise[i] = DenoiseSupport.relativeNoise(accumLuma[i], accumLumaSq[i], resolvedSamples);
         }
 
-        if (temporalHistoryValid && accumulatedSamples > 0L) {
+        if (shouldApplyPreviewTemporalHistory()) {
             long temporalStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.TEMPORAL);
             TemporalReprojectionDenoiser.apply(
                     count,
@@ -6879,7 +6953,11 @@ public class PathTracerRenderer implements Renderer {
             );
         }
         RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.CARRIER_RESOLVE, resolveStage);
-        updateTemporalHistory(count, temporalMask);
+        if (shouldUpdatePreviewTemporalHistory()) {
+            updateTemporalHistory(count, temporalMask);
+        } else {
+            invalidateTemporalHistory();
+        }
     }
 
     private void buildSmartSectionMaps(int count,
@@ -7507,7 +7585,7 @@ public class PathTracerRenderer implements Renderer {
     }
 
     static final class TraceContext {
-        final PathTracerBVHNode[] nodeStack = new PathTracerBVHNode[1024];
+        PathTracerBVHNode[] nodeStack = new PathTracerBVHNode[1024];
         final Hit hit = new Hit();
         final Hit tempHit = new Hit();
         final SurfaceState surface = new SurfaceState();

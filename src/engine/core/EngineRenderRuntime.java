@@ -27,6 +27,11 @@ final class EngineRenderRuntime {
     private static final int[] DYNAMIC_RESOLUTION_RECOVER_SAMPLE_GATE = {0, 120, 96, 72, 48, 24, 16, 10};
     private static final double[] DYNAMIC_RESOLUTION_DOWNSHIFT_OVERLOAD = {1.03, 1.08, 1.14, 1.22, 1.32, 1.50, 1.72, 99.0};
     private static final double[] DYNAMIC_RESOLUTION_UPSHIFT_OVERLOAD = {0.0, 1.08, 1.18, 1.35, 1.55, 1.75, 1.95, 2.10};
+    private static final int HEAVY_IDLE_WARMUP_SAMPLE_GATE = 12;
+    private static final int HEAVY_IDLE_DEEP_STARVATION_SAMPLE_GATE = 6;
+    private static final double HEAVY_IDLE_WARMUP_OVERLOAD_MARGIN = 0.10;
+    private static final double HEAVY_LARGE_VIEWPORT_MP = 2.5;
+    private static final double HEAVY_HUGE_VIEWPORT_MP = 3.0;
     private static final double[] DYNAMIC_MOVING_BASE_SHADING_SCALE = {1.00, 0.90, 0.80, 0.68, 0.56, 0.46, 0.36, 0.28};
     private static final double[] DYNAMIC_MOVING_POLISH_SCALE = {0.70, 0.52, 0.40, 0.30, 0.22, 0.16, 0.12, 0.08};
     private static final int[] DYNAMIC_MOVING_SECONDARY_CADENCE = {1, 3, 4, 5, 6, 7, 8, 8};
@@ -264,7 +269,7 @@ final class EngineRenderRuntime {
 
         double aspect = (double) engine.baseWidth / (double) engine.baseHeight;
         engine.perspectiveCamera.setAspectRatio(aspect);
-        engine.orthographicCamera.setExtents(-6.0 * aspect, 6.0 * aspect, -6.0, 6.0);
+        engine.orthographicCamera.setHalfHeightWithAspect(engine.orthographicCamera.getHalfHeight(), aspect);
 
         applyRenderScale(engine, false);
         EngineToolbarController.applyResponsiveToolbarLayout(engine);
@@ -411,7 +416,10 @@ final class EngineRenderRuntime {
             engine.lastViewportInteractionNanos = now;
         }
         updateViewportMotionHysteresis(engine, now);
-        if (activeMode == RenderMode.PATH_TRACING && engine.pathAccumulationLock && !interactionActive) {
+        if (activeMode == RenderMode.PATH_TRACING
+                && engine.pathAccumulationLock
+                && !interactionActive
+                && !shouldKeepPathLockAdaptiveRescue(engine)) {
             engine.viewportAdaptiveScaleCurrent = 1.0;
             engine.viewportAdaptiveScaleApplied = 1.0;
             engine.viewportScalePressureSeconds = 0.0;
@@ -1260,6 +1268,7 @@ final class EngineRenderRuntime {
         long sinceLastSwitchNs = now - engine.viewportDynamicResolutionLastSwitchNanos;
         boolean canDownshift = sinceLastSwitchNs >= DYNAMIC_RESOLUTION_DOWNSHIFT_DWELL_NS;
         boolean canUpshift = sinceLastSwitchNs >= DYNAMIC_RESOLUTION_UPSHIFT_DWELL_NS;
+        boolean aggressiveIdleWarmupRescue = false;
 
         boolean heavyOverload = overloadRatio >= 1.35
             || engine.viewportFrameDropStreak >= 2
@@ -1311,19 +1320,45 @@ final class EngineRenderRuntime {
         } else {
             engine.viewportDynamicResolutionDownshiftArmFrames = 0;
             String qualityTier = previewQualityTier(engine, activeMode);
+            int samples = previewAccumulatedSamples(engine, activeMode);
             boolean qualityStable = qualityTier.startsWith("STILL") || qualityTier.contains("REFERENCE");
+            boolean warmupStarved = isHeavyIdleWarmupStarved(activeMode, qualityTier, samples);
             double upshiftOverloadThreshold = DYNAMIC_RESOLUTION_UPSHIFT_OVERLOAD[tier];
-                double recoveryFrameMs = clamp(
-                    resolveDynamicResolutionDecisionMs(
-                            engine,
-                            Math.max(engine.viewportFastFrameMs, engine.viewportSmoothedFrameMs)),
-                    targetMs * 0.40,
-                    targetMs * 3.0);
-                double recoveryOverloadRatio = recoveryFrameMs / Math.max(1e-6, targetMs);
-                boolean overloadOk = recoveryOverloadRatio <= upshiftOverloadThreshold;
-                boolean frameDropOk = true;
-                boolean criticalPressureOk = true;
-                boolean scalePressureOk = true;
+            double recoveryFrameMs = clamp(
+                resolveDynamicResolutionDecisionMs(
+                        engine,
+                        Math.max(engine.viewportFastFrameMs, engine.viewportSmoothedFrameMs)),
+                targetMs * 0.40,
+                targetMs * 3.0);
+            double recoveryOverloadRatio = recoveryFrameMs / Math.max(1e-6, targetMs);
+            boolean overloadOk = recoveryOverloadRatio <= upshiftOverloadThreshold;
+            boolean frameDropOk = true;
+            boolean criticalPressureOk = true;
+            boolean scalePressureOk = true;
+
+            if (canDownshift && tier < DYNAMIC_RESOLUTION_MAX_INDEX && warmupStarved) {
+                double warmupDownshiftThreshold = Math.max(
+                        1.01,
+                        DYNAMIC_RESOLUTION_DOWNSHIFT_OVERLOAD[tier] - HEAVY_IDLE_WARMUP_OVERLOAD_MARGIN);
+                boolean overloadedWarmup = overloadRatio >= warmupDownshiftThreshold
+                        || recoveryOverloadRatio >= warmupDownshiftThreshold
+                        || heavyOverload
+                        || engine.viewportFrameDropStreak >= 1
+                        || engine.viewportCriticalPressureSeconds >= 0.45
+                        || engine.renderModeSwitchTransitionActive
+                        || engine.safetyRecoveryActive;
+                if (overloadedWarmup) {
+                    int dropStep = (heavyOverload
+                            || samples < HEAVY_IDLE_DEEP_STARVATION_SAMPLE_GATE
+                            || engine.safetyRecoveryActive) ? 2 : 1;
+                    int warmupFloorTier = resolveHeavyIdleWarmupFloorTier(engine, activeMode, samples);
+                    int candidate = Math.max(tier + dropStep, warmupFloorTier);
+                    tier = Math.min(DYNAMIC_RESOLUTION_MAX_INDEX, candidate);
+                    engine.viewportDynamicResolutionRecoverStableFrames = 0;
+                    engine.viewportDynamicResolutionRecoverSampleGateFrames = 0;
+                    aggressiveIdleWarmupRescue = true;
+                }
+            }
             boolean stableForRecovery = overloadOk
                     && frameDropOk
                     && criticalPressureOk
@@ -1360,7 +1395,6 @@ final class EngineRenderRuntime {
                 engine.viewportDynamicResolutionRecoverSampleGateFrames = 0;
             }
 
-            int samples = previewAccumulatedSamples(engine, activeMode);
             int sampleGate = DYNAMIC_RESOLUTION_RECOVER_SAMPLE_GATE[tier];
             if (tier > 0) {
                 engine.viewportUpshiftLastSampleCount = samples;
@@ -1421,12 +1455,17 @@ final class EngineRenderRuntime {
             : resolvePreviewOutputResolutionScale(engine.viewportDynamicResolutionTierIndex);
         double downBlend = 0.24;
         double upBlend = 0.14;
-        double blend = targetPreviewScale < engine.viewportAdaptiveScaleCurrent ? downBlend : upBlend;
-        engine.viewportAdaptiveScaleCurrent = approach(engine.viewportAdaptiveScaleCurrent, targetPreviewScale, blend);
-        engine.viewportAdaptiveScaleApplied = quantizeScale(engine.viewportAdaptiveScaleCurrent, HEAVY_SCALE_STEP);
-        if (Math.abs(engine.viewportAdaptiveScaleApplied - targetPreviewScale) <= HEAVY_SCALE_STEP * 0.6) {
+        if (aggressiveIdleWarmupRescue && targetPreviewScale < engine.viewportAdaptiveScaleCurrent) {
             engine.viewportAdaptiveScaleCurrent = targetPreviewScale;
             engine.viewportAdaptiveScaleApplied = targetPreviewScale;
+        } else {
+            double blend = targetPreviewScale < engine.viewportAdaptiveScaleCurrent ? downBlend : upBlend;
+            engine.viewportAdaptiveScaleCurrent = approach(engine.viewportAdaptiveScaleCurrent, targetPreviewScale, blend);
+            engine.viewportAdaptiveScaleApplied = quantizeScale(engine.viewportAdaptiveScaleCurrent, HEAVY_SCALE_STEP);
+            if (Math.abs(engine.viewportAdaptiveScaleApplied - targetPreviewScale) <= HEAVY_SCALE_STEP * 0.6) {
+                engine.viewportAdaptiveScaleCurrent = targetPreviewScale;
+                engine.viewportAdaptiveScaleApplied = targetPreviewScale;
+            }
         }
         RuntimeInstrumentation.addCounter(resolveTierFrameCounter(engine.viewportDynamicResolutionTierIndex), 1L);
 
@@ -1603,6 +1642,88 @@ final class EngineRenderRuntime {
             return (int) Math.max(0L, Math.min(Integer.MAX_VALUE, engine.pathTracerRenderer.getAccumulatedSamples()));
         }
         return 0;
+    }
+
+    private static boolean isHeavyIdleWarmupStarved(RenderMode activeMode, String qualityTier, int samples) {
+        if (!isHeavyViewportMode(activeMode)) {
+            return false;
+        }
+        if (samples < HEAVY_IDLE_WARMUP_SAMPLE_GATE) {
+            return true;
+        }
+        if (qualityTier == null || qualityTier.isBlank()) {
+            return true;
+        }
+        return qualityTier.contains("STILL_T0")
+                || qualityTier.contains("STILL_T1")
+                || qualityTier.contains("STILL_T2")
+                || qualityTier.endsWith("_BASE")
+                || qualityTier.endsWith("_REFLECTIONS")
+                || qualityTier.endsWith("_TRANSMISSION");
+    }
+
+    private static int resolveHeavyIdleWarmupFloorTier(Engine engine, RenderMode activeMode, int samples) {
+        double viewportMegaPixels = currentViewportMegaPixels(engine);
+        if (viewportMegaPixels >= HEAVY_HUGE_VIEWPORT_MP) {
+            if (activeMode == RenderMode.PATH_TRACING) {
+                return samples < HEAVY_IDLE_DEEP_STARVATION_SAMPLE_GATE ? 6 : 5;
+            }
+            if (activeMode == RenderMode.RAY_TRACING) {
+                return samples < HEAVY_IDLE_DEEP_STARVATION_SAMPLE_GATE ? 5 : 4;
+            }
+        }
+        if (viewportMegaPixels >= HEAVY_LARGE_VIEWPORT_MP) {
+            if (activeMode == RenderMode.PATH_TRACING) {
+                return 5;
+            }
+            if (activeMode == RenderMode.RAY_TRACING) {
+                return 4;
+            }
+        }
+        if (viewportMegaPixels >= 1.8) {
+            if (activeMode == RenderMode.PATH_TRACING) {
+                return 4;
+            }
+            if (activeMode == RenderMode.RAY_TRACING) {
+                return 3;
+            }
+        }
+        return 0;
+    }
+
+    private static double currentViewportMegaPixels(Engine engine) {
+        if (engine == null || engine.frameBuffer == null) {
+            return 0.0;
+        }
+        int width = Math.max(0, engine.frameBuffer.getWidth());
+        int height = Math.max(0, engine.frameBuffer.getHeight());
+        if (width <= 0 || height <= 0) {
+            return 0.0;
+        }
+        return ((long) width * (long) height) / 1_000_000.0;
+    }
+
+    private static boolean shouldKeepPathLockAdaptiveRescue(Engine engine) {
+        if (engine == null) {
+            return false;
+        }
+        if (currentViewportMegaPixels(engine) >= HEAVY_LARGE_VIEWPORT_MP) {
+            return true;
+        }
+        if (engine.viewportAdaptiveScaleApplied < 0.995
+                || engine.viewportFrameDropStreak > 0
+                || engine.viewportScalePressureSeconds >= 0.18
+                || engine.viewportCriticalPressureSeconds >= 0.12
+                || engine.viewportFallbackLockActive
+                || engine.viewportCriticalPreviewActive
+                || engine.renderModeSwitchTransitionActive
+                || engine.safetyRecoveryActive) {
+            return true;
+        }
+        double predictedMs = Math.max(
+                engine.viewportHeavyPredictedFrameMs,
+                Math.max(engine.viewportFastFrameMs, engine.viewportSmoothedFrameMs));
+        return predictedMs >= VIEWPORT_SOFT_FLOOR_MS * 0.92;
     }
 
     private static String previewQualityTier(Engine engine, RenderMode activeMode) {

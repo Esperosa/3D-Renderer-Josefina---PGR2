@@ -3755,7 +3755,14 @@ public class RayTracerRenderer implements Renderer {
     }
 
     private static double clamp01(double value) {
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
         return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static double finiteOrZero(double value) {
+        return Double.isFinite(value) ? value : 0.0;
     }
 
     private double resolveAdvancedOpticsWeight() {
@@ -3826,6 +3833,22 @@ public class RayTracerRenderer implements Renderer {
 
     private static double mix(double a, double b, double t) {
         return a + (b - a) * clamp01(t);
+    }
+
+    private int pushNode(RayTraceContext ctx, int sp, RayBVHNode node) {
+        if (node == null) {
+            return sp;
+        }
+        if (sp >= ctx.nodeStack.length) {
+            int current = ctx.nodeStack.length;
+            int grown = current < 1024 ? 1024 : current + (current >> 1);
+            if (grown <= current) {
+                grown = current + 1;
+            }
+            ctx.nodeStack = Arrays.copyOf(ctx.nodeStack, grown);
+        }
+        ctx.nodeStack[sp] = node;
+        return sp + 1;
     }
 
     private static int resolveAreaShadowSamples(AreaLight light, boolean motionActive) {
@@ -4005,7 +4028,7 @@ public class RayTracerRenderer implements Renderer {
         double invDz = Math.abs(dz) < 1e-14 ? Double.POSITIVE_INFINITY : 1.0 / dz;
 
         int sp = 0;
-        ctx.nodeStack[sp++] = bvhRoot;
+        sp = pushNode(ctx, sp, bvhRoot);
         boolean hitAnything = false;
         double closest = tMax;
 
@@ -4034,17 +4057,17 @@ public class RayTracerRenderer implements Renderer {
 
             if (tLeft < tRight) {
                 if (tRight < INF_T) {
-                    ctx.nodeStack[sp++] = right;
+                    sp = pushNode(ctx, sp, right);
                 }
                 if (tLeft < INF_T) {
-                    ctx.nodeStack[sp++] = left;
+                    sp = pushNode(ctx, sp, left);
                 }
             } else {
                 if (tLeft < INF_T) {
-                    ctx.nodeStack[sp++] = left;
+                    sp = pushNode(ctx, sp, left);
                 }
                 if (tRight < INF_T) {
-                    ctx.nodeStack[sp++] = right;
+                    sp = pushNode(ctx, sp, right);
                 }
             }
         }
@@ -4065,7 +4088,7 @@ public class RayTracerRenderer implements Renderer {
         double invDz = Math.abs(dz) < 1e-14 ? Double.POSITIVE_INFINITY : 1.0 / dz;
 
         int sp = 0;
-        ctx.nodeStack[sp++] = bvhRoot;
+        sp = pushNode(ctx, sp, bvhRoot);
 
         while (sp > 0) {
             RayBVHNode node = ctx.nodeStack[--sp];
@@ -4083,10 +4106,10 @@ public class RayTracerRenderer implements Renderer {
                 continue;
             }
             if (node.left != null) {
-                ctx.nodeStack[sp++] = node.left;
+                sp = pushNode(ctx, sp, node.left);
             }
             if (node.right != null) {
-                ctx.nodeStack[sp++] = node.right;
+                sp = pushNode(ctx, sp, node.right);
             }
         }
         return false;
@@ -5245,7 +5268,7 @@ public class RayTracerRenderer implements Renderer {
             ctx.envB = 0.0;
             return;
         }
-        double envScale = effectiveEnvironmentScale();
+        double envScale = Math.max(0.0, finiteOrZero(effectiveEnvironmentScale()));
         if (environmentMap != null) {
             EnvironmentMap.Sample sample = ctx.environmentSample;
             sample.r = 0.0;
@@ -5253,9 +5276,9 @@ public class RayTracerRenderer implements Renderer {
             sample.b = 0.0;
             rotateToEnvironment(dx, dy, dz, ctx);
             environmentMap.sample(ctx.environmentDirX, ctx.environmentDirY, ctx.environmentDirZ, sample);
-            ctx.envR = sample.r * envScale;
-            ctx.envG = sample.g * envScale;
-            ctx.envB = sample.b * envScale;
+            ctx.envR = finiteOrZero(sample.r) * envScale;
+            ctx.envG = finiteOrZero(sample.g) * envScale;
+            ctx.envB = finiteOrZero(sample.b) * envScale;
             return;
         }
 
@@ -5299,9 +5322,9 @@ public class RayTracerRenderer implements Renderer {
             ctx.envB += light.b * glow;
         }
 
-        ctx.envR = Math.max(0.0, ctx.envR);
-        ctx.envG = Math.max(0.0, ctx.envG);
-        ctx.envB = Math.max(0.0, ctx.envB);
+        ctx.envR = Math.max(0.0, finiteOrZero(ctx.envR));
+        ctx.envG = Math.max(0.0, finiteOrZero(ctx.envG));
+        ctx.envB = Math.max(0.0, finiteOrZero(ctx.envB));
     }
 
     private void renderEnvironmentOnly(Camera camera, FrameBuffer fb) {
@@ -5467,6 +5490,7 @@ public class RayTracerRenderer implements Renderer {
      // Tady pri pohybove fazi kamery nesmim drzet zastaralou carrier akumulaci,
         // jinak predchozi vzorky unikaji do obrazu jako ghosting stopy.
         softResetAccumulationPreserveHistory();
+        invalidatePreviewMotionCompositeCarry();
     }
 
     private void softResetPolishAccumulationPreserveComposite() {
@@ -5575,6 +5599,14 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    private void invalidatePreviewMotionCompositeCarry() {
+        if (!hasAnyPolishCompositeCache() && !polishLayerActive) {
+            return;
+        }
+        invalidatePolishCompositeCache();
+        polishLayerActive = false;
+    }
+
     private void invalidatePolishUpscaleMap() {
         if (polishUpscaleMapValid) {
             RuntimeInstrumentation.addCounter(
@@ -5673,7 +5705,9 @@ public class RayTracerRenderer implements Renderer {
         previewPhaseFrameSequence = 0;
         if (nextState) {
             softResetAccumulationInvalidateHistory();
+            invalidatePreviewMotionCompositeCarry();
         } else {
+            invalidatePreviewMotionCompositeCarry();
             invalidateTemporalHistory();
             nextTemporalBlendScale = 0.22;
             nextTemporalBlendFrames = 1;

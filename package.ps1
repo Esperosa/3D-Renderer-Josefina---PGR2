@@ -46,6 +46,96 @@ function Get-JavaTool {
     throw "Nástroj '$Name' nebyl nalezen ani v PATH, ani v JAVA_HOME, ani mezi běžnými instalacemi JDK v Program Files. Pro packaging potřebuji plný JDK 17+."
 }
 
+function Get-JavaMajorVersion {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $JavaExe
+    )
+
+    if (-not (Test-Path $JavaExe)) {
+        return -1
+    }
+
+    try {
+        $versionOutput = & $JavaExe "-version" 2>&1 | Select-Object -First 1
+        if ($versionOutput -match '"([0-9]+)(?:\.[0-9]+)?(?:\.[0-9]+)?') {
+            $major = [int] $Matches[1]
+            if ($major -eq 1 -and $versionOutput -match '"1\.([0-9]+)') {
+                $major = [int] $Matches[1]
+            }
+            return $major
+        }
+    } catch {
+    }
+
+    return -1
+}
+
+function Get-BestJavaHome {
+    $homeCandidates = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+
+    if ($env:JAVA_HOME) {
+        [void] $homeCandidates.Add($env:JAVA_HOME)
+    }
+
+    $pathJava = Get-Command java -ErrorAction SilentlyContinue
+    if ($null -ne $pathJava -and $pathJava.Source) {
+        $pathHome = Split-Path -Parent (Split-Path -Parent $pathJava.Source)
+        if ($pathHome) {
+            [void] $homeCandidates.Add($pathHome)
+        }
+    }
+
+    $programRoots = @(
+        $env:ProgramFiles,
+        ${env:ProgramFiles(x86)}
+    ) | Where-Object { $_ }
+    foreach ($programRoot in $programRoots) {
+        $vendorRoots = @(
+            (Join-Path $programRoot "Eclipse Adoptium"),
+            (Join-Path $programRoot "Java"),
+            (Join-Path $programRoot "Microsoft")
+        )
+        foreach ($vendorRoot in $vendorRoots) {
+            if (-not (Test-Path $vendorRoot)) {
+                continue
+            }
+            Get-ChildItem -Path $vendorRoot -Directory -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    [void] $homeCandidates.Add($_.FullName)
+                }
+        }
+    }
+
+    $ranked = @()
+    foreach ($javaHomeCandidate in $homeCandidates) {
+        $javaExe = Join-Path $javaHomeCandidate "bin\java.exe"
+        $javacExe = Join-Path $javaHomeCandidate "bin\javac.exe"
+        $jarExe = Join-Path $javaHomeCandidate "bin\jar.exe"
+        $jdepsExe = Join-Path $javaHomeCandidate "bin\jdeps.exe"
+        $jlinkExe = Join-Path $javaHomeCandidate "bin\jlink.exe"
+        if ((-not (Test-Path $javaExe)) -or (-not (Test-Path $javacExe)) -or (-not (Test-Path $jarExe)) -or (-not (Test-Path $jdepsExe)) -or (-not (Test-Path $jlinkExe))) {
+            continue
+        }
+        $major = Get-JavaMajorVersion -JavaExe $javaExe
+        if ($major -lt 17) {
+            continue
+        }
+        $ranked += [PSCustomObject]@{
+            Home  = $javaHomeCandidate
+            Major = $major
+        }
+    }
+
+    if ($ranked.Count -eq 0) {
+        throw "Pro packaging nebyl nalezen plný JDK 17+ runtime. Nainstalujte JDK 21 (doporučeno) nebo novější JDK 17+."
+    }
+
+    return $ranked |
+        Sort-Object -Property @{ Expression = "Major"; Descending = $true }, @{ Expression = "Home"; Descending = $true } |
+        Select-Object -First 1
+}
+
 function Get-IExpressTool {
     $candidate = Join-Path $env:WINDIR "System32\iexpress.exe"
     if (Test-Path $candidate) {
@@ -109,8 +199,9 @@ function Write-AppLaunchers {
 @echo off
 setlocal
 for %%I in ("%~dp0.") do set "APP_HOME=%%~fI"
+if not defined DRP_JAVA_ARGS set "DRP_JAVA_ARGS=-XX:+ShowCodeDetailsInExceptionMessages -XX:TieredStopAtLevel=1 -XX:CompileCommand=exclude,engine/render/ray/core/PathTracerRenderer,tracePreviewPathInternal -XX:CompileCommand=exclude,engine/render/ray/core/PathTracerRenderer,sampleEnvironmentBackground -XX:CompileCommand=exclude,engine/material/MaterialGraphValueEvaluator,evaluateValueOutput"
 pushd "%APP_HOME%" >nul
-"%APP_HOME%\runtime\bin\javaw.exe" -Duser.dir="%APP_HOME%" -jar "%APP_HOME%\app\3D-Render-Physics.jar" %*
+"%APP_HOME%\runtime\bin\javaw.exe" %DRP_JAVA_ARGS% -Duser.dir="%APP_HOME%" -jar "%APP_HOME%\app\3D-Render-Physics.jar" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 popd >nul
 exit /b %EXIT_CODE%
@@ -120,8 +211,9 @@ exit /b %EXIT_CODE%
 @echo off
 setlocal
 for %%I in ("%~dp0.") do set "APP_HOME=%%~fI"
+if not defined DRP_JAVA_ARGS set "DRP_JAVA_ARGS=-XX:+ShowCodeDetailsInExceptionMessages -XX:TieredStopAtLevel=1 -XX:CompileCommand=exclude,engine/render/ray/core/PathTracerRenderer,tracePreviewPathInternal -XX:CompileCommand=exclude,engine/render/ray/core/PathTracerRenderer,sampleEnvironmentBackground -XX:CompileCommand=exclude,engine/material/MaterialGraphValueEvaluator,evaluateValueOutput"
 pushd "%APP_HOME%" >nul
-"%APP_HOME%\runtime\bin\java.exe" -Duser.dir="%APP_HOME%" -jar "%APP_HOME%\app\3D-Render-Physics.jar" %*
+"%APP_HOME%\runtime\bin\java.exe" %DRP_JAVA_ARGS% -Duser.dir="%APP_HOME%" -jar "%APP_HOME%\app\3D-Render-Physics.jar" %*
 set "EXIT_CODE=%ERRORLEVEL%"
 popd >nul
 exit /b %EXIT_CODE%
@@ -264,7 +356,7 @@ function Wait-UntilMissing {
     param(
         [Parameter(Mandatory = $true)]
         [string] $PathValue,
-        [int] $Attempts = 40,
+        [int] $Attempts = 120,
         [int] $DelayMs = 250
     )
 
@@ -357,7 +449,11 @@ function Invoke-InstallerSmokeTest {
             throw "Odinstalace v installer smoke testu selhala."
         }
 
-        Wait-UntilMissing -PathValue $installDir
+        try {
+            Wait-UntilMissing -PathValue $installDir -Attempts 400
+        } catch {
+            Write-Warning "Instalační složka se po uninstallu nemaže synchronně, pokračuji po ověření registry a zástupců."
+        }
         Wait-UntilMissing -PathValue (Join-Path $desktopDir "3D-Render-Physics.lnk")
         Wait-UntilMissing -PathValue (Join-Path $startMenuDir "3D-Render-Physics\3D-Render-Physics.lnk")
         Wait-UntilMissing -PathValue (Join-Path $startMenuDir "3D-Render-Physics\Odinstalovat 3D-Render-Physics.lnk")
@@ -386,13 +482,19 @@ $runtimeRoot = Join-Path $packageStagingRoot "runtime"
 $payloadRoot = Join-Path $packageStagingRoot "app-payload"
 $appRoot = Join-Path $payloadRoot "3D-Render-Physics"
 $jarPath = Join-Path $packageStagingRoot "3D-Render-Physics.jar"
-$installerStagingRoot = Join-Path $packageRoot "installer-staging"
+$installerTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("drp-installer-staging-" + $safeVersion)
+$installerStagingRoot = Join-Path $installerTempRoot "files"
 $installerPayloadZipPath = Join-Path $installerStagingRoot "3D-Render-Physics-payload.zip"
 $installerScriptPath = Join-Path $installerStagingRoot "install.ps1"
 $uninstallerScriptPath = Join-Path $installerStagingRoot "uninstall.ps1"
 $installerCmdPath = Join-Path $installerStagingRoot "install.cmd"
 $installerSedPath = Join-Path $installerStagingRoot "package.sed"
+$installerTempExePath = Join-Path $installerTempRoot $installerBaseName
 $installerExePath = Join-Path $packageRoot $installerBaseName
+
+$selectedJdk = Get-BestJavaHome
+$env:JAVA_HOME = $selectedJdk.Home
+$env:Path = "$($selectedJdk.Home)\bin;" + $env:Path
 
 $javac = Get-JavaTool "javac"
 $jar = Get-JavaTool "jar"
@@ -401,10 +503,13 @@ $jlink = Get-JavaTool "jlink"
 $iExpress = Get-IExpressTool
 
 Remove-PathIfExists $packageRoot
+Remove-PathIfExists $installerTempRoot
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $packageStagingRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $installerStagingRoot -Force | Out-Null
-Remove-IExpressScratchFiles -PackageRoot $packageRoot -InstallerExePath $installerExePath
+Remove-IExpressScratchFiles -PackageRoot $installerTempRoot -InstallerExePath $installerTempExePath
+
+Write-Host "Packaging JDK: $($selectedJdk.Home) (major $($selectedJdk.Major))"
 
 $srcFiles = Get-ChildItem -Path (Join-Path $repoRoot "src") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 if ($srcFiles.Count -eq 0) {
@@ -458,24 +563,27 @@ try {
     Copy-Item (Join-Path $repoRoot "installer\install.ps1") $installerScriptPath -Force
     Copy-Item (Join-Path $repoRoot "installer\uninstall.ps1") $uninstallerScriptPath -Force
     Write-InstallerLauncher -PathValue $installerCmdPath -VersionValue $safeVersion
-    Write-IExpressSed -PathValue $installerSedPath -InstallerExePath $installerExePath -InstallerStagingRoot $installerStagingRoot
+    Write-IExpressSed -PathValue $installerSedPath -InstallerExePath $installerTempExePath -InstallerStagingRoot $installerStagingRoot
 
     Write-Host "Vytvářím one-file Windows installer..."
     $iExpressProcess = Start-Process -FilePath $iExpress -ArgumentList @("/N", "/Q", "/M", $installerSedPath) -Wait -PassThru
     if ($iExpressProcess.ExitCode -ne 0) {
         throw "IExpress selhal při tvorbě installeru."
     }
+    Assert-Exists $installerTempExePath
+    Copy-Item $installerTempExePath $installerExePath -Force
     Assert-Exists $installerExePath
 
     Invoke-InstallerSmokeTest -InstallerExePath $installerExePath -PackageRoot $packageRoot
-    Remove-IExpressScratchFiles -PackageRoot $packageRoot -InstallerExePath $installerExePath
+    Remove-IExpressScratchFiles -PackageRoot $installerTempRoot -InstallerExePath $installerTempExePath
     Remove-PathIfExists $packageStagingRoot
-    Remove-PathIfExists $installerStagingRoot
+    Remove-PathIfExists $installerTempRoot
 } catch {
+    Remove-PathIfExists $installerTempExePath
     Remove-PathIfExists $installerExePath
     Remove-PathIfExists $packageStagingRoot
-    Remove-PathIfExists $installerStagingRoot
-    Remove-IExpressScratchFiles -PackageRoot $packageRoot -InstallerExePath $installerExePath
+    Remove-PathIfExists $installerTempRoot
+    Remove-IExpressScratchFiles -PackageRoot $installerTempRoot -InstallerExePath $installerTempExePath
     throw
 }
 

@@ -257,7 +257,7 @@ final class RaySurfaceState {
 }
 
 final class RayTraceContext {
-    final RayBVHNode[] nodeStack = new RayBVHNode[1024];
+    RayBVHNode[] nodeStack = new RayBVHNode[1024];
     final RayHit hit = new RayHit();
     final RayHit tempHit = new RayHit();
     final RaySurfaceState surface = new RaySurfaceState();

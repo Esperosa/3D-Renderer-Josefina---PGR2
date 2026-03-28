@@ -9,6 +9,7 @@ import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -361,6 +362,7 @@ public class Engine {
     final List<SceneItemRef> sceneOutlinerItems;
     boolean suppressSceneOutlinerSelectionEvent;
     boolean suppressSceneDetailRebuild;
+    final ConcurrentLinkedQueue<Runnable> runtimeTaskQueue;
 
     int ditherToneCount;
     double ditherContrast;
@@ -650,6 +652,7 @@ public class Engine {
         this.sceneOutlinerItems = new ArrayList<>();
         this.suppressSceneOutlinerSelectionEvent = false;
         this.suppressSceneDetailRebuild = false;
+        this.runtimeTaskQueue = new ConcurrentLinkedQueue<>();
 
         this.outputCameraEntity = null;
         this.selectedLight = null;
@@ -1314,6 +1317,39 @@ public class Engine {
             }
             light.setEnabled(enabled);
         }
+    }
+
+    void enqueueRuntimeTask(Runnable task) {
+        if (task == null) {
+            return;
+        }
+        runtimeTaskQueue.offer(task);
+    }
+
+    void processRuntimeTasks() {
+        processRuntimeTasks(Long.MAX_VALUE, Integer.MAX_VALUE);
+    }
+
+    int processRuntimeTasks(long maxBudgetNanos, int maxTasks) {
+        int taskBudget = Math.max(1, maxTasks);
+        long budgetNanos = maxBudgetNanos <= 0L ? Long.MAX_VALUE : maxBudgetNanos;
+        long start = System.nanoTime();
+        int processed = 0;
+        Runnable task;
+        while (processed < taskBudget && (task = runtimeTaskQueue.poll()) != null) {
+            task.run();
+            processed++;
+            if (processed >= taskBudget) {
+                break;
+            }
+            if (budgetNanos != Long.MAX_VALUE && !runtimeTaskQueue.isEmpty()) {
+                long elapsed = System.nanoTime() - start;
+                if (elapsed >= budgetNanos) {
+                    break;
+                }
+            }
+        }
+        return processed;
     }
 
     public void setLaunchFullscreen(boolean launchFullscreen) {

@@ -31,6 +31,9 @@ final class EngineLifecycleController {
     private static final long RENDER_MODE_SWITCH_FADE_IN_NS = 300_000_000L;
     private static final long RENDER_MODE_SWITCH_FADE_OUT_NS = 650_000_000L;
     private static final long RENDER_MODE_SWITCH_MIN_SAMPLES = 15L;
+    private static final long RENDER_MODE_SWITCH_HEAVY_MIN_SAMPLES = 4L;
+    private static final long RENDER_MODE_SWITCH_HEAVY_MAX_VIEWPORT_MIN_SAMPLES = 1L;
+    private static final double RENDER_MODE_SWITCH_LARGE_VIEWPORT_MP = 2.5;
 
     private EngineLifecycleController() {
     }
@@ -224,6 +227,9 @@ final class EngineLifecycleController {
                 EngineCameraRuntime.updateMouseCaptureDelta(engine);
                 EngineHotkeyRouter.handle(engine);
                 engine.sceneImportController.update(engine);
+                engine.processRuntimeTasks(
+                        resolveRuntimeTaskBudgetNanos(engine),
+                        resolveRuntimeTaskBatchSize(engine));
                 engine.outputRenderController.processPendingRequest(
                         engine.scene,
                         (w, h) -> EngineCameraRuntime.buildOutputRenderCamera(engine, w, h),
@@ -676,7 +682,7 @@ final class EngineLifecycleController {
             long accumulatedSamples = currentAccumulatedSamplesForActiveMode(engine);
             boolean minShowReached = elapsed >= RENDER_MODE_SWITCH_MIN_SHOW_NS;
             boolean enoughSamples = !usesSampleAccumulation(engine.activeMode)
-                    || accumulatedSamples >= RENDER_MODE_SWITCH_MIN_SAMPLES;
+                    || accumulatedSamples >= requiredModeSwitchRevealSamples(engine);
             if (minShowReached && enoughSamples) {
                 engine.renderModeSwitchRevealStartNanos = now;
                 revealStart = now;
@@ -734,6 +740,47 @@ final class EngineLifecycleController {
 
     private static boolean usesSampleAccumulation(RenderMode mode) {
         return mode == RenderMode.RAY_TRACING || mode == RenderMode.PATH_TRACING;
+    }
+
+    private static long requiredModeSwitchRevealSamples(Engine engine) {
+        RenderMode mode = engine == null ? null : engine.activeMode;
+        if (!usesSampleAccumulation(mode)) {
+            return RENDER_MODE_SWITCH_MIN_SAMPLES;
+        }
+        double viewportMegaPixels = 0.0;
+        if (engine != null && engine.frameBuffer != null) {
+            viewportMegaPixels = (engine.frameBuffer.getWidth() * engine.frameBuffer.getHeight()) / 1_000_000.0;
+        }
+        if (viewportMegaPixels >= RENDER_MODE_SWITCH_LARGE_VIEWPORT_MP) {
+            return RENDER_MODE_SWITCH_HEAVY_MAX_VIEWPORT_MIN_SAMPLES;
+        }
+        return RENDER_MODE_SWITCH_HEAVY_MIN_SAMPLES;
+    }
+
+    private static long resolveRuntimeTaskBudgetNanos(Engine engine) {
+        RenderMode mode = engine == null || engine.activeMode == null ? RenderMode.PHONG : engine.activeMode;
+        if (mode == RenderMode.PATH_TRACING) {
+            return (engine != null && (engine.safetyRecoveryActive || engine.viewportCriticalPreviewActive))
+                    ? 1_500_000L
+                    : 2_500_000L;
+        }
+        if (mode == RenderMode.RAY_TRACING) {
+            return (engine != null && (engine.safetyRecoveryActive || engine.viewportCriticalPreviewActive))
+                    ? 2_000_000L
+                    : 3_500_000L;
+        }
+        return 6_000_000L;
+    }
+
+    private static int resolveRuntimeTaskBatchSize(Engine engine) {
+        RenderMode mode = engine == null || engine.activeMode == null ? RenderMode.PHONG : engine.activeMode;
+        if (mode == RenderMode.PATH_TRACING) {
+            return 2;
+        }
+        if (mode == RenderMode.RAY_TRACING) {
+            return 3;
+        }
+        return 12;
     }
 
     private static boolean isRenderModeSwitchFadePhase(Engine engine, long now) {
