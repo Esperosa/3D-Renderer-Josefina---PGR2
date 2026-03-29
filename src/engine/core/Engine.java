@@ -21,6 +21,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 
@@ -262,7 +263,9 @@ public class Engine {
     boolean viewportCameraMotionActive;
     boolean viewportSceneMotionActive;
     boolean viewportMotionLatchedActive;
+    long viewportLastMotionNanos;
     long viewportMotionEntryBoostUntilNanos;
+    long viewportMotionStartupFloorUntilNanos;
     long viewportMotionHoldUntilNanos;
     int viewportMotionExitStableFrames;
     boolean viewportFallbackLockActive;
@@ -426,6 +429,8 @@ public class Engine {
 
     final OutputRenderController outputRenderController;
     final SceneImportController sceneImportController;
+    boolean outputTabRefreshPending;
+    boolean outputTabRefreshDirty;
 
     JToggleButton lightMouse;
     JToggleButton lightNavFps;
@@ -565,7 +570,9 @@ public class Engine {
         this.viewportCameraMotionActive = false;
         this.viewportSceneMotionActive = false;
         this.viewportMotionLatchedActive = false;
+        this.viewportLastMotionNanos = 0L;
         this.viewportMotionEntryBoostUntilNanos = 0L;
+        this.viewportMotionStartupFloorUntilNanos = 0L;
         this.viewportMotionHoldUntilNanos = 0L;
         this.viewportMotionExitStableFrames = 0;
         this.viewportFallbackLockActive = false;
@@ -1531,6 +1538,35 @@ public class Engine {
         worldTab.revalidate();
         worldTab.repaint();
     }
+
+    void requestOutputTabRefresh() {
+        if (window == null) {
+            return;
+        }
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::requestOutputTabRefresh);
+            return;
+        }
+        outputTabRefreshDirty = true;
+        if (outputTabRefreshPending) {
+            return;
+        }
+        outputTabRefreshPending = true;
+        SwingUtilities.invokeLater(this::flushOutputTabRefresh);
+    }
+
+    private void flushOutputTabRefresh() {
+        outputTabRefreshPending = false;
+        if (window == null || !outputTabRefreshDirty) {
+            return;
+        }
+        outputTabRefreshDirty = false;
+        EngineRenderPanels.buildOutputTab(this);
+        if (outputTabRefreshDirty) {
+            requestOutputTabRefresh();
+        }
+    }
+
     JPanel addCollapsibleSection(JPanel parent, String title, boolean expandedByDefault) {
         return UiBuilder.addCollapsibleSection(parent, title, expandedByDefault, this::focusCanvas);
     }

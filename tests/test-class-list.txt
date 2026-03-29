@@ -29,8 +29,10 @@ engine.core.EngineSafetyRendererCoverageTests
 engine.core.PathTracingReferenceModeTests
 engine.core.ViewportRenderStressProfileTests
 engine.core.OutputRenderPerformanceEvidenceTests
+engine.core.EditorWorkflowPerformanceEvidenceTests
 engine.core.AdaptiveSchedulerEvidenceTests
 engine.core.PreviewRuntimeInstrumentationTests
+engine.core.PreviewQualityRegressionTests
 engine.core.EngineCameraProjectionTests
 engine.core.WindowResponsiveLayoutTests
 engine.core.EngineToolbarLayoutTests

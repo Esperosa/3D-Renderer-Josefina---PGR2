@@ -347,9 +347,14 @@ final class EngineLifecycleController {
                         || engine.input.isMouseButtonDown(MouseEvent.BUTTON2)
                         || engine.input.isMouseButtonDown(MouseEvent.BUTTON3);
                 boolean keyboardMovementIntent = isKeyboardMovementIntentActive(engine);
-                boolean cameraMoved = engine.camera != null
-                    && (engine.camera.getPosition().sub(cameraPosBefore).lengthSquared() > 1e-6
-                    || engine.camera.getForward().sub(cameraForwardBefore).lengthSquared() > 1e-6);
+                double cameraPosDeltaSq = engine.camera != null
+                    ? engine.camera.getPosition().sub(cameraPosBefore).lengthSquared()
+                    : 0.0;
+                double cameraForwardDeltaSq = engine.camera != null
+                    ? engine.camera.getForward().sub(cameraForwardBefore).lengthSquared()
+                    : 0.0;
+         // Reject tiny numeric drift so idle heavy preview can truly return to offline full-fidelity mode.
+                boolean cameraMoved = cameraPosDeltaSq > 1e-5 || cameraForwardDeltaSq > 1e-5;
                 viewportInteractionActive = mouseInteraction
                         || keyboardMovementIntent
                         || cameraMoved
@@ -367,6 +372,7 @@ final class EngineLifecycleController {
                 engine.viewportSceneMotionActive = sceneMutating;
                 engine.viewportCameraMotionActive = cameraMoved || keyboardMovementIntent || sceneMutating;
                 if (engine.viewportCameraMotionActive) {
+                    engine.viewportLastMotionNanos = System.nanoTime();
                     RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_MOTION_FRAMES, 1L);
                 }
 

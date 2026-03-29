@@ -566,12 +566,8 @@ public class RasterRenderer implements Renderer {
 
         int scheduledWorkers = Math.max(1, Math.min(localRasterizers.length, countNonEmptyTiles(tileBins)));
         AtomicInteger tileCursor = new AtomicInteger();
-        Runnable[] tasks = new Runnable[scheduledWorkers];
-        for (int i = 0; i < tasks.length; i++) {
-            final TriangleRasterizer workerRasterizer = localRasterizers[i];
-            tasks[i] = () -> renderTilesWorker(prepared, tileBins, output, workerRasterizer, tileCursor);
-        }
-        localThreadPool.submitAndWait(tasks);
+        localThreadPool.submitAndWait(scheduledWorkers, workerIndex ->
+                renderTilesWorker(prepared, tileBins, output, localRasterizers[workerIndex], tileCursor));
     }
 
     private void renderTilesSequential(List<PreparedEntity> prepared,

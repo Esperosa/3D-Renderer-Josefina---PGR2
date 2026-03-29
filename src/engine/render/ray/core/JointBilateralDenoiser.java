@@ -588,20 +588,16 @@ final class JointBilateralDenoiser {
 
         AtomicInteger rowCursor = new AtomicInteger(0);
         int rowBlock = Math.max(2, Math.min(24, pass.step * 6));
-        Runnable[] tasks = new Runnable[context.workerCount];
-        for (int i = 0; i < tasks.length; i++) {
-            tasks[i] = () -> {
-                while (true) {
-                    int startRow = rowCursor.getAndAdd(rowBlock);
-                    if (startRow >= context.height) {
-                        return;
-                    }
-                    int endRow = Math.min(context.height, startRow + rowBlock);
-                    filterRows(context, pass, startRow, endRow, sourceR, sourceG, sourceB, targetR, targetG, targetB);
+        context.threadPool.submitAndWait(context.workerCount, workerIndex -> {
+            while (true) {
+                int startRow = rowCursor.getAndAdd(rowBlock);
+                if (startRow >= context.height) {
+                    return;
                 }
-            };
-        }
-        context.threadPool.submitAndWait(tasks);
+                int endRow = Math.min(context.height, startRow + rowBlock);
+                filterRows(context, pass, startRow, endRow, sourceR, sourceG, sourceB, targetR, targetG, targetB);
+            }
+        });
     }
 
     private static void filterRows(FilterContext context,

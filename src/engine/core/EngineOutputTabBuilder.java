@@ -309,8 +309,7 @@ final class EngineOutputTabBuilder {
     }
 
     private static void refreshOutputTab(Engine engine) {
-        build(engine);
-        engine.window.selectRightTab("Output");
+        engine.requestOutputTabRefresh();
     }
 
     private static void browseOutputFolder(Engine engine, OutputRenderController.Settings outputSettings) {

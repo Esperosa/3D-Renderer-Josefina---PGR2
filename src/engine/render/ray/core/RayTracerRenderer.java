@@ -60,12 +60,12 @@ public class RayTracerRenderer implements Renderer {
     private static final double AUTO_PROCESS_CPU_LOW = 0.62;
     private static final double AUTO_PROCESS_CPU_HIGH = 0.95;
     private static final double AUTO_HW_EWMA_ALPHA = 0.24;
-    private static final long STILL_TIER1_MIN_SAMPLES = 12L;
-    private static final long STILL_TIER2_MIN_SAMPLES = 28L;
-    private static final long STILL_TIER3_MIN_SAMPLES = 48L;
-    private static final long STILL_TIER4_MIN_SAMPLES = 72L;
-    private static final long STILL_TIER5_MIN_SAMPLES = 100L;
-        private static final int PREVIEW_STILL_WARMUP_FRAMES = 2;
+    private static final long STILL_TIER1_MIN_SAMPLES = 8L;
+    private static final long STILL_TIER2_MIN_SAMPLES = 18L;
+    private static final long STILL_TIER3_MIN_SAMPLES = 32L;
+    private static final long STILL_TIER4_MIN_SAMPLES = 48L;
+    private static final long STILL_TIER5_MIN_SAMPLES = 64L;
+    private static final int PREVIEW_STILL_WARMUP_FRAMES = 2;
     private static final double MOVING_HYBRID_GUIDE_DEPTH_TOLERANCE_SCALE = 0.06;
     private static final double MOVING_HYBRID_GUIDE_DEPTH_TOLERANCE_MIN = 0.005;
     private static final double MOVING_HYBRID_GUIDE_DEPTH_TOLERANCE_MAX = 0.08;
@@ -1053,29 +1053,24 @@ public class RayTracerRenderer implements Renderer {
         }
 
         AtomicInteger tileCursor = new AtomicInteger(0);
-        Runnable[] tasks = new Runnable[activeWorkers];
-        for (int w = 0; w < activeWorkers; w++) {
-            final int workerIndex = w;
-            tasks[w] = () -> {
-                RayTraceContext ctx = new RayTraceContext();
-                configureTraceContextForCarrier(ctx, carrierMetrics);
-                RaySplitMix64 rng = new RaySplitMix64(seedForWorker(workerIndex, sampleTarget));
-                int chunkStart;
-                while ((chunkStart = tileCursor.getAndAdd(TILE_CLAIM_CHUNK)) < tileCount) {
-                    int chunkEnd = Math.min(tileCount, chunkStart + TILE_CLAIM_CHUNK);
-                    for (int tile = chunkStart; tile < chunkEnd; tile++) {
-                        if (tileRenderPlan != null && (tile >= tileRenderPlan.length || !tileRenderPlan[tile])) {
-                            continue;
-                        }
-                        long tileStartNanos = System.nanoTime();
-                        renderCarrierTile(tile, tileCols, tileW, tileH, fbWidth, fbHeight, camera, outColor,
-                            captureGuides, effectiveSamplesPerFrame, rng, ctx);
-                        recordTileCost(tileCostNanos, tileCostSamples, tileStartNanos);
+        threadPool.submitAndWait(activeWorkers, workerIndex -> {
+            RayTraceContext ctx = new RayTraceContext();
+            configureTraceContextForCarrier(ctx, carrierMetrics);
+            RaySplitMix64 rng = new RaySplitMix64(seedForWorker(workerIndex, sampleTarget));
+            int chunkStart;
+            while ((chunkStart = tileCursor.getAndAdd(TILE_CLAIM_CHUNK)) < tileCount) {
+                int chunkEnd = Math.min(tileCount, chunkStart + TILE_CLAIM_CHUNK);
+                for (int tile = chunkStart; tile < chunkEnd; tile++) {
+                    if (tileRenderPlan != null && (tile >= tileRenderPlan.length || !tileRenderPlan[tile])) {
+                        continue;
                     }
+                    long tileStartNanos = System.nanoTime();
+                    renderCarrierTile(tile, tileCols, tileW, tileH, fbWidth, fbHeight, camera, outColor,
+                        captureGuides, effectiveSamplesPerFrame, rng, ctx);
+                    recordTileCost(tileCostNanos, tileCostSamples, tileStartNanos);
                 }
-            };
-        }
-        threadPool.submitAndWait(tasks);
+            }
+        });
         flushCarrierTraceMetrics(carrierMetrics);
     }
 
@@ -5242,9 +5237,6 @@ public class RayTracerRenderer implements Renderer {
 
     private boolean resolveRunFullDenoise(long frameSequence) {
         if (!previewQualityLadderEnabled || !previewMotionActive) {
-            if (previewQualityLadderEnabled && !previewMotionActive && activePreviewPolishSamplesPerFrame <= 0) {
-                return temporalHistoryValid ? frameSequence % 2L == 0L : true;
-            }
             return true;
         }
         int cadence = Math.max(1, previewMotionDenoiseCadence);
