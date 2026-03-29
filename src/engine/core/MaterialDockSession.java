@@ -11,6 +11,7 @@ import engine.material.NodeTextureLibrary;
 import engine.material.PhongMaterial;
 import engine.material.TextureMap;
 import engine.math.Vec3;
+import engine.render.Texture;
 import engine.scene.Entity;
 import engine.ui.UiStrings;
 import engine.ui.UiTheme;
@@ -23,6 +24,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FileDialog;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -38,9 +40,15 @@ import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
 import javax.swing.BorderFactory;
@@ -53,7 +61,9 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JSlider;
+import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 
 final class MaterialDockSession {
@@ -61,7 +71,8 @@ final class MaterialDockSession {
     final JPanel host;
     final Entity entity;
     final PhongMaterial material;
-    final MaterialNodeGraph graph;
+    MaterialNodeGraph graph;
+    boolean graphAttached;
     final JLabel summaryLabel;
     final MaterialDockViewState viewState;
     final MaterialPreviewRenderer.Settings previewSettings;
@@ -87,7 +98,10 @@ final class MaterialDockSession {
         this.host = host;
         this.entity = entity;
         this.material = material;
-        this.graph = material.getOrCreateNodeGraph();
+        this.graphAttached = material.hasNodeGraph();
+        this.graph = graphAttached
+                ? material.getNodeGraph()
+                : MaterialGraphAuthoring.createAuthoringGraphFromMaterial(material);
         this.summaryLabel = summaryLabel;
         this.viewState = engine.materialDockViewState;
         this.previewSettings = viewState.previewSettings();
@@ -103,15 +117,19 @@ final class MaterialDockSession {
         JPanel north = new JPanel();
         north.setOpaque(false);
         north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
-        JPanel lookdevBody = UiBuilder.addCollapsibleSection(
-                north,
-                UiStrings.MaterialDock.LOOKDEV_SECTION,
-                viewState.isLookdevPanelExpanded(),
-                engine::focusCanvas,
-                this::handleLookdevPanelToggled
-        );
-        lookdevBody.setLayout(new BorderLayout());
-        lookdevBody.add(buildLookdevContent(), BorderLayout.CENTER);
+        north.add(buildWorkspaceToolbar());
+        if (workspaceMode().showsLookdev()) {
+            north.add(Box.createRigidArea(new Dimension(0, 8)));
+            JPanel lookdevBody = UiBuilder.addCollapsibleSection(
+                    north,
+                    UiStrings.MaterialDock.LOOKDEV_SECTION,
+                    viewState.isLookdevPanelExpanded(),
+                    engine::focusCanvas,
+                    this::handleLookdevPanelToggled
+            );
+            lookdevBody.setLayout(new BorderLayout());
+            lookdevBody.add(buildLookdevContent(), BorderLayout.CENTER);
+        }
         root.add(north, BorderLayout.NORTH);
 
         canvas = new MaterialGraphCanvas(this);
@@ -121,22 +139,52 @@ final class MaterialDockSession {
                 BorderFactory.createLineBorder(UiTheme.BORDER_SUBTLE, 1, true),
                 BorderFactory.createEmptyBorder(0, 0, 0, 0)
         ));
-        root.add(canvas, BorderLayout.CENTER);
+        if (workspaceMode().showsInspector()) {
+            inspectorPanel = new JPanel();
+            inspectorPanel.setOpaque(true);
+            inspectorPanel.setBackground(UiTheme.PANEL_BG);
+            inspectorPanel.setLayout(new BoxLayout(inspectorPanel, BoxLayout.Y_AXIS));
+            inspectorPanel.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
 
-        inspectorPanel = new JPanel();
-        inspectorPanel.setOpaque(true);
-        inspectorPanel.setBackground(UiTheme.PANEL_BG);
-        inspectorPanel.setLayout(new BoxLayout(inspectorPanel, BoxLayout.Y_AXIS));
-        inspectorPanel.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+            inspectorScroll = new JScrollPane(inspectorPanel);
+            UiTheme.styleScrollPane(inspectorScroll, UiTheme.PANEL_BG);
+            inspectorScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            int inspectorWidth = viewState.inspectorWidth();
+            inspectorScroll.setPreferredSize(new Dimension(inspectorWidth, 0));
+            inspectorScroll.setMinimumSize(new Dimension(UiTheme.MATERIAL_WORKSPACE_INSPECTOR_MIN_WIDTH, 0));
 
-        inspectorScroll = new JScrollPane(inspectorPanel);
-        UiTheme.styleScrollPane(inspectorScroll, UiTheme.PANEL_BG);
-        inspectorScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        inspectorScroll.setPreferredSize(new Dimension(UiTheme.MATERIAL_WORKSPACE_INSPECTOR_WIDTH, 0));
-        inspectorScroll.setMinimumSize(new Dimension(UiTheme.MATERIAL_WORKSPACE_INSPECTOR_MIN_WIDTH, 0));
-        root.add(inspectorScroll, BorderLayout.EAST);
+            JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, canvas, inspectorScroll);
+            splitPane.setOpaque(false);
+            splitPane.setBorder(BorderFactory.createEmptyBorder());
+            splitPane.setResizeWeight(1.0);
+            splitPane.setContinuousLayout(true);
+            splitPane.setDividerSize(8);
+            splitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, e -> {
+                if (inspectorScroll != null && inspectorScroll.getWidth() > 0) {
+                    viewState.setInspectorWidth(inspectorScroll.getWidth());
+                }
+            });
+            root.add(splitPane, BorderLayout.CENTER);
+        } else {
+            inspectorPanel = null;
+            inspectorScroll = null;
+            root.add(canvas, BorderLayout.CENTER);
+        }
         requestPreviewRefresh();
         return root;
+    }
+
+    private MaterialDockViewState.WorkspaceMode workspaceMode() {
+        return viewState.workspaceMode();
+    }
+
+    private void ensureGraphAttached() {
+        if (graphAttached) {
+            return;
+        }
+        material.setNodeGraph(graph);
+        graph = material.getOrCreateNodeGraph();
+        graphAttached = true;
     }
 
     JComponent buildFooter() {
@@ -153,6 +201,62 @@ final class MaterialDockSession {
                 + " / "
                 + EditorKeymap.shortcutLabel(EditorActionId.REDO)
                 + " vrací změny.");
+    }
+
+    private JComponent buildWorkspaceToolbar() {
+        JPanel bar = new JPanel(new BorderLayout(12, 0));
+        bar.setOpaque(true);
+        bar.setBackground(UiTheme.PANEL_ELEVATED);
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.BORDER_SUBTLE, 1, true),
+                BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+
+        JPanel left = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 0));
+        left.setOpaque(false);
+        left.add(EngineMaterialDock.infoLabel(UiStrings.MaterialDock.WORKSPACE_BAR));
+        left.add(createWorkspaceModeButton(UiStrings.MaterialDock.WORKSPACE_STUDIO, MaterialDockViewState.WorkspaceMode.BALANCED));
+        left.add(createWorkspaceModeButton(UiStrings.MaterialDock.WORKSPACE_GRAPH, MaterialDockViewState.WorkspaceMode.GRAPH_FOCUS));
+        left.add(createWorkspaceModeButton(UiStrings.MaterialDock.WORKSPACE_LOOKDEV, MaterialDockViewState.WorkspaceMode.LOOKDEV_FOCUS));
+
+        JPanel right = new JPanel(new WrapLayout(FlowLayout.RIGHT, 6, 0));
+        right.setOpaque(false);
+        right.add(EngineMaterialDock.createMiniButton(engine, UiStrings.MaterialDock.AUTO_LAYOUT, () -> {
+            if (canvas != null) {
+                canvas.autoLayoutAll();
+            }
+        }));
+        right.add(EngineMaterialDock.createMiniButton(engine, UiStrings.MaterialDock.AUTO_LAYOUT_SELECTION, () -> {
+            if (canvas != null) {
+                canvas.autoLayoutSelection();
+            }
+        }));
+        right.add(EngineMaterialDock.createMiniButton(engine, UiStrings.MaterialDock.FRAME_GRAPH, () -> {
+            if (canvas != null) {
+                canvas.focusGraph();
+            }
+        }));
+
+        bar.add(left, BorderLayout.WEST);
+        bar.add(right, BorderLayout.EAST);
+        return bar;
+    }
+
+    private JToggleButton createWorkspaceModeButton(String label, MaterialDockViewState.WorkspaceMode mode) {
+        JToggleButton button = UiBuilder.createStyledToggleButton(label);
+        button.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
+        UiBuilder.styleLight(button, workspaceMode() == mode);
+        button.addActionListener(e -> {
+            viewState.setWorkspaceMode(mode);
+            if (mode == MaterialDockViewState.WorkspaceMode.GRAPH_FOCUS) {
+                viewState.setLookdevPanelExpanded(false);
+            } else if (mode == MaterialDockViewState.WorkspaceMode.LOOKDEV_FOCUS) {
+                viewState.setLookdevPanelExpanded(true);
+            }
+            engine.rebuildMaterialDock();
+            engine.focusCanvas();
+        });
+        return button;
     }
 
     void refreshSummary() {
@@ -189,6 +293,10 @@ final class MaterialDockSession {
 
     void refreshInspector() {
         if (inspectorPanel == null) {
+            refreshSummary();
+            if (canvas != null) {
+                canvas.repaint();
+            }
             return;
         }
         inspectorPanel.removeAll();
@@ -204,7 +312,7 @@ final class MaterialDockSession {
             inspectorPanel.add(EngineMaterialDock.createMiniButton(engine, UiStrings.MaterialDock.RESET_DEFAULT_GRAPH, () -> {
                 noteMaterialHistoryLabel("Reset grafu materiálu");
                 graph.clearAndReset();
-                MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
+                MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(graph, material);
                 EngineMaterialDock.markCustom(material);
                 markStructureChanged();
             }));
@@ -230,6 +338,7 @@ final class MaterialDockSession {
                 UiTheme.MATERIAL_WORKSPACE_INSPECTOR_WIDTH,
                 preferred.width + 28
         );
+        viewState.setInspectorWidth(resolvedWidth);
         Dimension width = new Dimension(resolvedWidth, 0);
         inspectorScroll.setPreferredSize(width);
         inspectorScroll.setMinimumSize(width);
@@ -240,6 +349,7 @@ final class MaterialDockSession {
     }
 
     void markStructureChanged() {
+        ensureGraphAttached();
         MaterialGraphAuthoring.syncCompatibilityBindings(material);
         commitMaterialHistoryIfChanged(defaultMaterialHistoryLabel());
         refreshInspector();
@@ -362,7 +472,7 @@ final class MaterialDockSession {
         actions.add(EngineMaterialDock.createMiniButton(engine, UiStrings.MaterialDock.RESET_GRAPH, () -> {
             noteMaterialHistoryLabel("Reset grafu materiálu");
             graph.clearAndReset();
-            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
+            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(graph, material);
             EngineMaterialDock.markCustom(material);
             markStructureChanged();
         }));
@@ -376,8 +486,11 @@ final class MaterialDockSession {
         JPanel right = new JPanel(new BorderLayout(0, 8));
         right.setOpaque(false);
         previewPanel = new MaterialDockPreviewPanel(this);
-        previewPanel.setPreferredSize(new Dimension(236, 184));
-        previewPanel.setMinimumSize(new Dimension(236, 184));
+        Dimension previewSize = workspaceMode() == MaterialDockViewState.WorkspaceMode.LOOKDEV_FOCUS
+                ? new Dimension(320, 220)
+                : new Dimension(236, 184);
+        previewPanel.setPreferredSize(previewSize);
+        previewPanel.setMinimumSize(previewSize);
         right.add(previewPanel, BorderLayout.CENTER);
         right.add(buildPreviewControls(), BorderLayout.SOUTH);
 
@@ -596,6 +709,7 @@ final class MaterialDockSession {
             case IMPORTED_BASE_COLOR -> buildTextureInspector(node, material.getDiffuseMap(), "Base Color");
             case IMPORTED_METAL_ROUGHNESS -> buildTextureInspector(node, material.getMetallicRoughnessMap(), "Metal/Roughness");
             case IMPORTED_EMISSIVE -> buildTextureInspector(node, material.getEmissiveMap(), "Emissive");
+            case IMPORTED_NORMAL -> buildTextureInspector(node, material.getNormalMap(), "Normal");
             case TEXTURE_COORDINATE -> buildTextureCoordinateInspector(node);
             case MAPPING -> buildMappingInspector(node);
             case IMAGE_TEXTURE -> buildImageTextureInspector(node);
@@ -748,12 +862,10 @@ final class MaterialDockSession {
         inspectorPanel.add(EngineMaterialDock.createMiniButton(engine, UiStrings.MaterialDock.RESET_DEFAULT_GRAPH, () -> {
             noteMaterialHistoryLabel("Reset grafu materiálu");
             graph.clearAndReset();
-            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
+            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(graph, material);
             EngineMaterialDock.markCustom(material);
             markStructureChanged();
         }));
-        inspectorPanel.add(Box.createRigidArea(new Dimension(0, 6)));
-        inspectorPanel.add(EngineMaterialDock.createMiniButton(engine, UiStrings.Common.BACK_TO_TIMELINE, engine::showTimelineWorkspace));
     }
 
     private void buildPrincipledInspector(MaterialNodeGraph.Node node) {
@@ -1543,6 +1655,9 @@ final class MaterialGraphCanvas extends JComponent {
     private static final int ROW_HEIGHT = 22;
     private static final int SOCKET_RADIUS = 6;
     private static final int MIN_ROWS = 3;
+    private static final int DETAIL_LINE_HEIGHT = 15;
+    private static final int TEXTURE_PREVIEW_HEIGHT = 74;
+    private static final int SWATCH_PREVIEW_HEIGHT = 16;
     private static final Stroke LINK_STROKE = new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
 
     private final MaterialDockSession session;
@@ -1716,6 +1831,214 @@ final class MaterialGraphCanvas extends JComponent {
         addMouseWheelListener(mouseHandler);
     }
 
+    void autoLayoutAll() {
+        applyAutoLayout(session.graph.getNodes(), true, "Auto layout grafu");
+    }
+
+    void autoLayoutSelection() {
+        List<MaterialNodeGraph.Node> selection = connectedSelectionNodes();
+        applyAutoLayout(selection, false, "Srovnání výběru");
+    }
+
+    void focusGraph() {
+        frameAllNodes();
+    }
+
+    private void autoLayoutAfterNodeCreate(String historyLabel) {
+        applyAutoLayout(session.graph.getNodes(), true, historyLabel);
+    }
+
+    private void applyAutoLayout(List<MaterialNodeGraph.Node> targetNodes,
+                                 boolean frameAllAfter,
+                                 String historyLabel) {
+        if (targetNodes == null || targetNodes.isEmpty()) {
+            if (frameAllAfter) {
+                frameAllNodes();
+            }
+            return;
+        }
+        ArrayList<MaterialNodeGraph.Node> nodes = new ArrayList<>();
+        LinkedHashSet<Integer> nodeIds = new LinkedHashSet<>();
+        for (MaterialNodeGraph.Node node : targetNodes) {
+            if (node != null && nodeIds.add(node.getId())) {
+                nodes.add(node);
+            }
+        }
+        if (nodes.isEmpty()) {
+            return;
+        }
+
+        HashMap<Integer, Integer> depthCache = new HashMap<>();
+        HashMap<Integer, Integer> visiting = new HashMap<>();
+        int maxDepth = 0;
+        for (MaterialNodeGraph.Node node : nodes) {
+            maxDepth = Math.max(maxDepth, downstreamDepth(node.getId(), nodeIds, depthCache, visiting));
+        }
+
+        HashMap<Integer, ArrayList<MaterialNodeGraph.Node>> byDepth = new HashMap<>();
+        for (MaterialNodeGraph.Node node : nodes) {
+            int depth = depthCache.getOrDefault(node.getId(), 0);
+            byDepth.computeIfAbsent(depth, key -> new ArrayList<>()).add(node);
+        }
+
+        int columnGap = 112;
+        int rowGap = 38;
+        int startX;
+        int startY;
+        if (frameAllAfter) {
+            startX = 54;
+            startY = 72;
+        } else {
+            Rectangle anchor = graphBounds(nodes);
+            startX = (int) Math.round(anchor.getX());
+            startY = (int) Math.round(anchor.getY());
+        }
+
+        int[] columnWidths = new int[maxDepth + 1];
+        for (MaterialNodeGraph.Node node : nodes) {
+            int column = maxDepth - depthCache.getOrDefault(node.getId(), 0);
+            columnWidths[column] = Math.max(columnWidths[column], baseNodeWidth(node));
+        }
+        int[] xPositions = new int[maxDepth + 1];
+        int cursorX = startX;
+        for (int column = 0; column < xPositions.length; column++) {
+            xPositions[column] = cursorX;
+            cursorX += Math.max(208, columnWidths[column]) + columnGap;
+        }
+
+        HashMap<Integer, Double> centerY = new HashMap<>();
+        for (int depth = 0; depth <= maxDepth; depth++) {
+            ArrayList<MaterialNodeGraph.Node> layer = byDepth.get(depth);
+            if (layer == null || layer.isEmpty()) {
+                continue;
+            }
+            layer.sort(Comparator
+                    .comparingDouble((MaterialNodeGraph.Node node) -> outgoingBarycenter(node.getId(), nodeIds, centerY))
+                    .thenComparingDouble(MaterialNodeGraph.Node::getY)
+                    .thenComparingInt(node -> node.getType().ordinal()));
+
+            int column = maxDepth - depth;
+            int layerY = startY;
+            for (MaterialNodeGraph.Node node : layer) {
+                node.setX(xPositions[column]);
+                node.setY(layerY);
+                layerY += baseNodeHeight(node) + rowGap;
+                centerY.put(node.getId(), node.getY() + baseNodeHeight(node) * 0.5);
+            }
+        }
+
+        session.noteMaterialHistoryLabel(historyLabel);
+        session.markStructureChanged();
+        if (frameAllAfter) {
+            frameAllNodes();
+        } else {
+            frameSelectedNode();
+        }
+    }
+
+    private List<MaterialNodeGraph.Node> connectedSelectionNodes() {
+        MaterialNodeGraph.Node selected = session.graph.getNodeById(session.graph.getSelectedNodeId());
+        if (selected == null) {
+            return new ArrayList<>(session.graph.getNodes());
+        }
+        LinkedHashSet<Integer> open = new LinkedHashSet<>();
+        LinkedHashSet<Integer> visited = new LinkedHashSet<>();
+        open.add(selected.getId());
+        while (!open.isEmpty()) {
+            int currentId = open.iterator().next();
+            open.remove(currentId);
+            if (!visited.add(currentId)) {
+                continue;
+            }
+            for (MaterialNodeGraph.Link link : session.graph.getLinks()) {
+                if (link.getFromNodeId() == currentId && !visited.contains(link.getToNodeId())) {
+                    open.add(link.getToNodeId());
+                }
+                if (link.getToNodeId() == currentId && !visited.contains(link.getFromNodeId())) {
+                    open.add(link.getFromNodeId());
+                }
+            }
+        }
+        ArrayList<MaterialNodeGraph.Node> nodes = new ArrayList<>();
+        for (MaterialNodeGraph.Node node : session.graph.getNodes()) {
+            if (visited.contains(node.getId())) {
+                nodes.add(node);
+            }
+        }
+        return nodes;
+    }
+
+    private int downstreamDepth(int nodeId,
+                                Set<Integer> allowedNodeIds,
+                                Map<Integer, Integer> depthCache,
+                                Map<Integer, Integer> visiting) {
+        Integer cached = depthCache.get(nodeId);
+        if (cached != null) {
+            return cached;
+        }
+        if (visiting.put(nodeId, 1) != null) {
+            return 0;
+        }
+        int max = nodeId == outputNodeId() ? 0 : -1;
+        for (MaterialNodeGraph.Link link : session.graph.getLinks()) {
+            if (link.getFromNodeId() != nodeId || !allowedNodeIds.contains(link.getToNodeId())) {
+                continue;
+            }
+            max = Math.max(max, 1 + downstreamDepth(link.getToNodeId(), allowedNodeIds, depthCache, visiting));
+        }
+        visiting.remove(nodeId);
+        int resolved = Math.max(0, max);
+        depthCache.put(nodeId, resolved);
+        return resolved;
+    }
+
+    private double outgoingBarycenter(int nodeId, Set<Integer> allowedNodeIds, Map<Integer, Double> centerY) {
+        double sum = 0.0;
+        int count = 0;
+        for (MaterialNodeGraph.Link link : session.graph.getLinks()) {
+            if (link.getFromNodeId() != nodeId || !allowedNodeIds.contains(link.getToNodeId())) {
+                continue;
+            }
+            Double targetCenter = centerY.get(link.getToNodeId());
+            if (targetCenter != null) {
+                sum += targetCenter;
+                count++;
+            }
+        }
+        if (count == 0) {
+            MaterialNodeGraph.Node node = session.graph.getNodeById(nodeId);
+            return node == null ? 0.0 : node.getY();
+        }
+        return sum / count;
+    }
+
+    private int outputNodeId() {
+        MaterialNodeGraph.Node output = session.graph.findFirstNode(MaterialNodeGraph.NodeType.OUTPUT_MATERIAL);
+        return output == null ? -1 : output.getId();
+    }
+
+    private Rectangle graphBounds(List<MaterialNodeGraph.Node> nodes) {
+        double minX = Double.POSITIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+        for (MaterialNodeGraph.Node node : nodes) {
+            minX = Math.min(minX, node.getX());
+            minY = Math.min(minY, node.getY());
+            maxX = Math.max(maxX, node.getX() + baseNodeWidth(node));
+            maxY = Math.max(maxY, node.getY() + baseNodeHeight(node));
+        }
+        if (!Double.isFinite(minX) || !Double.isFinite(minY)) {
+            return new Rectangle(54, 72, 0, 0);
+        }
+        return new Rectangle(
+                (int) Math.round(minX),
+                (int) Math.round(minY),
+                (int) Math.round(Math.max(0.0, maxX - minX)),
+                (int) Math.round(Math.max(0.0, maxY - minY))
+        );
+    }
+
     private void installKeyBindings() {
         ActionMap actionMap = getActionMap();
         actionMap.put(EditorActionId.DELETE, new AbstractAction() {
@@ -1766,10 +2089,9 @@ final class MaterialGraphCanvas extends JComponent {
         }
         MaterialNodeGraph.Node copy = session.graph.duplicateNode(node.getId(), 28.0, 28.0);
         if (copy != null) {
-            session.noteMaterialHistoryLabel("Duplikace uzlu");
             EngineMaterialDock.markCustom(session.material);
             session.selectNode(copy);
-            session.markStructureChanged();
+            autoLayoutAfterNodeCreate("Duplikace uzlu");
         }
     }
 
@@ -1800,12 +2122,10 @@ final class MaterialGraphCanvas extends JComponent {
         double maxY = Double.NEGATIVE_INFINITY;
         for (MaterialNodeGraph.Node node : nodes) {
             int width = baseNodeWidth(node);
-            int rows = Math.max(MIN_ROWS, Math.max(node.getType().inputs().length, node.getType().outputs().length));
-            int height = HEADER_HEIGHT + 18 + rows * ROW_HEIGHT + 10;
             minX = Math.min(minX, node.getX());
             minY = Math.min(minY, node.getY());
             maxX = Math.max(maxX, node.getX() + width);
-            maxY = Math.max(maxY, node.getY() + height);
+            maxY = Math.max(maxY, node.getY() + baseNodeHeight(node));
         }
         double graphWidth = Math.max(240.0, maxX - minX);
         double graphHeight = Math.max(180.0, maxY - minY);
@@ -1827,6 +2147,7 @@ final class MaterialGraphCanvas extends JComponent {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         drawGrid(g2);
         drawLinks(g2);
         drawNodes(g2);
@@ -1870,6 +2191,7 @@ final class MaterialGraphCanvas extends JComponent {
     }
 
     private void drawNodes(Graphics2D g2) {
+        Font baseFont = g2.getFont();
         for (MaterialNodeGraph.Node node : session.graph.getNodes()) {
             NodeLayout layout = nodeLayout(node);
             int x = layout.bounds.x;
@@ -1878,6 +2200,12 @@ final class MaterialGraphCanvas extends JComponent {
             int h = layout.bounds.height;
             Color accent = new Color(node.getType().accentRgb());
             boolean selected = node.getId() == session.graph.getSelectedNodeId();
+            int detailHeight = scale(nodeDetailHeight(node));
+            int socketOffset = HEADER_HEIGHT + nodeDetailHeight(node);
+            Font titleFont = scaledFont(baseFont, Font.BOLD, 13f);
+            Font categoryFont = scaledFont(baseFont, Font.PLAIN, 10.5f);
+            Font socketFont = scaledFont(baseFont, Font.PLAIN, 10.5f);
+            Font detailFont = scaledFont(baseFont, Font.PLAIN, 10.0f);
 
             if (selected) {
                 g2.setColor(new Color(
@@ -1899,14 +2227,20 @@ final class MaterialGraphCanvas extends JComponent {
             String title = node.getType() == MaterialNodeGraph.NodeType.IMAGE_TEXTURE
                     ? node.getText("label", node.getType().title())
                     : node.getType().title();
+            g2.setFont(titleFont);
             g2.setColor(new Color(245, 249, 255));
-            g2.drawString(title, x + scale(12), y + scale(18));
+            g2.drawString(trimText(g2, title, w - scale(24)), x + scale(12), y + scale(18));
+            g2.setFont(categoryFont);
             g2.setColor(new Color(228, 235, 242));
             g2.drawString(node.getType().category(), x + scale(12), y + scale(30));
+            if (detailHeight > 0) {
+                drawNodeDetails(g2, node, x + scale(12), y + scale(HEADER_HEIGHT) + scale(10), w - scale(24), detailFont);
+            }
 
             int rows = Math.max(MIN_ROWS, Math.max(node.getType().inputs().length, node.getType().outputs().length));
+            g2.setFont(socketFont);
             for (int i = 0; i < rows; i++) {
-                int baseline = y + scale(HEADER_HEIGHT + 20 + i * ROW_HEIGHT);
+                int baseline = y + scale(socketOffset + 20 + i * ROW_HEIGHT);
                 MaterialNodeGraph.SocketDefinition input = i < node.getType().inputs().length ? node.getType().inputs()[i] : null;
                 MaterialNodeGraph.SocketDefinition output = i < node.getType().outputs().length ? node.getType().outputs()[i] : null;
                 if (input != null) {
@@ -1931,6 +2265,286 @@ final class MaterialGraphCanvas extends JComponent {
                 }
             }
         }
+    }
+
+    private void drawNodeDetails(Graphics2D g2,
+                                 MaterialNodeGraph.Node node,
+                                 int x,
+                                 int y,
+                                 int width,
+                                 Font detailFont) {
+        int cursorY = y;
+        if (showsTexturePreview(node)) {
+            drawTexturePreview(g2, node, x, cursorY, width, scale(TEXTURE_PREVIEW_HEIGHT));
+            cursorY += scale(TEXTURE_PREVIEW_HEIGHT + 8);
+        } else if (showsSwatchPreview(node)) {
+            drawSwatchPreview(g2, node, x, cursorY, width, scale(SWATCH_PREVIEW_HEIGHT));
+            cursorY += scale(SWATCH_PREVIEW_HEIGHT + 8);
+        }
+
+        g2.setFont(detailFont);
+        g2.setColor(UiTheme.TEXT_MUTED);
+        FontMetrics metrics = g2.getFontMetrics();
+        for (String line : visibleNodeSummaryLines(node)) {
+            g2.drawString(trimText(g2, line, width), x, cursorY + metrics.getAscent());
+            cursorY += metrics.getHeight();
+        }
+    }
+
+    private void drawTexturePreview(Graphics2D g2,
+                                    MaterialNodeGraph.Node node,
+                                    int x,
+                                    int y,
+                                    int width,
+                                    int height) {
+        int drawHeight = Math.max(scale(34), height);
+        g2.setColor(new Color(18, 24, 31));
+        g2.fillRoundRect(x, y, width, drawHeight, 12, 12);
+        paintChecker(g2, x + 1, y + 1, width - 2, drawHeight - 2);
+
+        Texture texture = resolveNodeTexture(node);
+        if (texture != null) {
+            BufferedImage image = renderTexturePreview(texture, Math.max(24, width - 2), Math.max(24, drawHeight - 2), resolveTextureFlipV(node));
+            g2.drawImage(image, x + 1, y + 1, width - 2, drawHeight - 2, null);
+        } else {
+            g2.setColor(new Color(255, 255, 255, 110));
+            g2.drawString("no texture", x + scale(10), y + drawHeight / 2 + scale(4));
+        }
+
+        g2.setColor(new Color(255, 255, 255, 46));
+        g2.drawRoundRect(x, y, width, drawHeight, 12, 12);
+    }
+
+    private void drawSwatchPreview(Graphics2D g2,
+                                   MaterialNodeGraph.Node node,
+                                   int x,
+                                   int y,
+                                   int width,
+                                   int height) {
+        int drawHeight = Math.max(scale(10), height);
+        if (node.getType() == MaterialNodeGraph.NodeType.COLOR_RAMP) {
+            Vec3 a = node.getColor("color_a", new Vec3(0.08, 0.08, 0.08));
+            Vec3 b = node.getColor("color_b", new Vec3(0.95, 0.95, 0.95));
+            for (int i = 0; i < width; i++) {
+                double t = width <= 1 ? 0.0 : i / (double) (width - 1);
+                Vec3 mix = Vec3.lerp(a, b, t, new Vec3());
+                g2.setColor(new Color(
+                        (int) Math.round(EngineMaterialDock.clamp01(mix.x) * 255.0),
+                        (int) Math.round(EngineMaterialDock.clamp01(mix.y) * 255.0),
+                        (int) Math.round(EngineMaterialDock.clamp01(mix.z) * 255.0)
+                ));
+                g2.drawLine(x + i, y, x + i, y + drawHeight);
+            }
+        } else {
+            Vec3 color = node.getColor("color", Vec3.ONE);
+            g2.setColor(new Color(
+                    (int) Math.round(EngineMaterialDock.clamp01(color.x) * 255.0),
+                    (int) Math.round(EngineMaterialDock.clamp01(color.y) * 255.0),
+                    (int) Math.round(EngineMaterialDock.clamp01(color.z) * 255.0)
+            ));
+            g2.fillRoundRect(x, y, width, drawHeight, 10, 10);
+        }
+        g2.setColor(new Color(255, 255, 255, 52));
+        g2.drawRoundRect(x, y, width, drawHeight, 10, 10);
+    }
+
+    private void paintChecker(Graphics2D g2, int x, int y, int width, int height) {
+        int tile = Math.max(4, scale(8));
+        Color a = new Color(32, 38, 46);
+        Color b = new Color(22, 27, 34);
+        for (int py = y; py < y + height; py += tile) {
+            for (int px = x; px < x + width; px += tile) {
+                boolean even = (((px - x) / tile) + ((py - y) / tile)) % 2 == 0;
+                g2.setColor(even ? a : b);
+                g2.fillRect(px, py, Math.min(tile, x + width - px), Math.min(tile, y + height - py));
+            }
+        }
+    }
+
+    private BufferedImage renderTexturePreview(Texture texture, int width, int height, boolean flipV) {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int py = 0; py < height; py++) {
+            double v = height <= 1 ? 0.0 : py / (double) (height - 1);
+            for (int px = 0; px < width; px++) {
+                double u = width <= 1 ? 0.0 : px / (double) (width - 1);
+                image.setRGB(px, py, texture.sampleBilinear(u, v, flipV));
+            }
+        }
+        return image;
+    }
+
+    private List<String> visibleNodeSummaryLines(MaterialNodeGraph.Node node) {
+        List<String> lines = nodeSummaryLines(node);
+        int limit = session.graph.getZoom() < 0.65 ? 1 : 2;
+        if (lines.size() <= limit) {
+            return lines;
+        }
+        return new ArrayList<>(lines.subList(0, limit));
+    }
+
+    private List<String> nodeSummaryLines(MaterialNodeGraph.Node node) {
+        ArrayList<String> lines = new ArrayList<>(2);
+        if (node == null) {
+            return lines;
+        }
+        switch (node.getType()) {
+            case OUTPUT_MATERIAL -> {
+                MaterialNodeGraph.Link surface = session.graph.findInputLink(node.getId(), "surface");
+                MaterialNodeGraph.Link volume = session.graph.findInputLink(node.getId(), "volume");
+                lines.add(surface != null && volume != null ? "surface + volume" : surface != null ? "surface only" : volume != null ? "volume only" : "no output");
+            }
+            case PRINCIPLED_BSDF -> {
+                lines.add("rough " + EngineMaterialDock.formatShort(node.getNumber("roughness", 0.45))
+                        + " | metal " + EngineMaterialDock.formatShort(node.getNumber("metallic", 0.0)));
+                lines.add("trans " + EngineMaterialDock.formatShort(node.getNumber("transmission", 0.0))
+                        + " | ior " + EngineMaterialDock.formatShort(node.getNumber("ior", 1.45)));
+            }
+            case GLASS_BSDF -> {
+                lines.add("rough " + EngineMaterialDock.formatShort(node.getNumber("roughness", 0.04))
+                        + " | ior " + EngineMaterialDock.formatShort(node.getNumber("ior", 1.45)));
+                lines.add("disp " + EngineMaterialDock.formatShort(node.getNumber("dispersion", 0.0))
+                        + " | opacity " + EngineMaterialDock.formatShort(node.getNumber("opacity", 1.0)));
+            }
+            case EMISSION_SHADER -> lines.add("strength " + EngineMaterialDock.formatShort(node.getNumber("strength", 2.0)));
+            case MIX_SHADER -> lines.add("factor " + EngineMaterialDock.formatShort(node.getNumber("factor", 0.5)));
+            case VOLUME_MEDIUM -> {
+                lines.add("density " + EngineMaterialDock.formatShort(node.getNumber("density", 0.0))
+                        + " | anis " + EngineMaterialDock.formatShort(node.getNumber("anisotropy", 0.0)));
+                lines.add("thick " + EngineMaterialDock.formatShort(node.getNumber("thickness", 0.1)));
+            }
+            case IMPORTED_BASE_COLOR -> {
+                lines.add(texturePreviewSummary(session.material.getDiffuseMap()));
+                lines.add("color x" + EngineMaterialDock.formatShort(session.material.getDiffuseColor().x)
+                        + " | alpha " + EngineMaterialDock.formatShort(session.material.getOpacity()));
+            }
+            case IMPORTED_METAL_ROUGHNESS -> {
+                lines.add(texturePreviewSummary(session.material.getMetallicRoughnessMap()));
+                lines.add("rough " + EngineMaterialDock.formatShort(session.material.getRoughness())
+                        + " | metal " + EngineMaterialDock.formatShort(session.material.getMetallic()));
+            }
+            case IMPORTED_EMISSIVE -> {
+                lines.add(texturePreviewSummary(session.material.getEmissiveMap()));
+                lines.add("strength " + EngineMaterialDock.formatShort(session.material.getEmissionStrength()));
+            }
+            case IMPORTED_NORMAL -> {
+                lines.add(texturePreviewSummary(session.material.getNormalMap()));
+                lines.add("strength " + EngineMaterialDock.formatShort(session.material.getNormalScale()));
+            }
+            case TEXTURE_COORDINATE -> lines.add("UV0 / UV1 / world");
+            case MAPPING -> {
+                lines.add("loc " + EngineMaterialDock.formatShort(node.getNumber("location_x", 0.0))
+                        + " " + EngineMaterialDock.formatShort(node.getNumber("location_y", 0.0)));
+                lines.add("scale " + EngineMaterialDock.formatShort(node.getNumber("scale_x", 1.0))
+                        + " | rot " + EngineMaterialDock.formatShort(node.getNumber("rotation_z", 0.0)));
+            }
+            case IMAGE_TEXTURE -> {
+                String path = node.getText("file_path", "");
+                if (path != null && !path.isBlank()) {
+                    lines.add(Path.of(path).getFileName().toString());
+                }
+                lines.add(node.getEnum("uv_set", "UV0") + " | " + node.getEnum("color_space", MaterialNodeGraph.TextureColorSpace.SRGB.name()));
+            }
+            case NORMAL_MAP -> lines.add("strength " + EngineMaterialDock.formatShort(node.getNumber("strength", 1.0)));
+            case TRANSPARENT_BSDF -> lines.add("opacity " + EngineMaterialDock.formatShort(node.getNumber("opacity", 0.0)));
+            case RGB -> {
+                Vec3 color = node.getColor("color", Vec3.ONE);
+                lines.add("rgb " + EngineMaterialDock.formatShort(color.x) + " " + EngineMaterialDock.formatShort(color.y) + " " + EngineMaterialDock.formatShort(color.z));
+            }
+            case VALUE -> lines.add("value " + EngineMaterialDock.formatShort(node.getNumber("value", 0.0)));
+            case NOISE_TEXTURE -> {
+                lines.add("scale " + EngineMaterialDock.formatShort(node.getNumber("scale", 5.0))
+                        + " | detail " + EngineMaterialDock.formatShort(node.getNumber("detail", 4.0)));
+                lines.add("rough " + EngineMaterialDock.formatShort(node.getNumber("roughness", 0.55))
+                        + " | dist " + EngineMaterialDock.formatShort(node.getNumber("distortion", 0.15)));
+            }
+            case COLOR_RAMP -> lines.add("A " + EngineMaterialDock.formatShort(node.getNumber("position_a", 0.18))
+                    + " -> B " + EngineMaterialDock.formatShort(node.getNumber("position_b", 0.82)));
+            case MIX_COLOR -> lines.add(node.getEnum("blend_mode", MaterialNodeGraph.BlendMode.MIX.name())
+                    + " | f " + EngineMaterialDock.formatShort(node.getNumber("factor", 0.5)));
+            case MATH -> lines.add(node.getEnum("operation", MaterialNodeGraph.MathOperation.MULTIPLY.name())
+                    + " | a " + EngineMaterialDock.formatShort(node.getNumber("a", 0.5))
+                    + " b " + EngineMaterialDock.formatShort(node.getNumber("b", 0.5)));
+            case CLAMP -> lines.add("min " + EngineMaterialDock.formatShort(node.getNumber("min", 0.0))
+                    + " | max " + EngineMaterialDock.formatShort(node.getNumber("max", 1.0)));
+            case MAP_RANGE -> lines.add("from " + EngineMaterialDock.formatShort(node.getNumber("from_min", 0.0))
+                    + " -> " + EngineMaterialDock.formatShort(node.getNumber("from_max", 1.0)));
+            default -> {
+            }
+        }
+        return lines;
+    }
+
+    private String texturePreviewSummary(TextureMap map) {
+        if (map == null || !map.hasTexture()) {
+            return "no texture";
+        }
+        Texture texture = map.getTexture();
+        return texture.getWidth() + "x" + texture.getHeight() + " | UV" + map.getTexCoord();
+    }
+
+    private boolean showsTexturePreview(MaterialNodeGraph.Node node) {
+        return node != null && switch (node.getType()) {
+            case IMPORTED_BASE_COLOR,
+                 IMPORTED_METAL_ROUGHNESS,
+                 IMPORTED_EMISSIVE,
+                 IMPORTED_NORMAL,
+                 IMAGE_TEXTURE -> true;
+            default -> false;
+        };
+    }
+
+    private boolean showsSwatchPreview(MaterialNodeGraph.Node node) {
+        return node != null && (node.getType() == MaterialNodeGraph.NodeType.RGB
+                || node.getType() == MaterialNodeGraph.NodeType.COLOR_RAMP);
+    }
+
+    private int nodeDetailHeight(MaterialNodeGraph.Node node) {
+        int height = 0;
+        int summaryLines = Math.min(2, nodeSummaryLines(node).size());
+        if (showsTexturePreview(node)) {
+            height += TEXTURE_PREVIEW_HEIGHT + 8;
+        } else if (showsSwatchPreview(node)) {
+            height += SWATCH_PREVIEW_HEIGHT + 8;
+        }
+        if (summaryLines > 0) {
+            height += summaryLines * DETAIL_LINE_HEIGHT + 4;
+        }
+        return height;
+    }
+
+    private Texture resolveNodeTexture(MaterialNodeGraph.Node node) {
+        if (node == null) {
+            return null;
+        }
+        return switch (node.getType()) {
+            case IMPORTED_BASE_COLOR -> session.material.getDiffuseMap().getTexture();
+            case IMPORTED_METAL_ROUGHNESS -> session.material.getMetallicRoughnessMap().getTexture();
+            case IMPORTED_EMISSIVE -> session.material.getEmissiveMap().getTexture();
+            case IMPORTED_NORMAL -> session.material.getNormalMap().getTexture();
+            case IMAGE_TEXTURE -> NodeTextureLibrary.load(node.getText("file_path", null));
+            default -> null;
+        };
+    }
+
+    private boolean resolveTextureFlipV(MaterialNodeGraph.Node node) {
+        if (node == null) {
+            return true;
+        }
+        return switch (node.getType()) {
+            case IMPORTED_BASE_COLOR -> session.material.getDiffuseMap().isFlipV();
+            case IMPORTED_METAL_ROUGHNESS -> session.material.getMetallicRoughnessMap().isFlipV();
+            case IMPORTED_EMISSIVE -> session.material.getEmissiveMap().isFlipV();
+            case IMPORTED_NORMAL -> session.material.getNormalMap().isFlipV();
+            case IMAGE_TEXTURE -> node.getNumber("flip_v", 0.0) >= 0.5;
+            default -> true;
+        };
+    }
+
+    private Font scaledFont(Font baseFont, int style, float baseSize) {
+        float zoom = (float) session.graph.getZoom();
+        float scaledSize = baseSize * (0.55f + zoom * 0.45f);
+        scaledSize = Math.max(8.0f, Math.min(baseSize * 1.45f, scaledSize));
+        return baseFont.deriveFont(style, scaledSize);
     }
 
     private void drawPendingLink(Graphics2D g2) {
@@ -2083,10 +2697,9 @@ final class MaterialGraphCanvas extends JComponent {
             duplicate.addActionListener(e -> {
                 MaterialNodeGraph.Node copy = session.graph.duplicateNode(hit.node.getId(), 28.0, 28.0);
                 if (copy != null) {
-                    session.noteMaterialHistoryLabel("Duplikace uzlu");
                     EngineMaterialDock.markCustom(session.material);
                     session.selectNode(copy);
-                    session.markStructureChanged();
+                    autoLayoutAfterNodeCreate("Duplikace uzlu");
                 }
             });
             popup.add(duplicate);
@@ -2105,10 +2718,9 @@ final class MaterialGraphCanvas extends JComponent {
             JMenuItem item = new JMenuItem(type.title());
             item.addActionListener(e -> {
                 MaterialNodeGraph.Node created = session.graph.addNode(type, graphX, graphY);
-                session.noteMaterialHistoryLabel("Přidání uzlu");
                 EngineMaterialDock.markCustom(session.material);
                 session.selectNode(created);
-                session.markStructureChanged();
+                autoLayoutAfterNodeCreate("Přidání uzlu");
             });
             category.add(item);
         }
@@ -2118,10 +2730,18 @@ final class MaterialGraphCanvas extends JComponent {
         reset.addActionListener(e -> {
             session.noteMaterialHistoryLabel("Reset grafu materiálu");
             session.graph.clearAndReset();
-            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(session.material);
+            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(session.graph, session.material);
             EngineMaterialDock.markCustom(session.material);
             session.markStructureChanged();
         });
+        JMenuItem autoLayoutItem = new JMenuItem(UiStrings.MaterialDock.AUTO_LAYOUT);
+        autoLayoutItem.addActionListener(e -> autoLayoutAll());
+        JMenuItem autoLayoutSelectionItem = new JMenuItem(UiStrings.MaterialDock.AUTO_LAYOUT_SELECTION);
+        autoLayoutSelectionItem.setEnabled(session.graph.getSelectedNodeId() >= 0);
+        autoLayoutSelectionItem.addActionListener(e -> autoLayoutSelection());
+        popup.addSeparator();
+        popup.add(autoLayoutItem);
+        popup.add(autoLayoutSelectionItem);
         popup.add(reset);
         UiTheme.stylePopupMenu(popup);
         popup.show(this, point.x, point.y);
@@ -2154,22 +2774,29 @@ final class MaterialGraphCanvas extends JComponent {
 
     private NodeLayout nodeLayout(MaterialNodeGraph.Node node) {
         int baseWidth = baseNodeWidth(node);
-        int rows = Math.max(MIN_ROWS, Math.max(node.getType().inputs().length, node.getType().outputs().length));
-        int baseHeight = HEADER_HEIGHT + 18 + rows * ROW_HEIGHT + 10;
         int x = (int) Math.round(session.graph.getViewOffsetX() + node.getX() * session.graph.getZoom());
         int y = (int) Math.round(session.graph.getViewOffsetY() + node.getY() * session.graph.getZoom());
         int width = scale(baseWidth);
-        int height = scale(baseHeight);
+        int height = scale(baseNodeHeight(node));
         return new NodeLayout(new Rectangle(x, y, width, height));
+    }
+
+    private int baseNodeHeight(MaterialNodeGraph.Node node) {
+        int rows = Math.max(MIN_ROWS, Math.max(node.getType().inputs().length, node.getType().outputs().length));
+        return HEADER_HEIGHT + nodeDetailHeight(node) + 18 + rows * ROW_HEIGHT + 10;
     }
 
     private int baseNodeWidth(MaterialNodeGraph.Node node) {
         return switch (node.getType()) {
-            case PRINCIPLED_BSDF -> 286;
+            case PRINCIPLED_BSDF -> 292;
             case OUTPUT_MATERIAL -> 242;
             case VOLUME_MEDIUM -> 238;
             case MAPPING -> 244;
-            case IMAGE_TEXTURE -> 252;
+            case IMAGE_TEXTURE,
+                 IMPORTED_BASE_COLOR,
+                 IMPORTED_METAL_ROUGHNESS,
+                 IMPORTED_EMISSIVE,
+                 IMPORTED_NORMAL -> 272;
             case NORMAL_MAP -> 236;
             case TEXTURE_COORDINATE -> 228;
             case TRANSPARENT_BSDF -> 232;
@@ -2191,7 +2818,7 @@ final class MaterialGraphCanvas extends JComponent {
             }
             NodeLayout nodeLayout = nodeLayout(node);
             int x = input ? nodeLayout.bounds.x + scale(10) : nodeLayout.bounds.x + nodeLayout.bounds.width - scale(10);
-            int y = nodeLayout.bounds.y + scale(HEADER_HEIGHT + 14 + i * ROW_HEIGHT);
+            int y = nodeLayout.bounds.y + scale(HEADER_HEIGHT + nodeDetailHeight(node) + 14 + i * ROW_HEIGHT);
             Point center = new Point(x, y);
             Rectangle hitBounds = new Rectangle(center.x - scale(10), center.y - scale(10), scale(20), scale(20));
             return new SocketLayout(definition, input, center, hitBounds);

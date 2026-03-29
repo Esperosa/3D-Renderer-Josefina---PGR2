@@ -85,13 +85,16 @@ final class MaterialGraphValueEvaluator {
             return fallback;
         }
         Vec3 value;
-        switch (node.getType()) {
-            case TEXTURE_COORDINATE -> value = evaluateTextureCoordinate(state, outputSocket);
-            case MAPPING -> value = evaluateMapping(state, node);
-            case NORMAL_MAP -> value = evaluateNormalVector(state, node);
-            default -> value = copyColor(fallback, state.borrowVector());
+        try {
+            switch (node.getType()) {
+                case TEXTURE_COORDINATE -> value = evaluateTextureCoordinate(state, outputSocket);
+                case MAPPING -> value = evaluateMapping(state, node);
+                case NORMAL_MAP -> value = evaluateNormalVector(state, node);
+                default -> value = copyColor(fallback, state.borrowVector());
+            }
+        } finally {
+            state.activeKeys.remove(cacheKey);
         }
-        state.activeKeys.remove(cacheKey);
         state.vectorCache.put(cacheKey, value);
         return value;
     }
@@ -108,21 +111,24 @@ final class MaterialGraphValueEvaluator {
             return fallback;
         }
         Vec3 value;
-        switch (node.getType()) {
-            case COMBINE_RGB -> value = evaluateCombineRgb(state, node);
-            case RGB -> value = copyColor(node.getColor("color", fallback), state.borrowColor());
-            case NOISE_TEXTURE -> value = gray(noiseFactor(state, node, true), state.borrowColor());
-            case COLOR_RAMP -> value = evaluateRampColor(state, node);
-            case MIX_COLOR -> value = evaluateMixColor(state, node);
-            case IMPORTED_BASE_COLOR -> value = sampleTextureColor(
-                    state.material.getDiffuseMap(), state.context, fallback, state.borrowColor());
-            case IMPORTED_EMISSIVE -> value = sampleTextureColor(
-                    state.material.getEmissiveMap(), state.context, fallback, state.borrowColor());
-            case IMAGE_TEXTURE -> value = sampleImageTextureColor(state, node, state.context, fallback, state.borrowColor());
-            default -> value = copyColor(fallback, state.borrowColor());
+        try {
+            switch (node.getType()) {
+                case COMBINE_RGB -> value = evaluateCombineRgb(state, node);
+                case RGB -> value = copyColor(node.getColor("color", fallback), state.borrowColor());
+                case NOISE_TEXTURE -> value = gray(noiseFactor(state, node, true), state.borrowColor());
+                case COLOR_RAMP -> value = evaluateRampColor(state, node);
+                case MIX_COLOR -> value = evaluateMixColor(state, node);
+                case IMPORTED_BASE_COLOR -> value = sampleImportedBaseColor(state, fallback, state.borrowColor());
+                case IMPORTED_EMISSIVE -> value = sampleImportedEmissive(state, fallback, state.borrowColor());
+                case IMPORTED_NORMAL -> value = sampleTextureColor(
+                        state.material.getNormalMap(), state.context, fallback, state.borrowColor());
+                case IMAGE_TEXTURE -> value = sampleImageTextureColor(state, node, state.context, fallback, state.borrowColor());
+                default -> value = copyColor(fallback, state.borrowColor());
+            }
+        } finally {
+            state.activeKeys.remove(cacheKey);
         }
         clampColorInPlace(value);
-        state.activeKeys.remove(cacheKey);
         state.colorCache.put(cacheKey, value);
         return value;
     }
@@ -139,32 +145,38 @@ final class MaterialGraphValueEvaluator {
             return fallback;
         }
         double value;
-        switch (node.getType()) {
-            case VALUE -> value = node.getNumber("value", fallback);
-            case NOISE_TEXTURE -> value = noiseFactor(state, node, false);
-            case COLOR_RAMP -> value = evaluateRampFactor(state, node);
-            case MATH -> value = evaluateMath(state, node);
-            case CLAMP -> value = evaluateClamp(state, node);
-            case MAP_RANGE -> value = evaluateMapRange(state, node);
-            case SEPARATE_RGB -> value = evaluateSeparateRgb(state, node, outputSocket, fallback);
-            case IMPORTED_BASE_COLOR -> value = sampleTextureAlpha(state.material.getDiffuseMap(), state.context, fallback);
-            case IMPORTED_METAL_ROUGHNESS -> {
-                int mr = sampleTexture(state.material.getMetallicRoughnessMap(), state.context);
-                if (mr == Integer.MIN_VALUE) {
-                    value = fallback;
-                } else if ("roughness".equalsIgnoreCase(outputSocket)) {
-                    value = ((mr >> 8) & 0xFF) / 255.0;
-                } else if ("metallic".equalsIgnoreCase(outputSocket)) {
-                    value = (mr & 0xFF) / 255.0;
-                } else {
-                    value = fallback;
+        try {
+            switch (node.getType()) {
+                case VALUE -> value = node.getNumber("value", fallback);
+                case NOISE_TEXTURE -> value = noiseFactor(state, node, false);
+                case COLOR_RAMP -> value = evaluateRampFactor(state, node);
+                case MATH -> value = evaluateMath(state, node);
+                case CLAMP -> value = evaluateClamp(state, node);
+                case MAP_RANGE -> value = evaluateMapRange(state, node);
+                case SEPARATE_RGB -> value = evaluateSeparateRgb(state, node, outputSocket, fallback);
+                case IMPORTED_BASE_COLOR -> value = sampleImportedOpacity(state, fallback);
+                case IMPORTED_METAL_ROUGHNESS -> {
+                    int mr = sampleTexture(state.material.getMetallicRoughnessMap(), state.context);
+                    if (mr == Integer.MIN_VALUE) {
+                        value = fallback;
+                    } else if ("roughness".equalsIgnoreCase(outputSocket)) {
+                        value = state.material.getRoughness() * (((mr >> 8) & 0xFF) / 255.0);
+                    } else if ("metallic".equalsIgnoreCase(outputSocket)) {
+                        value = state.material.getMetallic() * ((mr & 0xFF) / 255.0);
+                    } else {
+                        value = fallback;
+                    }
                 }
+                case IMAGE_TEXTURE -> value = sampleImageTextureValue(state, node, state.context, outputSocket, fallback);
+                case MIX_COLOR -> value = luminance(evaluateMixColor(state, node));
+                default -> value = fallback;
             }
-            case IMAGE_TEXTURE -> value = sampleImageTextureValue(state, node, state.context, outputSocket, fallback);
-            case MIX_COLOR -> value = luminance(evaluateMixColor(state, node));
-            default -> value = fallback;
+        } finally {
+            state.activeKeys.remove(cacheKey);
         }
-        state.activeKeys.remove(cacheKey);
+        if (!Double.isFinite(value)) {
+            value = fallback;
+        }
         state.valueCache.put(cacheKey, value);
         return value;
     }
@@ -448,6 +460,65 @@ final class MaterialGraphValueEvaluator {
 
     private static double smooth(double t) {
         return t * t * (3.0 - 2.0 * t);
+    }
+
+    private static Vec3 sampleImportedBaseColor(MaterialGraphEvaluator.EvalState state,
+                                                Vec3 fallback,
+                                                Vec3 out) {
+        Vec3 baseFactor = state != null && state.material != null
+                ? state.material.getDiffuseColor()
+                : fallback;
+        Vec3 sampled = sampleTextureColor(
+                state == null || state.material == null ? null : state.material.getDiffuseMap(),
+                state == null ? null : state.context,
+                baseFactor,
+                out
+        );
+        if (state == null || state.material == null || !state.material.getDiffuseMap().hasTexture()) {
+            return sampled;
+        }
+        return sampled.set(
+                sampled.x * MathUtil.clamp01(baseFactor.x),
+                sampled.y * MathUtil.clamp01(baseFactor.y),
+                sampled.z * MathUtil.clamp01(baseFactor.z)
+        );
+    }
+
+    private static Vec3 sampleImportedEmissive(MaterialGraphEvaluator.EvalState state,
+                                               Vec3 fallback,
+                                               Vec3 out) {
+        Vec3 emissiveFactor = state != null && state.material != null
+                ? state.material.getEmissionColor()
+                : fallback;
+        Vec3 sampled = sampleTextureColor(
+                state == null || state.material == null ? null : state.material.getEmissiveMap(),
+                state == null ? null : state.context,
+                emissiveFactor,
+                out
+        );
+        if (state == null || state.material == null || !state.material.getEmissiveMap().hasTexture()) {
+            return sampled;
+        }
+        return sampled.set(
+                sampled.x * MathUtil.clamp01(emissiveFactor.x),
+                sampled.y * MathUtil.clamp01(emissiveFactor.y),
+                sampled.z * MathUtil.clamp01(emissiveFactor.z)
+        );
+    }
+
+    private static double sampleImportedOpacity(MaterialGraphEvaluator.EvalState state, double fallback) {
+        double baseOpacity = state == null || state.material == null
+                ? fallback
+                : state.material.getOpacity();
+        double sampledAlpha = sampleTextureAlpha(
+                state == null || state.material == null ? null : state.material.getDiffuseMap(),
+                state == null ? null : state.context,
+                baseOpacity
+        );
+        if (state == null || state.material == null || !state.material.getDiffuseMap().hasTexture()) {
+            return sampledAlpha;
+        }
+        return baseOpacity * sampledAlpha;
     }
 
     private static int sampleTexture(TextureMap map, MaterialGraphEvaluator.Context context) {

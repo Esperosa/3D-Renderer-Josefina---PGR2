@@ -84,8 +84,8 @@ final class EngineMaterialDock {
                     if (source != null) {
                         converted.copyFrom(source);
                     }
-                    converted.getOrCreateNodeGraph();
-                    MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(converted);
+                    converted.setNodeGraph(MaterialGraphAuthoring.createAuthoringGraphFromMaterial(converted));
+                    MaterialGraphAuthoring.syncCompatibilityBindings(converted);
                     entity.setMaterial(converted);
                 });
                 rebuildInto(engine, host);
@@ -134,11 +134,6 @@ final class EngineMaterialDock {
         left.add(subtitleLabel);
         bar.add(left, BorderLayout.CENTER);
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        actions.setOpaque(false);
-        actions.add(createMiniButton(engine, UiStrings.Dock.TIMELINE, engine::showTimelineWorkspace));
-        actions.add(createMiniButton(engine, UiStrings.Common.OPEN_SCENE_TAB, () -> engine.window.selectRightTab("Scene")));
-        bar.add(actions, BorderLayout.EAST);
         return bar;
     }
 
@@ -162,8 +157,6 @@ final class EngineMaterialDock {
         JLabel body = new JLabel(message);
         body.setForeground(UiTheme.TEXT_SECONDARY);
         card.add(body);
-        card.add(Box.createRigidArea(new Dimension(0, 14)));
-        card.add(createMiniButton(engine, UiStrings.Common.BACK_TO_TIMELINE, engine::showTimelineWorkspace));
 
         JPanel wrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 18));
         wrap.setOpaque(false);
@@ -260,8 +253,8 @@ final class EngineMaterialDock {
         if (entity.getMaterial() instanceof PhongMaterial) {
             PhongMaterial material = (PhongMaterial) entity.getMaterial();
             if (!material.hasNodeGraph()) {
-                material.getOrCreateNodeGraph();
-                MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
+                material.setNodeGraph(MaterialGraphAuthoring.createAuthoringGraphFromMaterial(material));
+                MaterialGraphAuthoring.syncCompatibilityBindings(material);
             } else {
                 MaterialGraphAuthoring.syncCompatibilityBindings(material);
             }
@@ -272,8 +265,8 @@ final class EngineMaterialDock {
         if (entity.getMaterial() != null) {
             material.copyFrom(entity.getMaterial());
         }
-        material.getOrCreateNodeGraph();
-        MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
+        material.setNodeGraph(MaterialGraphAuthoring.createAuthoringGraphFromMaterial(material));
+        MaterialGraphAuthoring.syncCompatibilityBindings(material);
         entity.setMaterial(material);
         return material;
     }
@@ -282,13 +275,6 @@ final class EngineMaterialDock {
         if (entity == null || !(entity.getMaterial() instanceof PhongMaterial)) {
             return null;
         }
-        PhongMaterial material = (PhongMaterial) entity.getMaterial();
-        if (!material.hasNodeGraph()) {
-            material.getOrCreateNodeGraph();
-            MaterialGraphAuthoring.syncGraphDefaultsFromMaterial(material);
-        } else {
-            MaterialGraphAuthoring.syncCompatibilityBindings(material);
-        }
-        return material;
+        return (PhongMaterial) entity.getMaterial();
     }
 }

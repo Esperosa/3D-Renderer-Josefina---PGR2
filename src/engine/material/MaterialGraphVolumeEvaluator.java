@@ -22,18 +22,22 @@ final class MaterialGraphVolumeEvaluator {
         if (!state.activeKeys.add(cycleKey)) {
             return null;
         }
-        PhongMaterial material = state.material;
-        MaterialGraphEvaluator.VolumeData out = state.borrowVolume();
-        out.mediumColor.set(MaterialGraphValueEvaluator.resolveColorInput(state, node, "color", node.getColor("color", material.getMediumColor())));
-        out.density = Math.max(0.0, MaterialGraphValueEvaluator.resolveValueInput(state, node, "density", node.getNumber("density", material.getDensity())));
-        out.anisotropy = MathUtil.clamp(
-                MaterialGraphValueEvaluator.resolveValueInput(state, node, "anisotropy", node.getNumber("anisotropy", material.getAnisotropy())),
-                -0.99,
-                0.99
-        );
-        out.thickness = Math.max(0.0, MaterialGraphValueEvaluator.resolveValueInput(state, node, "thickness", node.getNumber("thickness", material.getThickness())));
-        MaterialGraphValueEvaluator.clampColorInPlace(out.mediumColor);
-        state.activeKeys.remove(cycleKey);
+        MaterialGraphEvaluator.VolumeData out;
+        try {
+            PhongMaterial material = state.material;
+            out = state.borrowVolume();
+            out.mediumColor.set(MaterialGraphValueEvaluator.resolveColorInput(state, node, "color", node.getColor("color", material.getMediumColor())));
+            out.density = Math.max(0.0, MaterialGraphValueEvaluator.resolveValueInput(state, node, "density", node.getNumber("density", material.getDensity())));
+            out.anisotropy = MathUtil.clamp(
+                    MaterialGraphValueEvaluator.resolveValueInput(state, node, "anisotropy", node.getNumber("anisotropy", material.getAnisotropy())),
+                    -0.99,
+                    0.99
+            );
+            out.thickness = Math.max(0.0, MaterialGraphValueEvaluator.resolveValueInput(state, node, "thickness", node.getNumber("thickness", material.getThickness())));
+            MaterialGraphValueEvaluator.clampColorInPlace(out.mediumColor);
+        } finally {
+            state.activeKeys.remove(cycleKey);
+        }
         state.volumeCache.put(nodeId, out);
         return out;
     }

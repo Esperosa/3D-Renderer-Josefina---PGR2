@@ -162,8 +162,24 @@ public final class GltfMaterialExtensionImportTests {
             assertTrue(mat.hasNormalTexture(), "Expected normal texture");
             assertTrue(mat.hasMetallicRoughnessTexture(), "Expected metallic-roughness texture");
             assertTrue(mat.hasEmissiveTexture(), "Expected emissive texture");
+            assertTrue(mat.hasNodeGraph(), "Imported GLTF material should have an authoring graph immediately");
             assertTrue(mat.getShadingModel() == engine.material.Material.ShadingModel.TRANSMISSIVE,
                     "Expected transmissive shading model");
+
+            MaterialGraphEvaluator.Result graph = MaterialGraphEvaluator.evaluate(
+                    mat,
+                    MaterialGraphEvaluator.Context.ofTriangle(0.0, 0.0, 0.0, true, 0.2, 0.3, true, 0.5, 0.5)
+            );
+            assertNear(0.7 * (128.0 / 255.0), graph.baseColor.x, 1e-6, "graph baseColor.x");
+            assertNear(0.8 * (160.0 / 255.0), graph.baseColor.y, 1e-6, "graph baseColor.y");
+            assertNear(0.9, graph.baseColor.z, 1e-6, "graph baseColor.z");
+            assertNear(0.6 * (204.0 / 255.0), graph.opacity, 1e-6, "graph opacity");
+            assertNear(0.25 * (160.0 / 255.0), graph.roughness, 1e-6, "graph roughness");
+            assertNear(0.5, graph.metallic, 1e-6, "graph metallic");
+            assertNear(0.9 * (128.0 / 255.0), graph.emissionColor.x, 1e-6, "graph emission.x");
+            assertNear(0.5 * (160.0 / 255.0), graph.emissionColor.y, 1e-6, "graph emission.y");
+            assertNear(0.2, graph.emissionColor.z, 1e-6, "graph emission.z");
+            assertNear(3.0, graph.emissionStrength, 1e-6, "graph emission strength");
 
             System.out.println("GltfMaterialExtensionImportTests: ALL TESTS PASSED");
         } finally {

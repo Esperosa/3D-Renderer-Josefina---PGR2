@@ -140,6 +140,7 @@ public final class MaterialNodeGraph {
         IMPORTED_BASE_COLOR,
         IMPORTED_METAL_ROUGHNESS,
         IMPORTED_EMISSIVE,
+        IMPORTED_NORMAL,
         TEXTURE_COORDINATE,
         MAPPING,
         IMAGE_TEXTURE,

@@ -27,8 +27,10 @@ public final class MaterialNodeGraphTests {
         testDisconnectedPrincipledSocketsUseNodeDefaults();
         testImageTextureMappingChainAffectsSampling();
         testTextureSetImportAutoWiresPrincipledGraph();
+        testAuthoringGraphFromTexturedMaterialPreservesImportedTextureWiring();
         testNormalMapCompatibilityBridgeTracksGraph();
         testVolumeOnlyRoutingProducesPureVolumeState();
+        testNonFiniteMathFallsBackToSocketDefault();
         testGraphCopiesWithMaterial();
         testGraphCopyDeepCopiesNodeColors();
         System.out.println("MaterialNodeGraphTests: ALL TESTS PASSED");
@@ -387,6 +389,63 @@ public final class MaterialNodeGraphTests {
         }
     }
 
+    private static void testAuthoringGraphFromTexturedMaterialPreservesImportedTextureWiring() {
+        PhongMaterial material = new PhongMaterial(new Vec3(0.5, 0.5, 0.5), 32.0);
+        material.setDiffuseColor(new Vec3(0.5, 0.5, 0.5));
+        material.setOpacity(0.65);
+        material.setRoughness(0.8);
+        material.setMetallic(0.25);
+        material.setEmissionColor(new Vec3(0.5, 0.25, 1.0));
+        material.setEmissionStrength(2.0);
+        material.getDiffuseMap().setTexture(new Texture(1, 1, new int[]{0x80408020}));
+        material.getDiffuseMap().setLinear(false);
+        material.getMetallicRoughnessMap().setTexture(new Texture(1, 1, new int[]{0xFF00BF40}));
+        material.getMetallicRoughnessMap().setLinear(false);
+        material.getEmissiveMap().setTexture(new Texture(1, 1, new int[]{0xFF204060}));
+        material.getEmissiveMap().setLinear(false);
+        material.getNormalMap().setTexture(new Texture(1, 1, new int[]{0xFF8080FF}));
+        material.getNormalMap().setLinear(false);
+        material.setNormalScale(0.85);
+
+        MaterialNodeGraph graph = MaterialGraphAuthoring.createAuthoringGraphFromMaterial(material);
+        material.setNodeGraph(graph);
+        MaterialGraphAuthoring.syncCompatibilityBindings(material);
+
+        MaterialNodeGraph.Node principled = graph.findFirstNode(MaterialNodeGraph.NodeType.PRINCIPLED_BSDF);
+        MaterialNodeGraph.Node importedNormal = graph.findFirstNode(MaterialNodeGraph.NodeType.IMPORTED_NORMAL);
+        MaterialNodeGraph.Node normalMap = graph.findFirstNode(MaterialNodeGraph.NodeType.NORMAL_MAP);
+        if (principled == null) {
+            throw new AssertionError("Authoring graph should contain Principled BSDF");
+        }
+        if (importedNormal == null) {
+            throw new AssertionError("Textured material should expose imported normal as a node");
+        }
+        if (normalMap == null || graph.findInputLink(principled.getId(), "normal") == null) {
+            throw new AssertionError("Textured material should auto-wire a visible normal path");
+        }
+        assertNear(0.85, normalMap.getNumber("strength", 0.0), 1e-6, "Imported normal path should keep the material normal strength");
+
+        MaterialGraphEvaluator.Result result = MaterialGraphEvaluator.evaluate(
+                material,
+                MaterialGraphEvaluator.Context.ofTriangle(0.0, 0.0, 0.0, true, 0.3, 0.7, false, 0.0, 0.0)
+        );
+
+        assertNear(0.5 * (64.0 / 255.0), result.baseColor.x, 1e-6, "Imported base texture red mismatch");
+        assertNear(0.5 * (128.0 / 255.0), result.baseColor.y, 1e-6, "Imported base texture green mismatch");
+        assertNear(0.5 * (32.0 / 255.0), result.baseColor.z, 1e-6, "Imported base texture blue mismatch");
+        assertNear(0.65 * (128.0 / 255.0), result.opacity, 1e-6, "Imported base alpha mismatch");
+        assertNear(0.8 * (191.0 / 255.0), result.roughness, 1e-6, "Imported roughness mismatch");
+        assertNear(0.25 * (64.0 / 255.0), result.metallic, 1e-6, "Imported metallic mismatch");
+        assertNear(0.5 * (32.0 / 255.0), result.emissionColor.x, 1e-6, "Imported emissive red mismatch");
+        assertNear(0.25 * (64.0 / 255.0), result.emissionColor.y, 1e-6, "Imported emissive green mismatch");
+        assertNear(1.0 * (96.0 / 255.0), result.emissionColor.z, 1e-6, "Imported emissive blue mismatch");
+        assertNear(2.0, result.emissionStrength, 1e-6, "Imported emissive strength mismatch");
+
+        if (!material.hasNormalTexture()) {
+            throw new AssertionError("Imported normal path should keep the compatibility normal map alive");
+        }
+    }
+
     private static void testNormalMapCompatibilityBridgeTracksGraph() {
         try {
             Path normalPath = createSolidTexture("bridge_normal", 0xFF8080FF);
@@ -417,6 +476,37 @@ public final class MaterialNodeGraphTests {
         } catch (Exception ex) {
             throw new AssertionError("Test kompatibilní větve normal mapy selhal: " + ex.getMessage(), ex);
         }
+    }
+
+    private static void testNonFiniteMathFallsBackToSocketDefault() {
+        PhongMaterial material = new PhongMaterial(new Vec3(0.4, 0.4, 0.4), 32.0);
+        MaterialNodeGraph graph = material.getOrCreateNodeGraph();
+        MaterialNodeGraph.Node principled = graph.findFirstNode(MaterialNodeGraph.NodeType.PRINCIPLED_BSDF);
+        if (principled == null) {
+            throw new AssertionError("Expected default principled node");
+        }
+        graph.disconnectInput(principled.getId(), "roughness");
+        principled.setNumber("roughness", 0.37);
+
+        MaterialNodeGraph.Node valueA = graph.addNode(MaterialNodeGraph.NodeType.VALUE, 40.0, 60.0);
+        valueA.setNumber("value", Double.MAX_VALUE);
+        MaterialNodeGraph.Node valueB = graph.addNode(MaterialNodeGraph.NodeType.VALUE, 40.0, 180.0);
+        valueB.setNumber("value", 2.0);
+        MaterialNodeGraph.Node math = graph.addNode(MaterialNodeGraph.NodeType.MATH, 280.0, 120.0);
+        math.setEnum("operation", MaterialNodeGraph.MathOperation.POWER.name());
+        graph.connect(valueA.getId(), "value", math.getId(), "a");
+        graph.connect(valueB.getId(), "value", math.getId(), "b");
+        graph.connect(math.getId(), "value", principled.getId(), "roughness");
+
+        MaterialGraphEvaluator.Result result = MaterialGraphEvaluator.evaluate(
+                material,
+                MaterialGraphEvaluator.Context.ofTriangle(0.0, 0.0, 0.0, true, 0.5, 0.5, false, 0.0, 0.0)
+        );
+
+        if (!Double.isFinite(result.roughness)) {
+            throw new AssertionError("Non-finite math output leaked into evaluated roughness");
+        }
+        assertNear(0.37, result.roughness, 1e-6, "Non-finite math output should fall back to the socket default");
     }
 
     private static void testGraphCopiesWithMaterial() {

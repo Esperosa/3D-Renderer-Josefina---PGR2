@@ -9,11 +9,30 @@ public final class MaterialGraphAuthoring {
     private MaterialGraphAuthoring() {
     }
 
+    public static MaterialNodeGraph createAuthoringGraphFromMaterial(PhongMaterial material) {
+        MaterialNodeGraph graph = MaterialNodeGraph.createDefault();
+        ensureImportedNormalBranch(graph, material);
+        syncGraphDefaultsFromMaterial(graph, material);
+        return graph;
+    }
+
     public static void syncGraphDefaultsFromMaterial(PhongMaterial material) {
         if (material == null) {
             return;
         }
-        MaterialNodeGraph graph = material.getOrCreateNodeGraph();
+        if (!material.hasNodeGraph()) {
+            material.setNodeGraph(createAuthoringGraphFromMaterial(material));
+            syncCompatibilityBindings(material);
+            return;
+        }
+        syncGraphDefaultsFromMaterial(material.getOrCreateNodeGraph(), material);
+        syncCompatibilityBindings(material);
+    }
+
+    public static void syncGraphDefaultsFromMaterial(MaterialNodeGraph graph, PhongMaterial material) {
+        if (graph == null || material == null) {
+            return;
+        }
         for (MaterialNodeGraph.Node node : graph.getNodes()) {
             switch (node.getType()) {
                 case PRINCIPLED_BSDF -> syncPrincipledDefaults(node, material);
@@ -25,7 +44,6 @@ public final class MaterialGraphAuthoring {
                 }
             }
         }
-        syncCompatibilityBindings(material);
     }
 
     public static void syncCompatibilityBindings(PhongMaterial material) {
@@ -34,7 +52,7 @@ public final class MaterialGraphAuthoring {
         }
         MaterialNodeGraph graph = material.getNodeGraph();
         boolean graphHasNormalNode = graph.findFirstNode(MaterialNodeGraph.NodeType.NORMAL_MAP) != null;
-        NormalBinding binding = resolveNormalBinding(graph);
+        NormalBinding binding = resolveNormalBinding(material, graph);
         if (binding != null) {
             applyTextureMap(material.getNormalMap(), binding.textureMap);
             material.setNormalScale(binding.strength);
@@ -48,7 +66,7 @@ public final class MaterialGraphAuthoring {
         if (material == null || !material.hasNodeGraph()) {
             return material != null && material.hasNormalTexture();
         }
-        return resolveNormalBinding(material.getNodeGraph()) != null || material.hasNormalTexture();
+        return resolveNormalBinding(material, material.getNodeGraph()) != null || material.hasNormalTexture();
     }
 
     private static void syncPrincipledDefaults(MaterialNodeGraph.Node node, PhongMaterial material) {
@@ -95,8 +113,50 @@ public final class MaterialGraphAuthoring {
         node.setNumber("opacity", material.getOpacity());
     }
 
-    private static NormalBinding resolveNormalBinding(MaterialNodeGraph graph) {
+    private static void ensureImportedNormalBranch(MaterialNodeGraph graph, PhongMaterial material) {
+        if (graph == null || material == null || !material.hasNormalTexture()) {
+            return;
+        }
+        MaterialNodeGraph.Node output = graph.findFirstNode(MaterialNodeGraph.NodeType.OUTPUT_MATERIAL);
+        MaterialNodeGraph.Node shaderNode = resolvePrimarySurfaceNode(graph, output);
+        if (shaderNode == null || graph.findInputLink(shaderNode.getId(), "normal") != null) {
+            return;
+        }
+        MaterialNodeGraph.Node importedNormal = graph.findFirstNode(MaterialNodeGraph.NodeType.IMPORTED_NORMAL);
+        if (importedNormal == null) {
+            importedNormal = graph.addNode(MaterialNodeGraph.NodeType.IMPORTED_NORMAL, 46.0, 608.0);
+        }
+        MaterialNodeGraph.Node normalMap = graph.findFirstNode(MaterialNodeGraph.NodeType.NORMAL_MAP);
+        if (normalMap == null) {
+            normalMap = graph.addNode(MaterialNodeGraph.NodeType.NORMAL_MAP, 236.0, 608.0);
+        }
+        normalMap.setNumber("strength", Math.max(0.0, material.getNormalScale()));
+        graph.connect(importedNormal.getId(), "color", normalMap.getId(), "color");
+        graph.connect(normalMap.getId(), "normal", shaderNode.getId(), "normal");
+    }
+
+    private static MaterialNodeGraph.Node resolvePrimarySurfaceNode(MaterialNodeGraph graph, MaterialNodeGraph.Node output) {
         if (graph == null) {
+            return null;
+        }
+        if (output != null) {
+            MaterialNodeGraph.Link surfaceLink = graph.findInputLink(output.getId(), "surface");
+            if (surfaceLink != null) {
+                MaterialNodeGraph.Node surface = graph.getNodeById(surfaceLink.getFromNodeId());
+                if (surface != null) {
+                    return surface;
+                }
+            }
+        }
+        MaterialNodeGraph.Node principled = graph.findFirstNode(MaterialNodeGraph.NodeType.PRINCIPLED_BSDF);
+        if (principled != null) {
+            return principled;
+        }
+        return graph.findFirstNode(MaterialNodeGraph.NodeType.GLASS_BSDF);
+    }
+
+    private static NormalBinding resolveNormalBinding(PhongMaterial material, MaterialNodeGraph graph) {
+        if (material == null || graph == null) {
             return null;
         }
         MaterialNodeGraph.Node output = graph.findFirstNode(MaterialNodeGraph.NodeType.OUTPUT_MATERIAL);
@@ -107,27 +167,31 @@ public final class MaterialGraphAuthoring {
         if (surfaceLink == null) {
             return null;
         }
-        return resolveSurfaceNormalBinding(graph, surfaceLink.getFromNodeId());
+        return resolveSurfaceNormalBinding(material, graph, surfaceLink.getFromNodeId());
     }
 
-    private static NormalBinding resolveSurfaceNormalBinding(MaterialNodeGraph graph, int nodeId) {
+    private static NormalBinding resolveSurfaceNormalBinding(PhongMaterial material,
+                                                            MaterialNodeGraph graph,
+                                                            int nodeId) {
         MaterialNodeGraph.Node node = graph.getNodeById(nodeId);
         if (node == null) {
             return null;
         }
         return switch (node.getType()) {
-            case PRINCIPLED_BSDF, GLASS_BSDF -> resolveNormalMapNode(graph, node);
+            case PRINCIPLED_BSDF, GLASS_BSDF -> resolveNormalMapNode(material, graph, node);
             case MIX_SHADER -> {
                 MaterialNodeGraph.Link a = graph.findInputLink(node.getId(), "shader_a");
                 MaterialNodeGraph.Link b = graph.findInputLink(node.getId(), "shader_b");
-                NormalBinding first = a == null ? null : resolveSurfaceNormalBinding(graph, a.getFromNodeId());
-                yield first != null ? first : b == null ? null : resolveSurfaceNormalBinding(graph, b.getFromNodeId());
+                NormalBinding first = a == null ? null : resolveSurfaceNormalBinding(material, graph, a.getFromNodeId());
+                yield first != null ? first : b == null ? null : resolveSurfaceNormalBinding(material, graph, b.getFromNodeId());
             }
             default -> null;
         };
     }
 
-    private static NormalBinding resolveNormalMapNode(MaterialNodeGraph graph, MaterialNodeGraph.Node shaderNode) {
+    private static NormalBinding resolveNormalMapNode(PhongMaterial material,
+                                                      MaterialNodeGraph graph,
+                                                      MaterialNodeGraph.Node shaderNode) {
         MaterialNodeGraph.Link normalLink = graph.findInputLink(shaderNode.getId(), "normal");
         if (normalLink == null) {
             return null;
@@ -141,6 +205,15 @@ public final class MaterialGraphAuthoring {
             return null;
         }
         MaterialNodeGraph.Node source = graph.getNodeById(colorLink.getFromNodeId());
+        if (source != null && source.getType() == MaterialNodeGraph.NodeType.IMPORTED_NORMAL) {
+            TextureMap importedNormalMap = material.getNormalMap();
+            if (importedNormalMap == null || !importedNormalMap.hasTexture()) {
+                return null;
+            }
+            TextureMap copy = new TextureMap();
+            copy.copyFrom(importedNormalMap);
+            return new NormalBinding(copy, Math.max(0.0, normalNode.getNumber("strength", 1.0)));
+        }
         TextureMap textureMap = resolveCompatibleTextureMap(graph, source);
         if (textureMap == null || !textureMap.hasTexture()) {
             return null;

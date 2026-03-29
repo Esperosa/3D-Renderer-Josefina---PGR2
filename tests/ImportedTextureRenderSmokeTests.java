@@ -37,7 +37,9 @@ public final class ImportedTextureRenderSmokeTests {
             if (importedEntry.getMaterial() == null || importedEntry.getMaterial().getDiffuseTexture() == null) {
                 throw new AssertionError("Expected imported diffuse texture");
             }
-            importedEntry.getMaterial().getOrCreateNodeGraph();
+            if (!importedEntry.getMaterial().hasNodeGraph()) {
+                throw new AssertionError("Imported textured material should already have a node graph");
+            }
             assertRedDominant(importedEntry.getMaterial().getDiffuseTexture().sampleNearest(0.5, 0.5),
                     "Imported material");
 

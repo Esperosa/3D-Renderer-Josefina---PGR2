@@ -19,6 +19,7 @@ public final class MaterialNodeRegistry {
         register(MaterialNodeGraph.NodeType.IMPORTED_BASE_COLOR, new ImportedBaseColorNodeDefinition());
         register(MaterialNodeGraph.NodeType.IMPORTED_METAL_ROUGHNESS, new ImportedMetalRoughnessNodeDefinition());
         register(MaterialNodeGraph.NodeType.IMPORTED_EMISSIVE, new ImportedEmissiveNodeDefinition());
+        register(MaterialNodeGraph.NodeType.IMPORTED_NORMAL, new ImportedNormalNodeDefinition());
         register(MaterialNodeGraph.NodeType.TEXTURE_COORDINATE, new TextureCoordinateNodeDefinition());
         register(MaterialNodeGraph.NodeType.MAPPING, new MappingNodeDefinition());
         register(MaterialNodeGraph.NodeType.IMAGE_TEXTURE, new ImageTextureNodeDefinition());

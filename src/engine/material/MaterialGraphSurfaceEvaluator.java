@@ -23,15 +23,19 @@ final class MaterialGraphSurfaceEvaluator {
         if (!state.activeKeys.add(cycleKey)) {
             return null;
         }
-        MaterialGraphEvaluator.SurfaceData out = switch (node.getType()) {
-            case PRINCIPLED_BSDF -> evaluatePrincipledSurface(state, node);
-            case GLASS_BSDF -> evaluateGlassSurface(state, node);
-            case EMISSION_SHADER -> evaluateEmissionSurface(state, node);
-            case MIX_SHADER -> evaluateMixShaderSurface(state, node);
-            case TRANSPARENT_BSDF -> evaluateTransparentSurface(state, node);
-            default -> null;
-        };
-        state.activeKeys.remove(cycleKey);
+        MaterialGraphEvaluator.SurfaceData out;
+        try {
+            out = switch (node.getType()) {
+                case PRINCIPLED_BSDF -> evaluatePrincipledSurface(state, node);
+                case GLASS_BSDF -> evaluateGlassSurface(state, node);
+                case EMISSION_SHADER -> evaluateEmissionSurface(state, node);
+                case MIX_SHADER -> evaluateMixShaderSurface(state, node);
+                case TRANSPARENT_BSDF -> evaluateTransparentSurface(state, node);
+                default -> null;
+            };
+        } finally {
+            state.activeKeys.remove(cycleKey);
+        }
         if (out != null) {
             state.surfaceCache.put(nodeId, out);
         }

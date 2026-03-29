@@ -1,6 +1,7 @@
 package engine.io;
 
 import engine.geometry.Mesh;
+import engine.material.MaterialGraphAuthoring;
 import engine.material.PhongMaterial;
 import engine.material.TextureMap;
 import engine.math.Mat3;
@@ -767,6 +768,8 @@ public class GltfLoader {
             if (normalInfo != null) {
                 mat.setNormalScale(Math.max(0.0, toDouble(normalInfo.get("scale"), 1.0)));
             }
+            mat.setNodeGraph(MaterialGraphAuthoring.createAuthoringGraphFromMaterial(mat));
+            MaterialGraphAuthoring.syncCompatibilityBindings(mat);
             out.add(mat);
         }
         return out;

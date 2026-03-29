@@ -1,5 +1,6 @@
 package engine.io;
 
+import engine.material.MaterialGraphAuthoring;
 import engine.material.PhongMaterial;
 import engine.math.Vec3;
 import engine.render.Texture;
@@ -170,6 +171,8 @@ final class ObjMaterialResolver {
                 }
             }
         }
+        mat.setNodeGraph(MaterialGraphAuthoring.createAuthoringGraphFromMaterial(mat));
+        MaterialGraphAuthoring.syncCompatibilityBindings(mat);
         return mat;
     }
 
