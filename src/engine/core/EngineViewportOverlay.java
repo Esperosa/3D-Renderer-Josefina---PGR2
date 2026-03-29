@@ -247,9 +247,11 @@ final class EngineViewportOverlay {
         }
         Vec3 camRight = engine.camera.getRight().normalize();
         Vec3 camUp = engine.camera.getUp().normalize();
+        Vec3 camForward = engine.camera.getForward().normalize();
         engine.window.setWorldAxisWidgetVectors(
                 camRight.x, camRight.y, camRight.z,
-                camUp.x, camUp.y, camUp.z);
+                camUp.x, camUp.y, camUp.z,
+                camForward.x, camForward.y, camForward.z);
     }
 
     static void drawSceneItemWireIcons(Engine engine, FrameBuffer fb) {

@@ -10,9 +10,7 @@ import javax.swing.Box;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextArea;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.io.File;
 
 /**
@@ -24,11 +22,12 @@ final class EngineOutputTabBuilder {
     }
 
     static JPanel build(Engine engine) {
+        java.awt.Point scrollPosition = engine.window.captureRightTabViewPosition("Output");
         JPanel outputTab = engine.window.createRightTab("Output", UiStrings.Tabs.OUTPUT, "output");
         outputTab.removeAll();
         OutputRenderController.Settings outputSettings = engine.outputRenderController.settings();
         normalizeOutputSettings(outputSettings);
-        outputTab.add(UiBuilder.panelHeader("Výstup", "Workflow pro statický snímek, sekvenci, GIF a AVI s oddělenými render session složkami."));
+        outputTab.add(UiBuilder.panelHeader("Výstup", null));
         outputTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
         RenderMode outputMode = outputSettings.mode == null ? RenderMode.PATH_TRACING : outputSettings.mode;
         String exportType = OutputPathUtil.normalizeExportType(outputSettings.exportType);
@@ -50,7 +49,7 @@ final class EngineOutputTabBuilder {
                 OutputPathUtil.timestampNow()
         );
 
-        JPanel outputTargetSection = engine.addCollapsibleSection(outputTab, "Cíl výstupu", true);
+        JPanel outputTargetSection = engine.addCollapsibleSection(outputTab, "Target", true);
         engine.addTextRow(outputTargetSection, "Základní složka", outputSettings.baseDirectory, value -> {
             outputSettings.baseDirectory = value.isBlank() ? "renders" : value.trim();
             outputSettings.outputDirectory = outputSettings.baseDirectory;
@@ -62,9 +61,6 @@ final class EngineOutputTabBuilder {
             outputSettings.createSessionFolder = value;
             refreshOutputTab(engine);
         });
-        outputTargetSection.add(engine.sectionTitle(outputSettings.createSessionFolder
-                ? "Session složky jsou řízené automaticky a mohou připojit timestamp."
-                : "Session složka zůstává pevná podle zadaného názvu, takže další exporty míří do stejné složky."));
         engine.addTextRow(outputTargetSection, "Název / prefix session", outputSettings.sessionName, value -> {
             outputSettings.sessionName = value.isBlank() ? "render" : value.trim();
             outputSettings.filePrefix = outputSettings.sessionName;
@@ -74,21 +70,17 @@ final class EngineOutputTabBuilder {
             outputSettings.appendTimestampToSession = value;
             refreshOutputTab(engine);
         });
-        outputTargetSection.add(engine.sectionTitle("Výsledná cesta"));
-        outputTargetSection.add(createReadOnlyBlock(previewPaths.sessionFolder.toString() + "\n"
-                + buildResolvedPathPreview(previewPaths, exportType, outputSettings.format)));
+        UiBuilder.addReadOnlyRow(outputTargetSection, "Složka", previewPaths.sessionFolder.toString());
+        UiBuilder.addReadOnlyRow(outputTargetSection, "Aktivní", previewPaths.primaryOutputPreview(exportType, outputSettings.format));
 
-        JPanel outputTypeSection = engine.addCollapsibleSection(outputTab, "Typ výstupu", true);
-        engine.addComboRow(outputTypeSection, "Typ exportu",
+        JPanel timingSection = engine.addCollapsibleSection(outputTab, "Frames", true);
+        engine.addComboRow(timingSection, "Typ exportu",
                 outputTypeLabels(),
                 outputTypeLabel(exportType),
                 value -> {
                     outputSettings.exportType = parseOutputTypeLabel(value);
                     refreshOutputTab(engine);
                 });
-        outputTypeSection.add(UiBuilder.helperText("Zvolený typ určuje viditelné formátové volby, path preview i session summary."));
-
-        JPanel timingSection = engine.addCollapsibleSection(outputTab, "Rozsah snímků a časování", true);
         engine.addBooleanRow(timingSection, "Použít rozsah časové osy", outputSettings.useTimelineRange, value -> {
             outputSettings.useTimelineRange = value;
             refreshOutputTab(engine);
@@ -130,16 +122,16 @@ final class EngineOutputTabBuilder {
                     }
                     refreshOutputTab(engine);
                 });
-        timingSection.add(engine.sectionTitle("Počet snímků: " + frameCount));
-        timingSection.add(engine.sectionTitle("Náhled délky: " + formatDuration(durationSeconds)));
+        UiBuilder.addReadOnlyRow(timingSection, "Rozsah", frameCount + " snímků");
+        UiBuilder.addReadOnlyRow(timingSection, "Délka", formatDuration(durationSeconds));
         switch (exportType) {
-            case "still" -> timingSection.add(engine.sectionTitle("Statický snímek používá snímek "
-                + (outputSettings.useTimelineRange ? engine.timelineCurrentFrame : outputSettings.frameStart) + "."));
+            case "still" -> UiBuilder.addReadOnlyRow(timingSection, "Snímek",
+                    Integer.toString(outputSettings.useTimelineRange ? engine.timelineCurrentFrame : outputSettings.frameStart));
             default -> {
             }
         }
 
-        JPanel formatSection = engine.addCollapsibleSection(outputTab, "Formát obrazu / videa", true);
+        JPanel formatSection = engine.addCollapsibleSection(outputTab, "Format", true);
         switch (exportType) {
             case "still", "sequence" -> {
                 engine.addComboRow(formatSection, "Formát obrazu",
@@ -169,8 +161,8 @@ final class EngineOutputTabBuilder {
                     outputSettings.gifLoopForever = value;
                     refreshOutputTab(engine);
                 });
-                formatSection.add(engine.sectionTitle("Zpoždění snímku se odvozuje z FPS: "
-                        + Math.max(10, (int) Math.round(1000.0 / Math.max(1.0, resolvedFps))) + " ms"));
+                UiBuilder.addReadOnlyRow(formatSection, "Zpoždění",
+                        Math.max(10, (int) Math.round(1000.0 / Math.max(1.0, resolvedFps))) + " ms");
             }
             default -> {
                 engine.addNumericRow(formatSection, "Kvalita MJPEG",
@@ -180,14 +172,10 @@ final class EngineOutputTabBuilder {
                                     engine.parseOrFallback(text, outputSettings.aviJpegQuality)));
                             refreshOutputTab(engine);
                         });
-                formatSection.add(UiBuilder.helperText("AVI se zapisuje jako fixed-rate MJPEG bez externích kodeků."));
             }
         }
 
-        JPanel engineSection = engine.addCollapsibleSection(outputTab, "Renderer výstupu", true);
-        engineSection.add(engine.sectionTitle("Renderer: " + EngineRenderPanelSupport.renderModeLabel(outputMode)));
-        engineSection.add(engine.sectionTitle(EngineRenderPanelSupport.renderModeSummary(outputMode)));
-        engineSection.add(engine.sectionTitle(EngineRenderPanelSupport.renderModeTuningHint(outputMode)));
+        JPanel engineSection = engine.addCollapsibleSection(outputTab, "Engine", true);
         engine.addComboRow(engineSection, "Renderer",
                 EngineRenderPanelSupport.renderModeLabels(),
                 EngineRenderPanelSupport.renderModeLabel(outputMode),
@@ -201,10 +189,9 @@ final class EngineOutputTabBuilder {
             EngineRenderPanelSupport.syncOutputTuningFromViewport(engine, outputSettings);
             refreshOutputTab(engine);
         }));
-        outputModeActions.add(engine.actionButton("Otevřít živé nastavení renderu", () -> engine.window.selectRightTab("Render")));
         engineSection.add(outputModeActions);
         engineSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        engineSection.add(engine.sectionTitle("Výstupní kamera"));
+        engineSection.add(UiBuilder.infoLine("Výstupní kamera"));
         JPanel outputCameraActions = EngineRenderPanelSupport.createButtonGrid(1);
         outputCameraActions.add(engine.actionButton("Nastavit z aktuálního pohledu", engine::syncOutputCameraFromCurrentView));
         outputCameraActions.add(engine.actionButton("Dívat se výstupní kamerou", () -> engine.jumpViewToOutputCamera(false)));
@@ -212,13 +199,13 @@ final class EngineOutputTabBuilder {
         outputCameraActions.add(engine.actionButton("Vybrat objekt kamery", () -> {
             if (engine.outputCameraEntity != null) {
                 engine.setCurrentEntitySelection(engine.outputCameraEntity);
-                engine.window.selectRightTab("Object");
+                engine.window.selectRightTab("Item");
                 engine.refreshObjectInspectorValues();
             }
         }));
         engineSection.add(outputCameraActions);
 
-        JPanel qualitySection = engine.addCollapsibleSection(outputTab, "Kvalita a výkon", true);
+        JPanel qualitySection = engine.addCollapsibleSection(outputTab, "Quality", true);
         engine.addNumericRow(qualitySection, "Šířka", Integer.toString(outputSettings.width), text -> {
             outputSettings.width = Math.max(64, Math.min(16384,
                     (int) Math.round(engine.parseOrFallback(text, outputSettings.width))));
@@ -243,37 +230,22 @@ final class EngineOutputTabBuilder {
         addOutputWorkerCountRow(engine, qualitySection, outputSettings);
         if (EngineRenderPanelSupport.isProgressiveRenderMode(outputMode)) {
             addOutputProgressiveCommon(engine, qualitySection, outputSettings);
-        } else {
-            qualitySection.add(UiBuilder.helperText("Tento renderer je single-pass. Tile a akumulace vzorků se zde nezobrazuje."));
         }
-        qualitySection.add(engine.sectionTitle("Odhad interního rozlišení: " + internalWidth + " x " + internalHeight));
-        qualitySection.add(engine.sectionTitle("Odhad paměti: " + formatBytes(estimatedWorkingSet)));
+        UiBuilder.addReadOnlyRow(qualitySection, "Interní", internalWidth + " x " + internalHeight);
+        UiBuilder.addReadOnlyRow(qualitySection, "Paměť", formatBytes(estimatedWorkingSet));
         if (budgetWarning != null) {
             qualitySection.add(createWarningLabel(budgetWarning));
-        } else {
-            qualitySection.add(UiBuilder.helperText("Paměťový rozpočet je v aktuální rezervě heapu."));
         }
 
-        JPanel outputModeSettingsSection = engine.addCollapsibleSection(outputTab, "Specifická nastavení rendereru", true);
+        JPanel outputModeSettingsSection = engine.addCollapsibleSection(outputTab, "Mode", true);
         buildOutputModeSettings(engine, outputModeSettingsSection, outputSettings, outputMode);
 
-        JPanel summarySection = engine.addCollapsibleSection(outputTab, "Souhrn výstupní session", true);
-        summarySection.add(createReadOnlyBlock(buildOutputSessionSummary(
-                outputSettings,
-                outputMode,
-                exportType,
-                previewPaths,
-                resolvedStartFrame,
-                resolvedEndFrame,
-                resolvedFps,
-                frameCount,
-                durationSeconds,
-                internalWidth,
-                internalHeight,
-                estimatedWorkingSet
-        )));
-
-        JPanel outputRunSection = engine.addCollapsibleSection(outputTab, "Spuštění", true);
+        JPanel outputRunSection = engine.addCollapsibleSection(outputTab, "Run", true);
+        UiBuilder.addReadOnlyRow(outputRunSection, "Cíl", previewPaths.primaryOutputPreview(exportType, outputSettings.format));
+        UiBuilder.addReadOnlyRow(outputRunSection, "Renderer", EngineRenderPanelSupport.renderModeLabel(outputMode));
+        UiBuilder.addReadOnlyRow(outputRunSection, "Rozsah", frameCount + " snímků");
+        UiBuilder.addReadOnlyRow(outputRunSection, "Délka", formatDuration(durationSeconds));
+        outputRunSection.add(Box.createRigidArea(new Dimension(0, 8)));
         JPanel outputRunGrid = EngineRenderPanelSupport.createButtonGrid(1);
         outputRunGrid.add(EngineRenderPanelSupport.primaryActionButton(engine, UiStrings.Output.RENDER_STILL, () -> {
             outputSettings.exportType = "still";
@@ -293,13 +265,12 @@ final class EngineOutputTabBuilder {
         }));
         outputRunGrid.add(engine.actionButton("Zrušit render", engine.outputRenderController::cancelRender));
         outputRunSection.add(outputRunGrid);
-        outputRunSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        outputRunSection.add(UiBuilder.helperText("Statický snímek, sekvence, GIF i AVI se ukládají do session složky zobrazené výše."));
-        outputRunSection.add(engine.sectionTitle(EngineRenderPanelSupport.isProgressiveRenderMode(outputMode)
-                ? "Progresivní režimy akumulují vzorky, dokud nedosáhnou cílové hodnoty pro každý snímek."
-                : "Single-pass režimy vyrenderují snímek jedním průchodem a ihned zapisují soubory."));
+        outputRunSection.add(UiBuilder.infoLine(EngineRenderPanelSupport.isProgressiveRenderMode(outputMode)
+                ? "Progresivní akumulace vzorků."
+                : "Single-pass zápis."));
         outputTab.revalidate();
         outputTab.repaint();
+        engine.window.restoreRightTabViewPosition("Output", scrollPosition);
         return outputTab;
     }
 
@@ -418,101 +389,6 @@ final class EngineOutputTabBuilder {
         return frameCount / Math.max(1.0, fps);
     }
 
-    private static int estimatedOutputFileCount(OutputRenderController.Settings outputSettings,
-                                                String exportType,
-                                                int frameCount) {
-        int count = "sequence".equals(exportType) ? frameCount : 1;
-        if (outputSettings.writePreviewImage) {
-            count++;
-        }
-        if (outputSettings.writeManifest) {
-            count++;
-        }
-        if (outputSettings.writeLogFile) {
-            count++;
-        }
-        return count;
-    }
-
-    private static String buildResolvedPathPreview(OutputPathUtil.SessionPaths paths,
-                                                   String exportType,
-                                                   String stillFormat) {
-        StringBuilder preview = new StringBuilder(256);
-        preview.append("snímek: ").append(paths.stillPathForFormat(stillFormat).getFileName()).append('\n');
-        preview.append("sekvence: ").append(paths.sequenceFolderName).append("/frame_0000.")
-                .append(OutputPathUtil.normalizeStillFormat(stillFormat)).append(" ...").append('\n');
-        preview.append("gif: ").append(paths.gifPath.getFileName()).append('\n');
-        preview.append("avi: ").append(paths.aviPath.getFileName()).append('\n');
-        preview.append("aktivní výstup: ").append(paths.primaryOutputPreview(exportType, stillFormat));
-        return preview.toString();
-    }
-
-    private static String buildOutputSessionSummary(OutputRenderController.Settings outputSettings,
-                                                    RenderMode outputMode,
-                                                    String exportType,
-                                                    OutputPathUtil.SessionPaths previewPaths,
-                                                    int startFrame,
-                                                    int endFrame,
-                                                    double fps,
-                                                    int frameCount,
-                                                    double durationSeconds,
-                                                    int internalWidth,
-                                                    int internalHeight,
-                                                    long estimatedWorkingSet) {
-        StringBuilder summary = new StringBuilder(512);
-        summary.append("Výsledná složka: ").append(previewPaths.sessionFolder).append('\n');
-        summary.append("Typ exportu: ").append(outputTypeLabel(exportType)).append('\n');
-        summary.append("Renderer: ").append(EngineRenderPanelSupport.renderModeLabel(outputMode)).append('\n');
-        summary.append("Rozlišení: ").append(outputSettings.width).append(" x ").append(outputSettings.height).append('\n');
-        summary.append("Interní rozlišení: ").append(internalWidth).append(" x ").append(internalHeight)
-                .append(" @ scale ").append(String.format("%.2f", outputSettings.internalScale)).append('\n');
-        summary.append("Rozsah snímků: ");
-        switch (exportType) {
-            case "still" -> summary.append(startFrame);
-            default -> summary.append(startFrame).append(" .. ").append(endFrame);
-        }
-        summary.append('\n');
-        summary.append("FPS: ").append(String.format("%.2f", fps)).append('\n');
-        summary.append("Odhad snímků: ").append(frameCount).append('\n');
-        summary.append("Odhad souborů: ").append(estimatedOutputFileCount(outputSettings, exportType, frameCount)).append('\n');
-        summary.append("Odhad délky: ").append(formatDuration(durationSeconds)).append('\n');
-        summary.append("Odhad paměti: ").append(formatBytes(estimatedWorkingSet)).append('\n');
-        summary.append("Denoise: ").append(outputSettings.denoise ? UiStrings.Common.YES : UiStrings.Common.NO).append('\n');
-        summary.append("Primární výstup: ").append(previewPaths.primaryOutputPreview(exportType, outputSettings.format)).append('\n');
-        summary.append("Obsah session: ");
-        switch (exportType) {
-            case "sequence" -> summary.append("manifest + preview + log + ").append(previewPaths.sequenceFolderName).append("/frames");
-            case "gif" -> summary.append("manifest + preview + log + animation.gif");
-            case "avi" -> summary.append("manifest + preview + log + animation.avi");
-            default -> summary.append("manifest + preview + log + statický snímek");
-        }
-        return summary.toString();
-    }
-
-    private static JTextArea createReadOnlyBlock(String text) {
-        JTextArea area = new JTextArea(text == null ? "" : text);
-        area.setEditable(false);
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-        area.setOpaque(true);
-        area.setBackground(UiTheme.PANEL_INSET);
-        area.setForeground(UiTheme.TEXT_PRIMARY);
-        area.setCaretColor(UiTheme.TEXT_PRIMARY);
-        area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        area.setBorder(javax.swing.BorderFactory.createCompoundBorder(
-                javax.swing.BorderFactory.createLineBorder(UiTheme.BORDER_STRONG, 1, true),
-                javax.swing.BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        ));
-        area.setAlignmentX(0.0f);
-        area.setColumns(26);
-        int logicalLines = Math.max(1, area.getText().split("\\R", -1).length);
-        int estimatedWrappedLines = Math.max(logicalLines, (int) Math.ceil(area.getText().length() / 34.0));
-        int lines = Math.max(4, Math.min(18, Math.max(logicalLines + 1, estimatedWrappedLines)));
-        area.setRows(lines);
-        area.setMaximumSize(new Dimension(Integer.MAX_VALUE, Math.max(88, lines * 18 + 20)));
-        return area;
-    }
-
     private static JLabel createWarningLabel(String text) {
         JLabel label = new JLabel("<html><b>Upozornění na rozpočet:</b> " + text + "</html>");
         label.setAlignmentX(0.0f);
@@ -561,15 +437,12 @@ final class EngineOutputTabBuilder {
                                                 RenderMode outputMode) {
         switch (outputMode) {
             case MODEL -> {
-                section.add(UiBuilder.helperText("Model je nejrychlejší solid preview. Ignoruje materiály, textury i odrazy."));
                 addOutputRasterToggles(section);
             }
             case BASIC -> {
-                section.add(UiBuilder.helperText("Basic je single-pass nelitovaný raster pro layout a blokování."));
                 addOutputRasterToggles(section);
             }
             case PHONG -> {
-                section.add(UiBuilder.helperText("Phong je single-pass lit raster používající světla scény a textury materiálů."));
                 addOutputRasterToggles(section);
             }
             case WIREFRAME -> buildOutputWireframeSettings(engine, section, outputSettings);
@@ -585,7 +458,7 @@ final class EngineOutputTabBuilder {
                                                 JPanel section,
                                                 OutputRenderController.Settings outputSettings) {
         engine.addNumericRow(section, "Počet vláken", Integer.toString(outputSettings.workerCount), text -> {
-            int max = ThreadPool.recommendedWorkerCount();
+            int max = ThreadPool.availableWorkerCount();
             outputSettings.workerCount = Math.max(1, Math.min(max,
                     (int) Math.round(engine.parseOrFallback(text, outputSettings.workerCount))));
             refreshOutputTab(engine);
@@ -593,8 +466,7 @@ final class EngineOutputTabBuilder {
     }
 
     private static void addOutputRasterToggles(JPanel section) {
-        section.add(Box.createRigidArea(new Dimension(0, 4)));
-        section.add(UiBuilder.helperText("Frustum culling i backface culling se zde řídí globálními volbami panelu Render."));
+        section.add(Box.createRigidArea(new Dimension(0, 2)));
     }
 
     private static void addOutputProgressiveCommon(Engine engine,
@@ -657,7 +529,6 @@ final class EngineOutputTabBuilder {
     private static void buildOutputRaySettings(Engine engine,
                                                JPanel section,
                                                OutputRenderController.Settings outputSettings) {
-        section.add(UiBuilder.helperText("Ray Tracing používá společné progresivní volby výše plus následující light transport přepínače."));
         engine.addBooleanRow(section, "Stíny", outputSettings.shadows,
                 value -> {
                     outputSettings.shadows = value;
@@ -673,7 +544,6 @@ final class EngineOutputTabBuilder {
     private static void buildOutputPathSettings(Engine engine,
                                                 JPanel section,
                                                 OutputRenderController.Settings outputSettings) {
-        section.add(UiBuilder.helperText("Path Tracing pro export může držet referenční transport a zároveň použít finální denoise a clampy podobně jako Cycles."));
         engine.addBooleanRow(section, "Reference clamp", outputSettings.referenceClampEnabled,
                 value -> {
                     outputSettings.referenceClampEnabled = value;
@@ -692,7 +562,6 @@ final class EngineOutputTabBuilder {
     private static void buildOutputWireframeSettings(Engine engine,
                                                      JPanel section,
                                                      OutputRenderController.Settings outputSettings) {
-        section.add(UiBuilder.helperText("Wireframe je single-pass a používá vlastní edge styling."));
         engine.addBooleanRow(section, "Hloubkově skryté hrany", outputSettings.wireframeDepthHiddenLines,
                 value -> {
                     outputSettings.wireframeDepthHiddenLines = value;
@@ -759,7 +628,6 @@ final class EngineOutputTabBuilder {
     private static void buildOutputTemporalSettings(Engine engine,
                                                     JPanel section,
                                                     OutputRenderController.Settings outputSettings) {
-        section.add(UiBuilder.helperText("Temporal Noise používá stabilní 2D grain na pevné mřížce. Objekty běží integer kroky po X i Y přes společný regionální krokovač, pozadí zůstává statické."));
         engine.addNumericRow(section, "Tempo posuvu", engine.formatTransformValue(outputSettings.temporalTickRate), text -> {
             outputSettings.temporalTickRate = Math.max(0.1, Math.min(20.0,
                     engine.parseOrFallback(text, outputSettings.temporalTickRate)));
@@ -807,7 +675,6 @@ final class EngineOutputTabBuilder {
     private static void buildOutputHexSettings(Engine engine,
                                                JPanel section,
                                                OutputRenderController.Settings outputSettings) {
-        section.add(UiBuilder.helperText("Hex je single-pass a používá vlastní buňku, outline a theme parametry."));
         engine.addNumericRow(section, "Velikost buňky", engine.formatTransformValue(outputSettings.hexCellSize), text -> {
             outputSettings.hexCellSize = Math.max(4.0, Math.min(64.0,
                     engine.parseOrFallback(text, outputSettings.hexCellSize)));

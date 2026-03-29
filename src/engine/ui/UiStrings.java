@@ -6,9 +6,9 @@ import engine.core.WorldPresetCatalog;
 public final class UiStrings {
 
     public static final class Tabs {
-        public static final String SCENE = "Scéna";
         public static final String WORLD = "Prostředí";
         public static final String VIEW = "Zobrazení";
+        public static final String ITEM = "Položka";
         public static final String OBJECT = "Objekt";
         public static final String RENDER = "Render";
         public static final String OUTPUT = "Výstup";
@@ -42,23 +42,13 @@ public final class UiStrings {
     }
 
     public static final class Scene {
-        public static final String HEADER_TITLE = "Správa scény";
-        public static final String HEADER_SUBTITLE = "Outliner, rychlé akce a kontext vybrané položky na jednom místě.";
-        public static final String OUTLINER = "Outliner scény";
         public static final String SELECTED_ITEM = "Vybraná položka";
-        public static final String ADD_TO_SCENE = "Přidat do scény";
-        public static final String SELECTION = "Výběr";
         public static final String BASIC_OBJECTS = "Základní objekty";
         public static final String FEATURED_OBJECTS = "Výrazné tvary";
+        public static final String IMPORT = "Import";
         public static final String LIGHTS = "Světla";
         public static final String FORCE_FIELDS = "Síly";
         public static final String SIMULATION = "Částicové efekty";
-        public static final String QUICK_ADD_HINT = "Rychlé přidání a výběr hlavních položek scény.";
-        public static final String SELECT_PREVIOUS = "Vybrat předchozí";
-        public static final String SELECT_NEXT = "Vybrat další";
-        public static final String FOCUS_SELECTION = "Zaměřit výběr (F)";
-        public static final String CLEAR_SELECTION = "Zrušit výběr";
-        public static final String SELECTION_CLEARED_MSG = "Výběr zrušen.";
 
         private Scene() {
         }
@@ -93,7 +83,6 @@ public final class UiStrings {
 
     public static final class Spray {
         public static final String TITLE = "Spray / splash emitor";
-        public static final String HONEST_HINT = "Experimentální částicový spray a splash overlay. Nejde o objemovou fluid simulaci.";
         public static final String EMISSION = "Emise";
         public static final String MOTION = "Pohyb částic";
         public static final String COLLISIONS = "Kolize a útlum";
@@ -148,6 +137,11 @@ public final class UiStrings {
         public static final String MATERIAL = "Materiál";
         public static final String TIMELINE_SUBTITLE = "Klíče, scrub a přehrávání animace.";
         public static final String MATERIAL_SUBTITLE = "Node-based editor materiálu inspirovaný Blenderem.";
+        public static final String DETACH_WINDOW = "Odpojit do okna";
+        public static final String ATTACH_WINDOW = "Vrátit do docku";
+        public static final String DETACHED_BADGE = "Samostatné okno";
+        public static final String DETACHED_PLACEHOLDER = "Tento workspace je otevřený v samostatném okně.";
+        public static final String FOCUS_WINDOW = "Aktivovat okno";
 
         private Dock() {
         }
@@ -172,6 +166,14 @@ public final class UiStrings {
         public static final String RESET_GRAPH = "Reset grafu";
         public static final String IMPORT_PBR = "Importovat PBR sadu...";
         public static final String APPLY_TO_SELECTED = "Použít na vybraný objekt";
+        public static final String WORKSPACE_BAR = "Pracovní režim";
+        public static final String WORKSPACE_STUDIO = "Studio";
+        public static final String WORKSPACE_GRAPH = "Graph";
+        public static final String WORKSPACE_LOOKDEV = "Lookdev";
+        public static final String AUTO_LAYOUT = "Auto layout";
+        public static final String AUTO_LAYOUT_SELECTION = "Srovnat výběr";
+        public static final String FRAME_GRAPH = "Zarovnat pohled";
+        public static final String WORKSPACE_GRAPH_HINT = "Uklidí graf, přepne rozložení workspace a nechá materiálový editor lépe využít prostor.";
         public static final String PREVIEW_PRIMITIVE = "Primitiv";
         public static final String PREVIEW_LIGHTING = "Světla";
         public static final String PREVIEW_BACKGROUND = "Pozadí";
@@ -202,7 +204,6 @@ public final class UiStrings {
     public static final class Common {
         public static final String SELECT_IN_OUTLINER = "Vyberte položku v outlineru.";
         public static final String OPEN_WORLD_TAB = "Otevřít panel prostředí";
-        public static final String OPEN_SCENE_TAB = "Otevřít panel scény";
         public static final String BACK_TO_TIMELINE = "Zpět na časovou osu";
         public static final String NO_MESH = "Vybraná položka nemá mesh.";
         public static final String NO_MATERIAL = "Žádný materiál";

@@ -59,7 +59,7 @@ final class EngineLifecycleController {
         try {
             Thread.currentThread().setPriority(Math.max(Thread.MIN_PRIORITY + 1, Thread.NORM_PRIORITY - 1));
         } catch (SecurityException ignored) {
- // Here nechavam vychozi prioritu vlakna, kdyz VM nepovoli jeji zmenu.
+            // Když VM nepovolí změnu priority, zůstane výchozí hodnota.
         }
 
         StartupLoadingScreen loadingScreen = StartupLoadingScreen.show(Engine.WINDOW_TITLE);
@@ -240,13 +240,19 @@ final class EngineLifecycleController {
                 );
                 RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.INPUT, inputStage);
 
-                long selectionStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.SELECTION_PICK);
-                EngineSelectionController.handleObjectInteraction(engine);
-                RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.SELECTION_PICK, selectionStage);
                 if (engine.outputRenderController.isRenderInProgress()) {
+                    if (engine.navigationPreset == Engine.NavigationPreset.FPS && engine.mouseCaptured) {
+                        engine.outputRenderRecapturePending = true;
+                        engine.releaseMouseCapture();
+                    }
+                    engine.window.setRenderPreviewMode(true);
+                    engine.window.setRenderPreviewActions(
+                            engine::toggleOutputRenderPause,
+                            engine::cancelOutputRender);
+                    engine.window.setRenderPreviewState(engine.currentOutputRenderPreviewState());
                     RuntimeInstrumentation.recordMode(engine.activeMode, "OUTPUT_PREVIEW");
                     long hudStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.HUD_UI);
-                    engine.window.setOverlayText(engine.outputRenderController.getViewportPreviewLines());
+                    engine.window.setOverlayText(new String[0]);
                     RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.HUD_UI, hudStage);
                     updateRenderModeSwitchOverlay(engine, System.nanoTime());
                     long blitStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.BLIT_PRESENT);
@@ -267,6 +273,19 @@ final class EngineLifecycleController {
                     }
                     continue;
                 }
+                if (engine.outputRenderRecapturePending
+                        && engine.navigationPreset == Engine.NavigationPreset.FPS
+                        && !engine.mouseCaptured) {
+                    engine.captureMouse();
+                }
+                engine.outputRenderRecapturePending = false;
+                engine.window.setRenderPreviewActions(null, null);
+                engine.window.setRenderPreviewState(null);
+                engine.window.setRenderPreviewMode(false);
+
+                long selectionStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.SELECTION_PICK);
+                EngineSelectionController.handleObjectInteraction(engine);
+                RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.SELECTION_PICK, selectionStage);
                 if (EngineSafetyController.shouldHoldFrame(engine, now)) {
                     RuntimeInstrumentation.recordMode(engine.activeMode, "SAFETY_HOLD");
                     long hudStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.HUD_UI);
@@ -291,6 +310,14 @@ final class EngineLifecycleController {
                 Vec3 cameraPosBefore = engine.camera != null ? engine.camera.getPosition() : Vec3.ZERO;
                 Vec3 cameraForwardBefore = engine.camera != null ? engine.camera.getForward() : Vec3.ZERO;
                 long cameraStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.CAMERA_UPDATE);
+                boolean axisSnapNavigationIntent = engine.axisSnapViewActive
+                        && engine.navigationPreset == Engine.NavigationPreset.BLENDER
+                        && (engine.input.isMouseButtonDown(MouseEvent.BUTTON2)
+                        || engine.input.getScrollDelta() != 0
+                        || isKeyboardMovementIntentActive(engine));
+                if (axisSnapNavigationIntent) {
+                    EngineCameraRuntime.restoreProjectionAfterAxisSnap(engine);
+                }
                 if (!engine.objectFocusMode || engine.mouseCaptured) {
                     engine.cameraController.update(engine.input, dt);
                 } else if (engine.selectedEntity != null
@@ -311,6 +338,7 @@ final class EngineLifecycleController {
                 } else if (engine.navigationPreset == Engine.NavigationPreset.BLENDER) {
                     EngineCameraRuntime.rememberCurrentBlendPose(engine);
                 }
+                EngineCameraRuntime.refreshOrthographicClipping(engine);
                 EngineTransformController.updateTransformTool(engine);
                 EngineTimelineController.updatePlayback(engine, dt);
                 RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.CAMERA_UPDATE, cameraStage);
@@ -613,7 +641,7 @@ final class EngineLifecycleController {
             engine.renderModeSwitchRevealStartNanos = 0L;
             engine.renderModeSwitchSampleBaseline = currentAccumulatedSamplesForMode(engine, mode);
 
- // Here hned resetuju progresivni historii, aby prepnuti modu startovalo z cisteho stavu.
+            // Reset progresivní historie zajistí čistý start po přepnutí režimu.
             if (engine.rayTracerRenderer != null) {
                 engine.rayTracerRenderer.setParameter("reset", true);
             }
@@ -621,7 +649,7 @@ final class EngineLifecycleController {
                 engine.pathTracerRenderer.setParameter("reset", true);
             }
 
- // Here hned po kliku zobrazuju cerny overlay s nazvem modu jeste pred rekonfiguraci rendereru.
+            // Overlay zobrazím hned po kliknutí, ještě před rekonfigurací rendereru.
             if (engine.window != null) {
                 engine.window.presentRenderModeSwitchOverlayNow(engine.renderModeSwitchTargetLabel, 0.08);
             }
@@ -721,7 +749,7 @@ final class EngineLifecycleController {
         if (raw >= baseline) {
             return Math.max(0L, raw - baseline);
         }
- // Here počítá s tim, ze reset rendereru muze shodit citac pod baseline a raw uz pak reprezentuje nove samples po prepnuti.
+        // Reset rendereru může shodit čítač pod baseline. Raw pak reprezentuje nové samples po přepnutí.
         return raw;
     }
 
@@ -884,6 +912,7 @@ final class EngineLifecycleController {
             engine.editorShortcutRouter.uninstall();
             engine.editorShortcutRouter = null;
         }
+        EngineBottomDock.disposeDetached(engine);
         if (engine.window != null) {
             engine.window.setCursorCaptured(false);
             engine.window.dispose();

@@ -6,10 +6,14 @@ import java.awt.PointerInfo;
 
 import engine.camera.Camera;
 import engine.camera.CameraController;
+import engine.camera.OrthographicCamera;
+import engine.camera.PerspectiveCamera;
 import engine.math.Vec3;
 import engine.scene.Entity;
 
 final class EngineCameraRuntime {
+    private static final double ORTHO_MATCH_SCALE = 1.0;
+
     private EngineCameraRuntime() {
     }
 
@@ -19,6 +23,11 @@ final class EngineCameraRuntime {
         double moveSpeed = engine.cameraController.getMoveSpeed();
         double rotateSpeed = engine.cameraController.getRotateSpeed();
         Vec3 orbitTarget = engine.cameraController.getOrbitTarget();
+        engine.axisSnapViewActive = false;
+
+        if (!engine.orthographicProjection) {
+            syncOrthographicScaleFromCurrentView(engine, orbitTarget);
+        }
 
         engine.orthographicProjection = !engine.orthographicProjection;
         engine.camera = engine.orthographicProjection ? engine.orthographicCamera : engine.perspectiveCamera;
@@ -29,6 +38,7 @@ final class EngineCameraRuntime {
         engine.cameraController.setRotateSpeed(rotateSpeed);
         engine.cameraController.setOrbitTarget(orbitTarget);
         engine.cameraController.setMouseLookAlways(engine.mouseCaptured);
+        refreshOrthographicClipping(engine);
 
         System.out.println("Projection: " + (engine.orthographicProjection ? "ORTHOGRAPHIC" : "PERSPECTIVE"));
         engine.refreshUiIndicators();
@@ -132,7 +142,7 @@ final class EngineCameraRuntime {
     }
 
     static void rememberCurrentFpsPose(Engine engine) {
-        if (engine.camera == null) {
+        if (!shouldTrackFpsPose(engine)) {
             return;
         }
         Vec3 pos = engine.camera.getPosition();
@@ -143,6 +153,23 @@ final class EngineCameraRuntime {
         engine.savedFpsPosition = new Vec3(pos.x, pos.y, pos.z);
         engine.savedFpsForward = new Vec3(fwd.x, fwd.y, fwd.z);
         engine.savedFpsPoseValid = true;
+    }
+
+    static boolean shouldTrackFpsPose(Engine engine) {
+        if (engine == null
+                || engine.camera == null
+                || engine.navigationPreset != Engine.NavigationPreset.FPS) {
+            return false;
+        }
+        if (engine.axisSnapViewActive
+                || engine.viewportContextMenuRecapturePending
+                || EngineViewportOverlay.isViewingThroughOutputCamera(engine)) {
+            return false;
+        }
+        return !(engine.timelineEnabled
+                && engine.animationPlaybackEnabled
+                && engine.sceneTimeline != null
+                && engine.sceneTimeline.hasAnyCameraKeys());
     }
 
     static void rememberCurrentBlendPose(Engine engine) {
@@ -184,8 +211,207 @@ final class EngineCameraRuntime {
                 engine.outputCameraEntity,
                 engine.camera,
                 engine.perspectiveCamera,
+                engine.orthographicCamera,
                 engine.orthographicProjection,
                 width,
                 height);
+    }
+
+    static void snapToWorldAxis(Engine engine, Window.AxisWidgetTarget target) {
+        if (engine == null || target == null || target == Window.AxisWidgetTarget.NONE || engine.camera == null) {
+            return;
+        }
+        if (EngineViewportOverlay.isViewingThroughOutputCamera(engine)) {
+            restoreBlendViewport(engine);
+        }
+        engine.axisSnapRestoreOrthographicProjection = engine.orthographicProjection;
+        engine.axisSnapViewActive = true;
+
+        Vec3 requested = axisDirection(target);
+        Vec3 current = engine.camera.getForward().normalize();
+        Vec3 finalDirection = current.dot(requested) > 0.999 ? requested.mul(-1.0) : requested;
+        Vec3 focusTarget = resolveAxisSnapTarget(engine);
+        double distance = Math.max(2.2, engine.camera.getPosition().sub(focusTarget).length());
+        CameraController.Mode controllerMode = engine.cameraController != null
+                ? engine.cameraController.getMode()
+                : CameraController.Mode.ORBIT;
+        double moveSpeed = engine.cameraController != null ? engine.cameraController.getMoveSpeed() : 2.2;
+        double rotateSpeed = engine.cameraController != null ? engine.cameraController.getRotateSpeed() : 0.00138;
+        boolean mouseLookAlways = engine.cameraController != null && engine.cameraController.isMouseLookAlways();
+
+        if (!engine.orthographicProjection) {
+            syncOrthographicScaleForDistance(engine, distance);
+            engine.orthographicProjection = true;
+            engine.camera = engine.orthographicCamera;
+            engine.cameraController = new CameraController(engine.camera, controllerMode);
+            engine.cameraController.setMoveSpeed(moveSpeed);
+            engine.cameraController.setRotateSpeed(rotateSpeed);
+            engine.cameraController.setMouseLookAlways(mouseLookAlways);
+        }
+
+        applyCameraPose(engine, focusTarget.sub(finalDirection.mul(distance)), finalDirection);
+        refreshOrthographicClipping(engine);
+        if (engine.cameraController != null) {
+            if (engine.cameraController.getMode() != CameraController.Mode.ORBIT) {
+                engine.cameraController.setMode(CameraController.Mode.ORBIT);
+            }
+            engine.cameraController.setOrbitTarget(focusTarget);
+            engine.cameraController.syncStateFromCamera();
+        }
+        engine.objectFocusMode = false;
+        engine.draggingSelectedObject = false;
+        engine.pendingSelectedObjectDrag = false;
+        engine.transformMode = Engine.TransformMode.NONE;
+        engine.axisConstraint = Engine.AxisConstraint.NONE;
+        engine.gizmoDragActive = false;
+        engine.captureSelectLatch = false;
+        if (engine.input != null) {
+            engine.input.forceMouseDelta(0, 0);
+        }
+        if (engine.window != null && engine.window.getCanvas() != null) {
+            engine.window.getCanvas().requestFocusInWindow();
+        }
+        rememberCurrentBlendPose(engine);
+        engine.refreshUiIndicators();
+    }
+
+    static void restoreProjectionAfterAxisSnap(Engine engine) {
+        if (engine == null || !engine.axisSnapViewActive) {
+            return;
+        }
+        if (engine.axisSnapRestoreOrthographicProjection || engine.camera == null) {
+            engine.axisSnapViewActive = false;
+            refreshOrthographicClipping(engine);
+            return;
+        }
+        Camera previous = engine.camera;
+        CameraController.Mode mode = engine.cameraController != null
+                ? engine.cameraController.getMode()
+                : CameraController.Mode.ORBIT;
+        double moveSpeed = engine.cameraController != null ? engine.cameraController.getMoveSpeed() : 2.2;
+        double rotateSpeed = engine.cameraController != null ? engine.cameraController.getRotateSpeed() : 0.00138;
+        Vec3 orbitTarget = engine.cameraController != null ? engine.cameraController.getOrbitTarget() : resolveAxisSnapTarget(engine);
+        boolean mouseLookAlways = engine.cameraController != null && engine.cameraController.isMouseLookAlways();
+
+        engine.orthographicProjection = false;
+        engine.camera = engine.perspectiveCamera;
+        copyCameraPose(previous, engine.camera);
+        engine.cameraController = new CameraController(engine.camera, mode);
+        engine.cameraController.setMoveSpeed(moveSpeed);
+        engine.cameraController.setRotateSpeed(rotateSpeed);
+        engine.cameraController.setOrbitTarget(orbitTarget);
+        engine.cameraController.setMouseLookAlways(mouseLookAlways);
+        engine.axisSnapViewActive = false;
+        engine.refreshUiIndicators();
+    }
+
+    static void refreshOrthographicClipping(Engine engine) {
+        if (engine == null || !engine.orthographicProjection || engine.orthographicCamera == null || engine.camera == null) {
+            return;
+        }
+
+        Vec3 cameraPos = engine.camera.getPosition();
+        Vec3 forward = engine.camera.getForward().normalize();
+        if (forward.lengthSquared() < 1e-10) {
+            forward = new Vec3(0.0, 0.0, -1.0);
+        }
+
+        double minDepth = Double.POSITIVE_INFINITY;
+        double maxDepth = Double.NEGATIVE_INFINITY;
+        if (engine.scene != null) {
+            for (Entity entity : engine.scene.getEntities()) {
+                if (entity == null || !entity.isVisible()) {
+                    continue;
+                }
+                if (entity.getWorldBounds() == null) {
+                    entity.computeWorldBounds();
+                }
+                Vec3 center = entity.getWorldBounds() != null
+                        ? entity.getWorldBounds().center()
+                        : entity.getTransform().getPosition();
+                double radius = entity.getWorldBounds() != null
+                        ? entity.getWorldBounds().getMax().sub(center).length()
+                        : Math.max(0.35, entity.getTransform().getScale().length() * 0.5);
+                double depth = center.sub(cameraPos).dot(forward);
+                minDepth = Math.min(minDepth, depth - radius);
+                maxDepth = Math.max(maxDepth, depth + radius);
+            }
+        }
+
+        double halfHeight = engine.orthographicCamera.getHalfHeight();
+        double padding = Math.max(12.0, halfHeight * 1.5);
+        if (!Double.isFinite(minDepth) || !Double.isFinite(maxDepth)) {
+            minDepth = 0.05;
+            maxDepth = Math.max(800.0, halfHeight * 12.0);
+        }
+
+        double near = 0.01;
+        double far = Math.max(near + 64.0, maxDepth + padding);
+        far = Math.max(far, near + 512.0);
+        engine.orthographicCamera.setClipping(near, far);
+    }
+
+    static void syncOrthographicScaleFromCurrentView(Engine engine, Vec3 focusTarget) {
+        if (engine == null || engine.camera == null || engine.perspectiveCamera == null || engine.orthographicCamera == null) {
+            return;
+        }
+        Vec3 target = focusTarget;
+        if (target == null) {
+            target = resolveAxisSnapTarget(engine);
+        }
+        double distance = Math.max(0.25, engine.camera.getPosition().sub(target).length());
+        syncOrthographicScaleForDistance(engine, distance);
+    }
+
+    private static void syncOrthographicScaleForDistance(Engine engine, double distance) {
+        if (engine == null || engine.perspectiveCamera == null || engine.orthographicCamera == null) {
+            return;
+        }
+        PerspectiveCamera perspective = engine.perspectiveCamera;
+        double halfHeight = Math.tan(perspective.getFovY() * 0.5) * Math.max(0.25, distance) * ORTHO_MATCH_SCALE;
+        engine.orthographicCamera.setHalfHeightWithAspect(
+                halfHeight,
+                Math.max(1e-4, perspective.getAspectRatio()));
+    }
+
+    private static Vec3 resolveAxisSnapTarget(Engine engine) {
+        if (engine == null || engine.camera == null) {
+            return Vec3.ZERO;
+        }
+        Vec3 selectionPivot = engine.selectionPivotPosition();
+        if (selectionPivot != null) {
+            return selectionPivot;
+        }
+        if (engine.cameraController != null && engine.cameraController.getOrbitTarget() != null) {
+            return engine.cameraController.getOrbitTarget();
+        }
+        return engine.camera.getPosition().add(engine.camera.getForward().mul(4.0));
+    }
+
+    private static void restoreBlendViewport(Engine engine) {
+        if (engine == null) {
+            return;
+        }
+        if (engine.savedBlendPoseValid && engine.savedBlendPosition != null && engine.savedBlendForward != null) {
+            applyCameraPose(engine, engine.savedBlendPosition, engine.savedBlendForward);
+            return;
+        }
+        if (engine.outputCameraEntity != null) {
+            Vec3 outPos = engine.outputCameraEntity.getTransform().getPosition();
+            Vec3 outFwd = engine.outputCameraForward();
+            applyCameraPose(engine, outPos.sub(outFwd.mul(2.8)), outFwd);
+        }
+    }
+
+    private static Vec3 axisDirection(Window.AxisWidgetTarget target) {
+        return switch (target) {
+            case POS_X -> new Vec3(1.0, 0.0, 0.0);
+            case NEG_X -> new Vec3(-1.0, 0.0, 0.0);
+            case POS_Y -> new Vec3(0.0, 1.0, 0.0);
+            case NEG_Y -> new Vec3(0.0, -1.0, 0.0);
+            case POS_Z -> new Vec3(0.0, 0.0, 1.0);
+            case NEG_Z -> new Vec3(0.0, 0.0, -1.0);
+            case NONE -> new Vec3(0.0, 0.0, -1.0);
+        };
     }
 }

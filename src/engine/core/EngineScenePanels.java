@@ -5,34 +5,80 @@ import engine.ui.UiStrings;
 import engine.ui.UiTheme;
 import engine.util.UiBuilder;
 
+import java.awt.BorderLayout;
 import java.awt.Dimension;
+
+import javax.swing.BorderFactory;
 import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
-import javax.swing.JList;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 final class EngineScenePanels {
+    private static final Dimension SCENE_BROWSER_SEARCH_PREFERRED = new Dimension(140, 24);
+    private static final Dimension SCENE_BROWSER_SEARCH_MIN = new Dimension(108, 24);
+    private static final Dimension SCENE_BROWSER_SEARCH_MAX = new Dimension(168, 24);
 
     private EngineScenePanels() {
     }
 
-    static JPanel buildSceneTab(Engine engine) {
-        JPanel sceneTab = engine.window.createRightTab("Scene", UiStrings.Tabs.SCENE, "scene");
-        sceneTab.removeAll();
-        sceneTab.add(UiBuilder.panelHeader(UiStrings.Scene.HEADER_TITLE, UiStrings.Scene.HEADER_SUBTITLE));
-        sceneTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
+    static JPanel buildSceneBrowser(Engine engine) {
+        JPanel browser = new JPanel(new BorderLayout(0, 4));
+        browser.setOpaque(true);
+        browser.setBackground(UiTheme.PANEL_BG);
+        browser.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+        browser.setMinimumSize(new Dimension(0, 0));
 
-        JPanel outlinerSection = engine.addCollapsibleSection(sceneTab, UiStrings.Scene.OUTLINER, true);
+        JPanel header = new JPanel(new BorderLayout(6, 0));
+        header.setOpaque(false);
+        engine.sceneBrowserStatusLabel = new JLabel("0 položek", engine.window.createVectorIcon("scene", 13), JLabel.LEFT);
+        engine.sceneBrowserStatusLabel.setForeground(UiTheme.TEXT_MUTED);
+        engine.sceneBrowserStatusLabel.setFont(engine.sceneBrowserStatusLabel.getFont().deriveFont(java.awt.Font.PLAIN, 11.5f));
+        header.add(engine.sceneBrowserStatusLabel, BorderLayout.WEST);
+
+        engine.sceneBrowserSearchField = new JTextField(engine.sceneBrowserFilterText == null ? "" : engine.sceneBrowserFilterText);
+        EditorFocusContext.mark(engine.sceneBrowserSearchField, EditorFocusContext.TEXT_INPUT);
+        UiBuilder.styleInspectorField(engine.sceneBrowserSearchField);
+        engine.sceneBrowserSearchField.setToolTipText("Filtrovat položky podle názvu nebo typu.");
+        engine.sceneBrowserSearchField.setFont(engine.sceneBrowserSearchField.getFont().deriveFont(12.0f));
+        engine.sceneBrowserSearchField.setPreferredSize(SCENE_BROWSER_SEARCH_PREFERRED);
+        engine.sceneBrowserSearchField.setMinimumSize(SCENE_BROWSER_SEARCH_MIN);
+        engine.sceneBrowserSearchField.setMaximumSize(SCENE_BROWSER_SEARCH_MAX);
+        engine.sceneBrowserSearchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateSceneBrowserFilter(engine);
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateSceneBrowserFilter(engine);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateSceneBrowserFilter(engine);
+            }
+        });
+        header.add(engine.sceneBrowserSearchField, BorderLayout.EAST);
+        browser.add(header, BorderLayout.NORTH);
+
         engine.sceneOutlinerModel = new DefaultListModel<>();
-        engine.sceneOutlinerList = new JList<>(engine.sceneOutlinerModel);
+        engine.sceneOutlinerList = new javax.swing.JList<>(engine.sceneOutlinerModel);
         EditorFocusContext.mark(engine.sceneOutlinerList, EditorFocusContext.OUTLINER);
         engine.sceneOutlinerList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         engine.sceneOutlinerList.setBackground(UiTheme.PANEL_INSET);
         engine.sceneOutlinerList.setForeground(UiTheme.TEXT_PRIMARY);
-        engine.sceneOutlinerList.setSelectionBackground(UiTheme.SELECTION_BG);
+        engine.sceneOutlinerList.setSelectionBackground(UiTheme.SELECTION_BG_SOFT);
         engine.sceneOutlinerList.setSelectionForeground(UiTheme.TEXT_PRIMARY);
+        engine.sceneOutlinerList.setFixedCellHeight(EngineSceneInspector.outlinerRowHeight());
+        engine.sceneOutlinerList.setCellRenderer(EngineSceneInspector.createSceneOutlinerRenderer(engine));
         engine.sceneOutlinerList.getActionMap().put(EditorActionId.DELETE, new javax.swing.AbstractAction() {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
@@ -41,86 +87,24 @@ final class EngineScenePanels {
                 }
             }
         });
-        JScrollPane outlinerScroll = new JScrollPane(engine.sceneOutlinerList);
-        outlinerScroll.setAlignmentX(0.0f);
-        outlinerScroll.setPreferredSize(new Dimension(220, 240));
-        outlinerScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 280));
-        UiTheme.styleScrollPane(outlinerScroll, UiTheme.PANEL_INSET);
-        outlinerSection.add(outlinerScroll);
-        outlinerSection.add(Box.createRigidArea(new Dimension(0, 6)));
-        outlinerSection.add(UiBuilder.helperText(UiStrings.Scene.QUICK_ADD_HINT));
-
-        JPanel outlinerQuickAdd = createButtonGrid();
-        for (String type : EngineSceneActions.basicPrimitiveTypes()) {
-            outlinerQuickAdd.add(engine.actionButton("+ " + EngineSceneActions.primitiveLabel(type),
-                    () -> engine.addPrimitive(type)));
-        }
-        outlinerSection.add(outlinerQuickAdd);
-        outlinerSection.add(Box.createRigidArea(new Dimension(0, 6)));
-
-        JPanel featuredQuickAdd = createButtonGrid();
-        for (String type : EngineSceneActions.featuredPrimitiveTypes()) {
-            featuredQuickAdd.add(engine.actionButton("+ " + EngineSceneActions.primitiveLabel(type),
-                    () -> engine.addPrimitive(type)));
-        }
-        outlinerSection.add(featuredQuickAdd);
-
-        engine.sceneDetailsPanel = engine.addCollapsibleSection(sceneTab, UiStrings.Scene.SELECTED_ITEM, true);
-        engine.sceneDetailsPanel.add(engine.sectionTitle(UiStrings.Common.SELECT_IN_OUTLINER));
         bindSceneOutlinerShortcuts(engine);
+        EngineSceneInspector.installSceneOutlinerInteractions(engine);
 
-        JPanel addSection = engine.addCollapsibleSection(sceneTab, UiStrings.Scene.ADD_TO_SCENE, false);
-        addSection.add(engine.sectionTitle(UiStrings.Scene.BASIC_OBJECTS));
-        JPanel basicGrid = createButtonGrid();
-        for (String type : EngineSceneActions.basicPrimitiveTypes()) {
-            basicGrid.add(engine.actionButton(UiStrings.ContextMenu.ADD_PREFIX + EngineSceneActions.primitiveLabel(type),
-                    () -> engine.addPrimitive(type)));
-        }
-        addSection.add(basicGrid);
-        addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        addSection.add(engine.sectionTitle(UiStrings.Scene.FEATURED_OBJECTS));
-        JPanel featuredGrid = createButtonGrid();
-        for (String type : EngineSceneActions.featuredPrimitiveTypes()) {
-            featuredGrid.add(engine.actionButton(UiStrings.ContextMenu.ADD_PREFIX + EngineSceneActions.primitiveLabel(type),
-                    () -> engine.addPrimitive(type)));
-        }
-        addSection.add(featuredGrid);
-        addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_2)));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.IMPORT_MODEL_SCENE, engine::importModelOrSceneFromDialog));
-        addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        addSection.add(engine.sectionTitle(UiStrings.Scene.LIGHTS));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_POINT_LIGHT, engine::addPointLight));
-        addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_AREA_LIGHT, engine::addAreaLight));
-        addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_CONE_LIGHT, engine::addConeLight));
-        addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        addSection.add(engine.sectionTitle(UiStrings.Scene.FORCE_FIELDS));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_VECTOR_FORCE, engine::addVectorForceField));
-        addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_POINT_ATTRACTOR, () -> engine.addPointForceField(true)));
-        addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_POINT_REPULSOR, () -> engine.addPointForceField(false)));
-        addSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_TURBULENCE, engine::addTurbulenceForceField));
-        addSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        addSection.add(engine.sectionTitle(UiStrings.Scene.SIMULATION));
-        addSection.add(engine.actionButton(UiStrings.ContextMenu.ADD_WATER_EMITTER, engine::addWaterEmitter));
+        JScrollPane outlinerScroll = new JScrollPane(engine.sceneOutlinerList);
+        outlinerScroll.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER_SUBTLE, 1, true));
+        outlinerScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        outlinerScroll.setMinimumSize(new Dimension(0, 0));
+        UiTheme.styleScrollPane(outlinerScroll, UiTheme.PANEL_INSET);
+        browser.add(outlinerScroll, BorderLayout.CENTER);
 
-        JPanel selectionSection = engine.addCollapsibleSection(sceneTab, UiStrings.Scene.SELECTION, false);
-        selectionSection.add(engine.actionButton(UiStrings.Scene.SELECT_PREVIOUS, () -> engine.selectRelative(-1)));
-        selectionSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        selectionSection.add(engine.actionButton(UiStrings.Scene.SELECT_NEXT, () -> engine.selectRelative(1)));
-        selectionSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        selectionSection.add(engine.actionButton(UiStrings.Scene.FOCUS_SELECTION, () -> {
-            if (engine.selectedEntity != null) {
-                engine.cameraController.frameTarget(engine.selectedEntity.getTransform().getPosition());
-            }
-        }));
-        selectionSection.add(Box.createRigidArea(new Dimension(0, 4)));
-        selectionSection.add(engine.actionButton(UiStrings.Scene.CLEAR_SELECTION, () -> engine.clearSelection(UiStrings.Scene.SELECTION_CLEARED_MSG)));
+        engine.window.setRightSidebarSceneBrowser(browser);
+        return browser;
+    }
 
-        return sceneTab;
+    private static void updateSceneBrowserFilter(Engine engine) {
+        String next = engine.sceneBrowserSearchField != null ? engine.sceneBrowserSearchField.getText() : "";
+        engine.sceneBrowserFilterText = next == null ? "" : next.trim();
+        engine.refreshSceneOutliner();
     }
 
     static void bindSceneOutlinerShortcuts(Engine engine) {
@@ -136,9 +120,10 @@ final class EngineScenePanels {
     }
 
     static JPanel buildWorldTab(Engine engine) {
-        JPanel worldTab = engine.window.createRightTab("World", UiStrings.Tabs.WORLD, "scene");
+        java.awt.Point scrollPosition = engine.window.captureRightTabViewPosition("World");
+        JPanel worldTab = engine.window.createRightTab("World", UiStrings.Tabs.WORLD, "world");
         worldTab.removeAll();
-        worldTab.add(UiBuilder.panelHeader(UiStrings.World.HEADER_TITLE, UiStrings.World.HEADER_SUBTITLE));
+        worldTab.add(UiBuilder.panelHeader(UiStrings.World.HEADER_TITLE, null));
         worldTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
 
         JPanel worldSection = engine.addCollapsibleSection(worldTab, UiStrings.World.LIGHT, true);
@@ -188,6 +173,9 @@ final class EngineScenePanels {
                 value -> engine.applyWorldPreset(UiStrings.worldPresetKey(value)));
         engine.addBooleanRow(worldSection, UiStrings.World.ANIMATE_WORLD_LIGHT, engine.worldLightAnimationEnabled, value ->
                 engine.applySceneEdit(UiStrings.World.HISTORY_TOGGLE_ANIMATION, () -> engine.worldLightAnimationEnabled = value));
+        worldTab.revalidate();
+        worldTab.repaint();
+        engine.window.restoreRightTabViewPosition("World", scrollPosition);
         return worldTab;
     }
 
@@ -201,7 +189,7 @@ final class EngineScenePanels {
     static JPanel buildInputTab(Engine engine) {
         JPanel inputTab = engine.window.createRightTab("Controls", UiStrings.Tabs.VIEW, "controls");
         inputTab.removeAll();
-        inputTab.add(UiBuilder.panelHeader(UiStrings.View.HEADER_TITLE, UiStrings.View.HEADER_SUBTITLE));
+        inputTab.add(UiBuilder.panelHeader(UiStrings.View.HEADER_TITLE, null));
         inputTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
 
         JPanel navSection = engine.addCollapsibleSection(inputTab, UiStrings.View.NAVIGATION, true);
@@ -241,61 +229,55 @@ final class EngineScenePanels {
         return inputTab;
     }
 
-    static JPanel buildObjectTab(Engine engine) {
-        JPanel objectTab = engine.window.createRightTab("Object", UiStrings.Tabs.OBJECT, "object");
-        objectTab.removeAll();
-        objectTab.add(UiBuilder.panelHeader(UiStrings.Object.HEADER_TITLE, UiStrings.Object.HEADER_SUBTITLE));
-        objectTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
+    static JPanel buildItemTab(Engine engine) {
+        JPanel itemTab = engine.window.createRightTab("Item", UiStrings.Tabs.ITEM, "item");
+        itemTab.removeAll();
+        itemTab.add(UiBuilder.panelHeader("Položka", null));
+        itemTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
 
-        engine.objectHeaderLabel = engine.sectionTitle(UiStrings.Object.NONE_SELECTED);
-        objectTab.add(engine.objectHeaderLabel);
-        objectTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
+        engine.objectHeaderLabel = engine.sectionTitle("Bez výběru");
+        itemTab.add(engine.objectHeaderLabel);
+        itemTab.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
 
-        JPanel objectTransform = engine.addCollapsibleSection(objectTab, UiStrings.Object.TRANSFORM, true);
-        objectTransform.add(engine.sectionTitle(UiStrings.Object.POSITION));
-        engine.posXField = engine.addTransformField(objectTransform, "X");
-        engine.posYField = engine.addTransformField(objectTransform, "Y");
-        engine.posZField = engine.addTransformField(objectTransform, "Z");
-        objectTransform.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        objectTransform.add(engine.sectionTitle(UiStrings.Object.ROTATION));
-        engine.rotXField = engine.addTransformField(objectTransform, "X");
-        engine.rotYField = engine.addTransformField(objectTransform, "Y");
-        engine.rotZField = engine.addTransformField(objectTransform, "Z");
-        objectTransform.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        objectTransform.add(engine.sectionTitle(UiStrings.Object.SCALE));
-        engine.scaleXField = engine.addTransformField(objectTransform, "X");
-        engine.scaleYField = engine.addTransformField(objectTransform, "Y");
-        engine.scaleZField = engine.addTransformField(objectTransform, "Z");
-        objectTransform.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
-        objectTransform.add(engine.actionButton(UiStrings.Object.APPLY_TRANSFORM, engine::applyObjectInspectorValues));
+        engine.sceneDetailsPanel = engine.addCollapsibleSection(itemTab, UiStrings.Scene.SELECTED_ITEM, true);
 
-        JPanel objectOps = engine.addCollapsibleSection(objectTab, UiStrings.Object.OPERATIONS, false);
-        objectOps.add(engine.actionButton(UiStrings.Object.FOCUS_SELECTION_ACTION, () -> {
+        engine.itemTransformSection = engine.addCollapsibleSection(itemTab, UiStrings.Object.TRANSFORM, true);
+        engine.itemTransformSection.add(engine.sectionTitle(UiStrings.Object.POSITION));
+        engine.posXField = engine.addTransformField(engine.itemTransformSection, "X");
+        engine.posYField = engine.addTransformField(engine.itemTransformSection, "Y");
+        engine.posZField = engine.addTransformField(engine.itemTransformSection, "Z");
+        engine.itemTransformSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
+        engine.itemTransformSection.add(engine.sectionTitle(UiStrings.Object.ROTATION));
+        engine.rotXField = engine.addTransformField(engine.itemTransformSection, "X");
+        engine.rotYField = engine.addTransformField(engine.itemTransformSection, "Y");
+        engine.rotZField = engine.addTransformField(engine.itemTransformSection, "Z");
+        engine.itemTransformSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
+        engine.itemTransformSection.add(engine.sectionTitle(UiStrings.Object.SCALE));
+        engine.scaleXField = engine.addTransformField(engine.itemTransformSection, "X");
+        engine.scaleYField = engine.addTransformField(engine.itemTransformSection, "Y");
+        engine.scaleZField = engine.addTransformField(engine.itemTransformSection, "Z");
+        engine.itemTransformSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
+        engine.itemTransformSection.add(engine.actionButton(UiStrings.Object.APPLY_TRANSFORM, engine::applyObjectInspectorValues));
+
+        engine.itemOperationsSection = engine.addCollapsibleSection(itemTab, UiStrings.Object.OPERATIONS, false);
+        engine.itemOperationsSection.add(engine.actionButton(UiStrings.Object.FOCUS_SELECTION_ACTION, () -> {
             if (engine.selectedEntity != null) {
                 engine.cameraController.frameTarget(engine.selectedEntity.getTransform().getPosition());
                 engine.camera.lookAt(engine.selectedEntity.getTransform().getPosition());
             }
         }));
-        objectOps.add(Box.createRigidArea(new Dimension(0, 4)));
-        objectOps.add(engine.actionButton(UiStrings.Object.RELEASE_FOCUS, () -> {
+        engine.itemOperationsSection.add(Box.createRigidArea(new Dimension(0, 4)));
+        engine.itemOperationsSection.add(engine.actionButton(UiStrings.Object.RELEASE_FOCUS, () -> {
             engine.objectFocusMode = false;
             engine.draggingSelectedObject = false;
             engine.transformMode = Engine.TransformMode.NONE;
             engine.axisConstraint = Engine.AxisConstraint.NONE;
             engine.gizmoDragActive = false;
         }));
-        objectOps.add(Box.createRigidArea(new Dimension(0, 4)));
-        objectOps.add(engine.actionButton(UiStrings.Object.ADD_RELEASE_KEY, engine::addTimelineReleaseKeyForSelection));
-        objectOps.add(Box.createRigidArea(new Dimension(0, 4)));
-        objectOps.add(engine.actionButton(UiStrings.Object.REMOVE_RELEASE_KEY, engine::removeTimelineReleaseKeyForSelection));
-        return objectTab;
-    }
-
-    private static JPanel createButtonGrid() {
-        JPanel grid = new JPanel(new java.awt.GridLayout(0, 2, 6, 6));
-        grid.setOpaque(false);
-        grid.setAlignmentX(0.0f);
-        grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
-        return grid;
+        engine.itemOperationsSection.add(Box.createRigidArea(new Dimension(0, 4)));
+        engine.itemOperationsSection.add(engine.actionButton(UiStrings.Object.ADD_RELEASE_KEY, engine::addTimelineReleaseKeyForSelection));
+        engine.itemOperationsSection.add(Box.createRigidArea(new Dimension(0, 4)));
+        engine.itemOperationsSection.add(engine.actionButton(UiStrings.Object.REMOVE_RELEASE_KEY, engine::removeTimelineReleaseKeyForSelection));
+        return itemTab;
     }
 }

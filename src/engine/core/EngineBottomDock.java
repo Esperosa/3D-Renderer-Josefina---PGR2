@@ -7,6 +7,7 @@ import engine.util.UiBuilder;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JToggleButton;
@@ -27,8 +28,35 @@ final class EngineBottomDock {
             return;
         }
         JPanel host = engine.window.getTimelinePanel();
+        engine.window.setTimelineDockAttached(!isDetached(engine));
         host.removeAll();
         host.setLayout(new BorderLayout(0, 0));
+
+        JPanel root = buildRoot(engine);
+        engine.bottomDockRootPanel = root;
+
+        if (isDetached(engine)) {
+            host.setVisible(false);
+            DetachedWorkspaceWindow detachedWindow = ensureDetachedWindow(engine);
+            detachedWindow.hostPanel().removeAll();
+            detachedWindow.hostPanel().add(root, BorderLayout.CENTER);
+            detachedWindow.hostPanel().revalidate();
+            detachedWindow.hostPanel().repaint();
+            detachedWindow.show();
+        } else {
+            host.setVisible(true);
+            host.add(root, BorderLayout.CENTER);
+            syncDockSizing(engine, host);
+            host.revalidate();
+            host.repaint();
+        }
+
+        showWorkspace(engine, engine.bottomDockWorkspace);
+    }
+
+    private static JPanel buildRoot(Engine engine) {
+        JPanel root = new JPanel(new BorderLayout(0, 0));
+        root.setOpaque(false);
 
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(true);
@@ -63,7 +91,15 @@ final class EngineBottomDock {
         tabs.add(engine.bottomDockTimelineButton);
         tabs.add(Box.createRigidArea(new Dimension(8, 1)));
         tabs.add(engine.bottomDockMaterialButton);
-        header.add(tabs, BorderLayout.EAST);
+
+        JPanel controls = new JPanel();
+        controls.setOpaque(false);
+        controls.setLayout(new BoxLayout(controls, BoxLayout.X_AXIS));
+        controls.add(tabs);
+        controls.add(Box.createRigidArea(new Dimension(10, 1)));
+        engine.bottomDockDetachButton = createDetachButton(engine);
+        controls.add(engine.bottomDockDetachButton);
+        header.add(controls, BorderLayout.EAST);
 
         engine.bottomDockCardPanel = new JPanel(new CardLayout());
         engine.bottomDockCardPanel.setOpaque(false);
@@ -73,6 +109,7 @@ final class EngineBottomDock {
         JPanel materialHost = new JPanel(new BorderLayout());
         materialHost.setOpaque(false);
 
+        engine.timelineDockHostPanel = timelineHost;
         engine.materialDockHostPanel = materialHost;
         EngineTimelineDock.populate(engine, timelineHost);
         EngineMaterialDock.rebuildInto(engine, materialHost);
@@ -80,13 +117,9 @@ final class EngineBottomDock {
         engine.bottomDockCardPanel.add(timelineHost, CARD_TIMELINE);
         engine.bottomDockCardPanel.add(materialHost, CARD_MATERIAL);
 
-        host.add(header, BorderLayout.NORTH);
-        host.add(engine.bottomDockCardPanel, BorderLayout.CENTER);
-        syncDockSizing(engine, host);
-        host.revalidate();
-        host.repaint();
-
-        showWorkspace(engine, engine.bottomDockWorkspace);
+        root.add(header, BorderLayout.NORTH);
+        root.add(engine.bottomDockCardPanel, BorderLayout.CENTER);
+        return root;
     }
 
     static void showWorkspace(Engine engine, Engine.BottomDockWorkspace workspace) {
@@ -105,16 +138,112 @@ final class EngineBottomDock {
                     : UiStrings.Dock.TIMELINE);
         }
         if (engine.bottomDockSubtitleLabel != null) {
-            engine.bottomDockSubtitleLabel.setText(next == Engine.BottomDockWorkspace.MATERIAL
-                    ? UiStrings.Dock.MATERIAL_SUBTITLE
-                    : UiStrings.Dock.TIMELINE_SUBTITLE);
+            engine.bottomDockSubtitleLabel.setText(workspaceSubtitle(next));
         }
         updateWorkspaceButtons(engine);
-        if (engine.window != null) {
+        if (engine.bottomDockCardPanel != null) {
+            engine.bottomDockCardPanel.revalidate();
+            engine.bottomDockCardPanel.repaint();
+        }
+        if (isDetached(engine)) {
+            updateDetachedWindowTitle(engine);
+            focusDetached(engine);
+        } else if (engine.window != null) {
             syncDockSizing(engine, engine.window.getTimelinePanel());
         }
-        engine.bottomDockCardPanel.revalidate();
-        engine.bottomDockCardPanel.repaint();
+    }
+
+    static void detach(Engine engine) {
+        if (engine == null || engine.window == null || engine.bottomDockRootPanel == null || isDetached(engine)) {
+            return;
+        }
+        JPanel mainHost = engine.window.getTimelinePanel();
+        mainHost.removeAll();
+        mainHost.setVisible(false);
+        engine.window.setTimelineDockAttached(false);
+        mainHost.revalidate();
+        mainHost.repaint();
+
+        DetachedWorkspaceWindow detachedWindow = ensureDetachedWindow(engine);
+        detachedWindow.hostPanel().removeAll();
+        detachedWindow.hostPanel().add(engine.bottomDockRootPanel, BorderLayout.CENTER);
+        detachedWindow.hostPanel().revalidate();
+        detachedWindow.hostPanel().repaint();
+        updateDetachedWindowTitle(engine);
+        detachedWindow.show();
+        updateWorkspaceButtons(engine);
+    }
+
+    static void attach(Engine engine) {
+        if (engine == null || engine.window == null || engine.bottomDockRootPanel == null) {
+            return;
+        }
+        DetachedWorkspaceWindow detachedWindow = engine.detachedBottomDockWindow;
+        if (detachedWindow != null) {
+            detachedWindow.hostPanel().removeAll();
+        }
+        JPanel mainHost = engine.window.getTimelinePanel();
+        mainHost.removeAll();
+        mainHost.add(engine.bottomDockRootPanel, BorderLayout.CENTER);
+        mainHost.setVisible(true);
+        engine.window.setTimelineDockAttached(true);
+        syncDockSizing(engine, mainHost);
+        mainHost.revalidate();
+        mainHost.repaint();
+        if (detachedWindow != null) {
+            detachedWindow.disposeSilently();
+        }
+        engine.detachedBottomDockWindow = null;
+        updateWorkspaceButtons(engine);
+    }
+
+    static void focusDetached(Engine engine) {
+        if (engine != null && engine.detachedBottomDockWindow != null) {
+            engine.detachedBottomDockWindow.focus();
+        }
+    }
+
+    static void disposeDetached(Engine engine) {
+        if (engine == null) {
+            return;
+        }
+        DetachedWorkspaceWindow detachedWindow = engine.detachedBottomDockWindow;
+        engine.detachedBottomDockWindow = null;
+        if (detachedWindow != null) {
+            detachedWindow.disposeSilently();
+        }
+    }
+
+    static boolean isDetached(Engine engine) {
+        return engine != null
+                && engine.detachedBottomDockWindow != null
+                && engine.detachedBottomDockWindow.isDisplayable();
+    }
+
+    private static DetachedWorkspaceWindow ensureDetachedWindow(Engine engine) {
+        if (engine.detachedBottomDockWindow != null && engine.detachedBottomDockWindow.isDisplayable()) {
+            return engine.detachedBottomDockWindow;
+        }
+        engine.detachedBottomDockWindow = new DetachedWorkspaceWindow(
+                engine,
+                UiStrings.Dock.TITLE,
+                workspaceSubtitle(engine.bottomDockWorkspace),
+                () -> attach(engine)
+        );
+        return engine.detachedBottomDockWindow;
+    }
+
+    private static void updateDetachedWindowTitle(Engine engine) {
+        if (engine == null || engine.detachedBottomDockWindow == null) {
+            return;
+        }
+        engine.detachedBottomDockWindow.updateTitle(UiStrings.Dock.TITLE, workspaceSubtitle(engine.bottomDockWorkspace));
+    }
+
+    private static String workspaceSubtitle(Engine.BottomDockWorkspace workspace) {
+        return workspace == Engine.BottomDockWorkspace.MATERIAL
+                ? UiStrings.Dock.MATERIAL_SUBTITLE
+                : UiStrings.Dock.TIMELINE_SUBTITLE;
     }
 
     private static JToggleButton createWorkspaceButton(Engine engine,
@@ -124,7 +253,22 @@ final class EngineBottomDock {
         button.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
         button.addActionListener(e -> {
             showWorkspace(engine, workspace);
-            engine.focusCanvas();
+            if (!isDetached(engine)) {
+                engine.focusCanvas();
+            }
+        });
+        return button;
+    }
+
+    private static JButton createDetachButton(Engine engine) {
+        JButton button = new JButton(UiStrings.Dock.DETACH_WINDOW);
+        UiBuilder.styleGhostButton(button);
+        button.addActionListener(e -> {
+            if (isDetached(engine)) {
+                attach(engine);
+            } else {
+                detach(engine);
+            }
         });
         return button;
     }
@@ -138,18 +282,23 @@ final class EngineBottomDock {
             UiBuilder.styleLight(engine.bottomDockMaterialButton,
                     engine.bottomDockWorkspace == Engine.BottomDockWorkspace.MATERIAL);
         }
+        if (engine.bottomDockDetachButton != null) {
+            engine.bottomDockDetachButton.setText(isDetached(engine)
+                    ? UiStrings.Dock.ATTACH_WINDOW
+                    : UiStrings.Dock.DETACH_WINDOW);
+        }
     }
 
     private static void syncDockSizing(Engine engine, JPanel host) {
-        if (engine == null || host == null) {
+        if (engine == null || host == null || engine.window == null) {
             return;
         }
         BorderLayout layout = host.getLayout() instanceof BorderLayout
                 ? (BorderLayout) host.getLayout()
                 : null;
-        Component north = layout != null ? layout.getLayoutComponent(BorderLayout.NORTH) : null;
-        int headerHeight = north != null ? north.getPreferredSize().height : 0;
-        int minHeight = Math.max(UiTheme.BOTTOM_DOCK_MIN_HEIGHT, headerHeight + 10);
+        Component center = layout != null ? layout.getLayoutComponent(BorderLayout.CENTER) : null;
+        int contentHeight = center != null ? center.getPreferredSize().height : 0;
+        int minHeight = Math.max(UiTheme.BOTTOM_DOCK_MIN_HEIGHT, contentHeight);
         Dimension preferred = host.getPreferredSize();
         host.setMinimumSize(new Dimension(0, minHeight));
         host.setPreferredSize(new Dimension(

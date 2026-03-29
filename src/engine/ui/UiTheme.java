@@ -30,6 +30,7 @@ import javax.swing.plaf.basic.BasicPopupMenuUI;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import java.awt.BasicStroke;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -506,8 +507,8 @@ public final class UiTheme {
     public static JLabel createSectionTitle(String text) {
         JLabel label = new JLabel(text == null ? "" : text);
         label.setAlignmentX(0.0f);
-        label.setForeground(ACCENT_GLOW);
-        label.setBorder(BorderFactory.createEmptyBorder(2, 2, 8, 2));
+        label.setForeground(TEXT_SECONDARY);
+        label.setBorder(BorderFactory.createEmptyBorder(2, 2, 6, 2));
         label.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         return label;
     }
@@ -534,22 +535,31 @@ public final class UiTheme {
     }
 
     public static JPanel createPanelHeader(String title, String subtitle) {
-        JPanel panel = new JPanel();
-        panel.setLayout(new javax.swing.BoxLayout(panel, javax.swing.BoxLayout.Y_AXIS));
+        JPanel panel = new JPanel(new BorderLayout(10, 0));
         panel.setOpaque(true);
         panel.setBackground(SECTION_CARD_BG);
         panel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER_SUBTLE, 1, true),
-                BorderFactory.createEmptyBorder(12, 12, 10, 12)
+                BorderFactory.createEmptyBorder(10, 12, 10, 12)
         ));
         JLabel titleLabel = new JLabel(title == null ? "" : title);
         titleLabel.setForeground(TEXT_PRIMARY);
         titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 14f));
-        titleLabel.setAlignmentX(0.0f);
-        panel.add(titleLabel);
+        panel.add(titleLabel, BorderLayout.WEST);
         if (subtitle != null && !subtitle.isBlank()) {
-            panel.add(javax.swing.Box.createRigidArea(new Dimension(0, 4)));
-            panel.add(createHelperText(subtitle));
+            JLabel hint = new JLabel("i");
+            hint.setOpaque(true);
+            hint.setHorizontalAlignment(JLabel.CENTER);
+            hint.setPreferredSize(new Dimension(18, 18));
+            hint.setBackground(new Color(41, 50, 61));
+            hint.setForeground(TEXT_MUTED);
+            hint.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(BORDER_SUBTLE, 1, true),
+                    BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            ));
+            hint.setToolTipText("<html><div style='width:220px'>" + subtitle + "</div></html>");
+            titleLabel.setToolTipText(hint.getToolTipText());
+            panel.add(hint, BorderLayout.EAST);
         }
         return panel;
     }
@@ -640,10 +650,10 @@ public final class UiTheme {
         @Override
         protected void installDefaults() {
             super.installDefaults();
-            tabInsets = new Insets(9, 14, 9, 14);
+            tabInsets = new Insets(8, 8, 8, 8);
             selectedTabPadInsets = new Insets(0, 0, 0, 0);
             contentBorderInsets = new Insets(0, 0, 0, 0);
-            tabAreaInsets = new Insets(8, 8, 8, 6);
+            tabAreaInsets = new Insets(8, 6, 8, 4);
         }
 
         @Override
@@ -653,6 +663,11 @@ public final class UiTheme {
 
         @Override
         protected int calculateTabWidth(int tabPlacement, int tabIndex, FontMetrics metrics) {
+            String title = tabPane.getTitleAt(tabIndex);
+            Icon icon = getIconForTab(tabIndex);
+            if ((title == null || title.isBlank()) && icon != null) {
+                return 42;
+            }
             return Math.max(112, super.calculateTabWidth(tabPlacement, tabIndex, metrics) + 6);
         }
 

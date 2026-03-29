@@ -24,19 +24,31 @@ final class EngineObjectInspectorController {
         if (engine.objectHeaderLabel == null) {
             return;
         }
+        Engine.SceneItemRef outlinerRef = EngineSceneInspector.selectedOutlinerRef(engine);
         if (engine.selectedEntity == null) {
-            engine.objectHeaderLabel.setText(UiStrings.Object.NONE_SELECTED);
+            if (engine.selectedLight != null) {
+                engine.objectHeaderLabel.setText("Světlo · " + engine.getLightName(engine.selectedLight));
+            } else if (engine.selectedForceField != null) {
+                engine.objectHeaderLabel.setText("Síla · " + engine.selectedForceField.name);
+            } else if (outlinerRef != null && outlinerRef.type == Engine.SceneItemType.WORLD) {
+                engine.objectHeaderLabel.setText("Prostředí");
+            } else {
+                engine.objectHeaderLabel.setText("Bez výběru");
+            }
+            setItemSectionVisibility(engine, false);
             styleTransformFields(engine, false, false);
             return;
         }
+        setItemSectionVisibility(engine, true);
 
         boolean hasExactTransformKey = engine.sceneTimeline != null
                 && engine.sceneTimeline.hasEntityKey(engine.selectedEntity, engine.timelineCurrentFrame);
         boolean hasExactReleaseKey = engine.sceneTimeline != null
                 && engine.sceneTimeline.hasEntityReleaseKey(engine.selectedEntity, engine.timelineCurrentFrame);
-        StringBuilder header = new StringBuilder("Vybraný objekt: ")
-                .append(engine.selectedEntity.getName())
-                .append(engine.objectFocusMode ? " (fokus)" : "");
+        StringBuilder header = new StringBuilder(engine.selectedEntity.getName());
+        if (engine.objectFocusMode) {
+            header.append(" · fokus");
+        }
         if (hasExactTransformKey) {
             header.append("  [KLÍČ @ ").append(engine.timelineCurrentFrame).append("]");
         } else if (hasExactReleaseKey) {
@@ -129,6 +141,15 @@ final class EngineObjectInspectorController {
         styleField(engine.scaleXField, keyed, releaseKey);
         styleField(engine.scaleYField, keyed, releaseKey);
         styleField(engine.scaleZField, keyed, releaseKey);
+    }
+
+    private static void setItemSectionVisibility(Engine engine, boolean entitySelected) {
+        if (engine.itemTransformSection != null) {
+            engine.itemTransformSection.setVisible(entitySelected);
+        }
+        if (engine.itemOperationsSection != null) {
+            engine.itemOperationsSection.setVisible(entitySelected);
+        }
     }
 
     private static void styleField(JTextField field, boolean keyed, boolean releaseKey) {

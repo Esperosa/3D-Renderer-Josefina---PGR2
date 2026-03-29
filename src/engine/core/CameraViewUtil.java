@@ -54,14 +54,18 @@ final class CameraViewUtil {
             Entity outputCameraEntity,
             Camera camera,
             PerspectiveCamera perspectiveCamera,
+            OrthographicCamera orthographicCamera,
             boolean orthographicProjection,
             int width,
             int height) {
         double aspect = Math.max(0.01, (double) width / (double) height);
         Camera renderCamera;
         if (orthographicProjection) {
+            double halfHeight = orthographicCamera != null
+                    ? orthographicCamera.getHalfHeight()
+                    : 6.0;
             renderCamera = new OrthographicCamera(
-                    -6.0 * aspect, 6.0 * aspect, -6.0, 6.0,
+                    -halfHeight * aspect, halfHeight * aspect, -halfHeight, halfHeight,
                     camera.getNear(), camera.getFar()
             );
         } else {

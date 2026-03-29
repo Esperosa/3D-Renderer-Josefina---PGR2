@@ -11,6 +11,7 @@ import java.awt.event.MouseEvent;
  * Processes pohyb a rotaci kamery z uživatelského vstupu.
  */
 public class CameraController {
+    private static final double ORBIT_PITCH_LIMIT = 1.54;
 
  /**
  * Distinguishes režim ovládání kamery.
@@ -122,17 +123,29 @@ public class CameraController {
     }
 
     private void updateOrbit(Input input, double dt) {
+        OrthographicCamera orthoCamera = camera instanceof OrthographicCamera
+                ? (OrthographicCamera) camera
+                : null;
         boolean orbitDrag = input.isMouseButtonDown(MouseEvent.BUTTON2) && !input.isShiftDown();
         boolean panDrag = input.isMouseButtonDown(MouseEvent.BUTTON2) && input.isShiftDown();
 
         if (orbitDrag) {
             double dx = MathUtil.clamp(input.getMouseDX(), -60.0, 60.0);
             double dy = MathUtil.clamp(input.getMouseDY(), -60.0, 60.0);
+            if (Math.abs(pitch) > ORBIT_PITCH_LIMIT - 0.12 && Math.abs(dx) > 0.0 && Math.abs(dy) < 0.5) {
+                pitch -= Math.signum(pitch) * Math.abs(dx) * rotateSpeed * 0.65;
+            }
             yaw += dx * rotateSpeed;
-            pitch = MathUtil.clamp(pitch - dy * rotateSpeed, -1.54, 1.54);
+            pitch = MathUtil.clamp(pitch - dy * rotateSpeed, -ORBIT_PITCH_LIMIT, ORBIT_PITCH_LIMIT);
         } else if (panDrag) {
             Vec3 forward = fromYawPitch(yaw, pitch).normalize();
             Vec3 right = forward.cross(Vec3.UP).normalize();
+            if (right.lengthSquared() < 1e-8) {
+                right = new Vec3(Math.cos(yaw), 0.0, Math.sin(yaw)).normalize();
+            }
+            if (right.lengthSquared() < 1e-8) {
+                right = new Vec3(1.0, 0.0, 0.0);
+            }
             Vec3 up = right.cross(forward).normalize();
             double panScale = orbitDistance * 0.0025;
             orbitTarget = orbitTarget
@@ -143,14 +156,26 @@ public class CameraController {
         int scroll = input.getScrollDelta();
         if (scroll != 0) {
             double zoomScale = Math.exp(scroll * 0.11);
-            orbitDistance = MathUtil.clamp(orbitDistance * zoomScale, 0.25, 1000.0);
+            if (orthoCamera != null) {
+                orthoCamera.scaleZoom(zoomScale);
+            } else {
+                orbitDistance = MathUtil.clamp(orbitDistance * zoomScale, 0.25, 1000.0);
+            }
         }
 
         if (input.isKeyDown(KeyEvent.VK_W)) {
-            orbitDistance = Math.max(0.25, orbitDistance - moveSpeed * dt * 2.0);
+            if (orthoCamera != null) {
+                orthoCamera.scaleZoom(Math.exp(-moveSpeed * dt * 0.35));
+            } else {
+                orbitDistance = Math.max(0.25, orbitDistance - moveSpeed * dt * 2.0);
+            }
         }
         if (input.isKeyDown(KeyEvent.VK_S)) {
-            orbitDistance = Math.min(1000.0, orbitDistance + moveSpeed * dt * 2.0);
+            if (orthoCamera != null) {
+                orthoCamera.scaleZoom(Math.exp(moveSpeed * dt * 0.35));
+            } else {
+                orbitDistance = Math.min(1000.0, orbitDistance + moveSpeed * dt * 2.0);
+            }
         }
 
         Vec3 forward = fromYawPitch(yaw, pitch).normalize();
@@ -249,7 +274,11 @@ public class CameraController {
             dir = new Vec3(0.0, 0.0, -1.0);
         }
         this.yaw = Math.atan2(dir.x, -dir.z);
-        this.pitch = Math.asin(MathUtil.clamp(dir.y, -1.0, 1.0));
+        double rawPitch = Math.asin(MathUtil.clamp(dir.y, -1.0, 1.0));
+        if (Math.abs(dir.y) > 0.9985) {
+            rawPitch = Math.copySign(ORBIT_PITCH_LIMIT - 0.08, dir.y);
+        }
+        this.pitch = MathUtil.clamp(rawPitch, -ORBIT_PITCH_LIMIT, ORBIT_PITCH_LIMIT);
         this.orbitDistance = Math.max(0.2, camera.getPosition().sub(orbitTarget).length());
     }
 }

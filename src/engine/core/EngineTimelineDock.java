@@ -36,7 +36,10 @@ final class EngineTimelineDock {
         if (engine == null || engine.window == null) {
             return;
         }
-        populate(engine, engine.window.getTimelinePanel());
+        populate(engine,
+                engine.timelineDockHostPanel != null
+                        ? engine.timelineDockHostPanel
+                        : engine.window.getTimelinePanel());
     }
 
     static void populate(Engine engine, JPanel host) {

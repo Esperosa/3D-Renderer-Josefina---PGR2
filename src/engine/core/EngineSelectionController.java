@@ -36,6 +36,19 @@ final class EngineSelectionController {
 
         if (engine.input.isMouseButtonPressed(MouseEvent.BUTTON1)) {
             if (engine.navigationPreset == Engine.NavigationPreset.BLENDER
+                    && !engine.mouseCaptured
+                    && engine.window != null) {
+                Window.AxisWidgetTarget axisTarget = engine.window.pickWorldAxisWidgetTarget(
+                        engine.input.getMouseX(),
+                        engine.input.getMouseY());
+                if (axisTarget != Window.AxisWidgetTarget.NONE) {
+                    engine.snapToWorldAxis(axisTarget);
+                    engine.draggingSelectedObject = false;
+                    engine.pendingSelectedObjectDrag = false;
+                    return;
+                }
+            }
+            if (engine.navigationPreset == Engine.NavigationPreset.BLENDER
                     && engine.selectionSupportsTransform()
                     && EngineViewportOverlay.tryActivateGizmoHandleAtCanvas(
                     engine, engine.input.getMouseX(), engine.input.getMouseY())) {
@@ -270,7 +283,7 @@ final class EngineSelectionController {
                 boolean isOutputCameraEntity = engine.selectedEntity == engine.outputCameraEntity;
                 if (crosshairSelection) {
                     engine.pendingSelectedObjectDrag = false;
-                    engine.window.selectRightTab("Object");
+                    engine.window.selectRightTab("Item");
                     engine.refreshObjectInspectorValues();
                     engine.syncOutlinerSelectionToCurrentSelection();
                     engine.rebuildSceneDetailsPanel();
@@ -290,7 +303,7 @@ final class EngineSelectionController {
                         engine.cameraController.frameTarget(engine.selectedEntity.getTransform().getPosition());
                         engine.camera.lookAt(engine.selectedEntity.getTransform().getPosition());
                     }
-                    engine.window.selectRightTab(isOutputCameraEntity ? "Output" : "Object");
+                    engine.window.selectRightTab(isOutputCameraEntity ? "Output" : "Item");
                     engine.refreshObjectInspectorValues();
                     engine.syncOutlinerSelectionToCurrentSelection();
                     engine.rebuildSceneDetailsPanel();
@@ -304,7 +317,7 @@ final class EngineSelectionController {
 
         if (hit.type == Engine.SceneItemType.LIGHT && hit.light != null) {
             engine.setCurrentLightSelection(hit.light);
-            engine.window.selectRightTab("Scene");
+            engine.window.selectRightTab("Item");
             engine.refreshObjectInspectorValues();
             engine.syncOutlinerSelectionToCurrentSelection();
             engine.rebuildSceneDetailsPanel();
@@ -314,7 +327,7 @@ final class EngineSelectionController {
 
         if (hit.type == Engine.SceneItemType.FORCE_FIELD && hit.forceField != null) {
             engine.setCurrentForceFieldSelection(hit.forceField);
-            engine.window.selectRightTab("Scene");
+            engine.window.selectRightTab("Item");
             engine.refreshObjectInspectorValues();
             engine.syncOutlinerSelectionToCurrentSelection();
             engine.rebuildSceneDetailsPanel();

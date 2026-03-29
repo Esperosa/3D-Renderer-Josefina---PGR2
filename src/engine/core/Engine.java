@@ -146,6 +146,8 @@ public class Engine {
     PerspectiveCamera perspectiveCamera;
     OrthographicCamera orthographicCamera;
     boolean orthographicProjection;
+    boolean axisSnapViewActive;
+    boolean axisSnapRestoreOrthographicProjection;
     CameraController cameraController;
     FrameBuffer frameBuffer;
     Input input;
@@ -206,6 +208,7 @@ public class Engine {
     Robot mouseRobot;
     boolean mouseCaptured;
     boolean viewportContextMenuRecapturePending;
+    boolean outputRenderRecapturePending;
     boolean objectFocusMode;
     boolean draggingSelectedObject;
     boolean pendingSelectedObjectDrag;
@@ -455,9 +458,14 @@ public class Engine {
     JTextField scaleYField;
     JTextField scaleZField;
     boolean suppressObjectFieldApply;
-    DefaultListModel<String> sceneOutlinerModel;
-    JList<String> sceneOutlinerList;
+    DefaultListModel<SceneItemRef> sceneOutlinerModel;
+    JList<SceneItemRef> sceneOutlinerList;
+    JTextField sceneBrowserSearchField;
+    JLabel sceneBrowserStatusLabel;
+    String sceneBrowserFilterText;
     JPanel sceneDetailsPanel;
+    JPanel itemTransformSection;
+    JPanel itemOperationsSection;
     JTextField timelineCurrentFrameField;
     JLabel timelineStatusLabel;
     JTextField timelineDockCurrentFrameField;
@@ -467,12 +475,16 @@ public class Engine {
     JLabel timelineDockStatusLabel;
     JComponent timelineDockStripComponent;
     BottomDockWorkspace bottomDockWorkspace;
+    JPanel bottomDockRootPanel;
     JPanel bottomDockCardPanel;
     JLabel bottomDockTitleLabel;
     JLabel bottomDockSubtitleLabel;
+    JPanel timelineDockHostPanel;
     JPanel materialDockHostPanel;
     JToggleButton bottomDockTimelineButton;
     JToggleButton bottomDockMaterialButton;
+    JButton bottomDockDetachButton;
+    DetachedWorkspaceWindow detachedBottomDockWindow;
     final MaterialDockViewState materialDockViewState;
     final Deque<EditorCommand> undoHistory;
     final Deque<EditorCommand> redoHistory;
@@ -495,8 +507,11 @@ public class Engine {
         this.spawnCounter = 0;
         this.random = new Random(42L);
         this.orthographicProjection = false;
+        this.axisSnapViewActive = false;
+        this.axisSnapRestoreOrthographicProjection = false;
         this.mouseCaptured = false;
         this.viewportContextMenuRecapturePending = false;
+        this.outputRenderRecapturePending = false;
         this.objectFocusMode = false;
         this.draggingSelectedObject = false;
         this.pendingSelectedObjectDrag = false;
@@ -736,7 +751,12 @@ public class Engine {
         this.suppressObjectFieldApply = false;
         this.sceneOutlinerModel = null;
         this.sceneOutlinerList = null;
+        this.sceneBrowserSearchField = null;
+        this.sceneBrowserStatusLabel = null;
+        this.sceneBrowserFilterText = "";
         this.sceneDetailsPanel = null;
+        this.itemTransformSection = null;
+        this.itemOperationsSection = null;
         this.timelineCurrentFrameField = null;
         this.timelineStatusLabel = null;
         this.timelineDockCurrentFrameField = null;
@@ -746,12 +766,16 @@ public class Engine {
         this.timelineDockStatusLabel = null;
         this.timelineDockStripComponent = null;
         this.bottomDockWorkspace = BottomDockWorkspace.TIMELINE;
+        this.bottomDockRootPanel = null;
         this.bottomDockCardPanel = null;
         this.bottomDockTitleLabel = null;
         this.bottomDockSubtitleLabel = null;
+        this.timelineDockHostPanel = null;
         this.materialDockHostPanel = null;
         this.bottomDockTimelineButton = null;
         this.bottomDockMaterialButton = null;
+        this.bottomDockDetachButton = null;
+        this.detachedBottomDockWindow = null;
         this.undoHistory = new ArrayDeque<>();
         this.redoHistory = new ArrayDeque<>();
         this.activeHistoryTransaction = null;
@@ -1005,6 +1029,10 @@ public class Engine {
         EngineCameraRuntime.toggleProjectionCamera(this);
     }
 
+    void snapToWorldAxis(Window.AxisWidgetTarget target) {
+        EngineCameraRuntime.snapToWorldAxis(this, target);
+    }
+
     AABBCollider createFittedAabbCollider(Mesh mesh, double uniformScale) {
         if (mesh.getAABB() == null) {
             return new AABBCollider(new Vec3(0.5, 0.5, 0.5));
@@ -1123,6 +1151,22 @@ public class Engine {
         EngineCameraRuntime.jumpViewToOutputCamera(this, fpsCapture);
     }
 
+    void toggleOutputRenderPause() {
+        outputRenderController.togglePauseRender();
+    }
+
+    void cancelOutputRender() {
+        outputRenderController.cancelRender();
+    }
+
+    boolean isOutputRenderPaused() {
+        return outputRenderController.isRenderPaused();
+    }
+
+    OutputRenderController.PreviewState currentOutputRenderPreviewState() {
+        return outputRenderController.getViewportPreviewState();
+    }
+
     void requestOutputStill(String format) {
         outputRenderController.captureStylizedViewportSettings(this);
         OutputRenderController.Settings outputSettings = outputRenderController.settings();
@@ -1225,6 +1269,18 @@ public class Engine {
 
     void showMaterialWorkspace() {
         setBottomDockWorkspace(BottomDockWorkspace.MATERIAL);
+    }
+
+    void detachBottomDockWorkspace(BottomDockWorkspace workspace) {
+        EngineBottomDock.detach(this);
+    }
+
+    void attachBottomDockWorkspace(BottomDockWorkspace workspace) {
+        EngineBottomDock.attach(this);
+    }
+
+    void focusDetachedBottomDockWorkspace(BottomDockWorkspace workspace) {
+        EngineBottomDock.focusDetached(this);
     }
 
     void setupRightPanel() {
@@ -1477,6 +1533,10 @@ public class Engine {
     }
     JPanel addCollapsibleSection(JPanel parent, String title, boolean expandedByDefault) {
         return UiBuilder.addCollapsibleSection(parent, title, expandedByDefault, this::focusCanvas);
+    }
+
+    JPanel addCollapsibleSection(JPanel parent, String title, boolean expandedByDefault, String tooltip) {
+        return UiBuilder.addCollapsibleSection(parent, title, expandedByDefault, this::focusCanvas, tooltip);
     }
 
     JCheckBox addBooleanRow(JPanel parent, String label, boolean initial, Consumer<Boolean> onChange) {

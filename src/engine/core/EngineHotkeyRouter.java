@@ -11,6 +11,15 @@ final class EngineHotkeyRouter {
     }
 
     static void handle(Engine engine) {
+        if (engine.outputRenderController != null && engine.outputRenderController.isRenderInProgress()) {
+            if (engine.input.isKeyPressed(KeyEvent.VK_SPACE)) {
+                engine.toggleOutputRenderPause();
+            }
+            if (engine.input.isKeyPressed(KeyEvent.VK_ESCAPE)) {
+                engine.cancelOutputRender();
+            }
+            return;
+        }
         if (engine.input.isKeyPressed(KeyEvent.VK_H)) {
             engine.printHelp();
         }

@@ -22,6 +22,7 @@ import java.awt.FileDialog;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 final class EngineSceneActions {
     private static final String[] BASIC_PRIMITIVES = {
@@ -34,12 +35,46 @@ final class EngineSceneActions {
     private EngineSceneActions() {
     }
 
-    static String[] basicPrimitiveTypes() {
-        return BASIC_PRIMITIVES.clone();
+    static final class SceneAddAction {
+        private final String label;
+        private final Consumer<Engine> command;
+
+        private SceneAddAction(String label, Consumer<Engine> command) {
+            this.label = label;
+            this.command = command;
+        }
+
+        String label() {
+            return label;
+        }
+
+        void invoke(Engine engine) {
+            command.accept(engine);
+        }
     }
 
-    static String[] featuredPrimitiveTypes() {
-        return FEATURED_PRIMITIVES.clone();
+    static final class SceneAddGroup {
+        private final String title;
+        private final boolean buttonGrid;
+        private final List<SceneAddAction> actions;
+
+        private SceneAddGroup(String title, boolean buttonGrid, List<SceneAddAction> actions) {
+            this.title = title;
+            this.buttonGrid = buttonGrid;
+            this.actions = List.copyOf(actions);
+        }
+
+        String title() {
+            return title;
+        }
+
+        boolean buttonGrid() {
+            return buttonGrid;
+        }
+
+        List<SceneAddAction> actions() {
+            return actions;
+        }
     }
 
     static String primitiveLabel(String type) {
@@ -60,6 +95,41 @@ final class EngineSceneActions {
             case "torus-knot" -> "Torus Knot";
             default -> type;
         };
+    }
+
+    static List<SceneAddGroup> sceneAddGroups() {
+        List<SceneAddGroup> groups = new ArrayList<>();
+        groups.add(primitiveGroup(UiStrings.Scene.BASIC_OBJECTS, BASIC_PRIMITIVES));
+        groups.add(primitiveGroup(UiStrings.Scene.FEATURED_OBJECTS, FEATURED_PRIMITIVES));
+        groups.add(linearGroup(UiStrings.Scene.IMPORT,
+                new SceneAddAction(UiStrings.ContextMenu.IMPORT_MODEL_SCENE, Engine::importModelOrSceneFromDialog)));
+        groups.add(linearGroup(UiStrings.Scene.LIGHTS,
+                new SceneAddAction(UiStrings.ContextMenu.ADD_POINT_LIGHT, Engine::addPointLight),
+                new SceneAddAction(UiStrings.ContextMenu.ADD_AREA_LIGHT, Engine::addAreaLight),
+                new SceneAddAction(UiStrings.ContextMenu.ADD_CONE_LIGHT, Engine::addConeLight)));
+        groups.add(linearGroup(UiStrings.Scene.FORCE_FIELDS,
+                new SceneAddAction(UiStrings.ContextMenu.ADD_VECTOR_FORCE, Engine::addVectorForceField),
+                new SceneAddAction(UiStrings.ContextMenu.ADD_POINT_ATTRACTOR, engine -> engine.addPointForceField(true)),
+                new SceneAddAction(UiStrings.ContextMenu.ADD_POINT_REPULSOR, engine -> engine.addPointForceField(false)),
+                new SceneAddAction(UiStrings.ContextMenu.ADD_TURBULENCE, Engine::addTurbulenceForceField)));
+        groups.add(linearGroup(UiStrings.Scene.SIMULATION,
+                new SceneAddAction(UiStrings.ContextMenu.ADD_WATER_EMITTER, Engine::addWaterEmitter)));
+        return List.copyOf(groups);
+    }
+
+    private static SceneAddGroup primitiveGroup(String title, String[] primitiveTypes) {
+        List<SceneAddAction> actions = new ArrayList<>(primitiveTypes.length);
+        for (String type : primitiveTypes) {
+            String primitiveType = type;
+            actions.add(new SceneAddAction(
+                    UiStrings.ContextMenu.ADD_PREFIX + primitiveLabel(primitiveType),
+                    engine -> engine.addPrimitive(primitiveType)));
+        }
+        return new SceneAddGroup(title, true, actions);
+    }
+
+    private static SceneAddGroup linearGroup(String title, SceneAddAction... actions) {
+        return new SceneAddGroup(title, false, List.of(actions));
     }
 
     static void addPrimitive(Engine engine, String type) {
@@ -447,7 +517,7 @@ final class EngineSceneActions {
                 + " = materiálový graf nebo časová osa podle kontextu.");
         System.out.println("UI:");
         System.out.println("  Horní toolbar = rychlé přepínače navigace, renderu a runtime.");
-        System.out.println("  Pravý panel = Scéna, Prostředí, Zobrazení, Objekt, Render, Výstup.");
+        System.out.println("  Pravý panel = Scene Browser + vlastnosti: Položka, Prostředí, Zobrazení, Render, Výstup.");
         System.out.println("  Výstup = session-based render workflow pro snímek, sekvenci, GIF a AVI.");
     }
 }
