@@ -38,6 +38,35 @@ import engine.util.ThreadPool;
 public class OutputRenderController {
 
     private static final long VIEWPORT_PREVIEW_INTERVAL_NS = 2_000_000_000L;
+    private static final long UI_PROGRESS_UPDATE_MIN_NS = 40_000_000L;
+    private static final long PAUSE_WAIT_SLICE_MS = 40L;
+
+    public static final class PreviewState {
+        public final String headline;
+        public final String progressText;
+        public final String metricsText;
+        public final double progressFraction;
+        public final boolean paused;
+        public final boolean cancellable;
+        public final boolean pausable;
+
+        PreviewState(
+                String headline,
+                String progressText,
+                String metricsText,
+                double progressFraction,
+                boolean paused,
+                boolean cancellable,
+                boolean pausable) {
+            this.headline = headline;
+            this.progressText = progressText;
+            this.metricsText = metricsText;
+            this.progressFraction = progressFraction;
+            this.paused = paused;
+            this.cancellable = cancellable;
+            this.pausable = pausable;
+        }
+    }
 
     public static final class Settings {
         public int width = 1920;
@@ -65,7 +94,7 @@ public class OutputRenderController {
         public String outputDirectory = "renders";
         public String filePrefix = "render";
         public double internalScale = 1.0;
-        public int workerCount = ThreadPool.recommendedWorkerCount();
+        public int workerCount = ThreadPool.recommendedOutputWorkerCount();
         public int tileSize = 24;
         public int targetSamples = 192;
         public int samplesPerStep = 1;
@@ -123,6 +152,7 @@ public class OutputRenderController {
     private volatile int viewportPreviewWidth;
     private volatile int viewportPreviewHeight;
     private final AtomicReference<String[]> viewportPreviewLines;
+    private final AtomicReference<PreviewState> viewportPreviewState;
     private volatile long viewportPreviewLastPublishNanos;
     private volatile OutputRenderJob activeViewportPreviewJob;
     private volatile int progressFrameNumber;
@@ -131,6 +161,17 @@ public class OutputRenderController {
     private volatile int progressFramesCompleted;
     private volatile String progressCurrentFile;
     private volatile String progressOutputFolder;
+    private volatile boolean renderPaused;
+    private volatile long renderPauseStartedNanos;
+    private volatile long renderPausedAccumulatedNanos;
+    private volatile long progressRateSampleNanos;
+    private volatile long progressRateSampleUnits;
+    private volatile double progressUnitsPerSecondSmoothed;
+    private volatile long progressAdvanceSampleNanos;
+    private volatile long progressAdvanceSampleUnits;
+    private volatile double progressInstantUnitsPerSecond;
+    private volatile long progressFastestUnitNanos;
+    private volatile long progressSlowestUnitNanos;
 
     public OutputRenderController() {
         this.settings = new Settings();
@@ -146,6 +187,7 @@ public class OutputRenderController {
         this.viewportPreviewWidth = 1;
         this.viewportPreviewHeight = 1;
         this.viewportPreviewLines = new AtomicReference<>(new String[0]);
+        this.viewportPreviewState = new AtomicReference<>(null);
         this.viewportPreviewLastPublishNanos = 0L;
         this.activeViewportPreviewJob = null;
         this.progressFrameNumber = 0;
@@ -154,6 +196,17 @@ public class OutputRenderController {
         this.progressFramesCompleted = 0;
         this.progressCurrentFile = "";
         this.progressOutputFolder = "";
+        this.renderPaused = false;
+        this.renderPauseStartedNanos = 0L;
+        this.renderPausedAccumulatedNanos = 0L;
+        this.progressRateSampleNanos = 0L;
+        this.progressRateSampleUnits = 0L;
+        this.progressUnitsPerSecondSmoothed = 0.0;
+        this.progressAdvanceSampleNanos = 0L;
+        this.progressAdvanceSampleUnits = 0L;
+        this.progressInstantUnitsPerSecond = 0.0;
+        this.progressFastestUnitNanos = 0L;
+        this.progressSlowestUnitNanos = 0L;
     }
 
     public Settings settings() {
@@ -180,6 +233,10 @@ public class OutputRenderController {
     public String[] getViewportPreviewLines() {
         String[] lines = viewportPreviewLines.get();
         return lines == null ? new String[0] : lines.clone();
+    }
+
+    public PreviewState getViewportPreviewState() {
+        return viewportPreviewState.get();
     }
 
     public void captureStylizedViewportSettings(Engine engine) {
@@ -223,6 +280,10 @@ public class OutputRenderController {
 
     public boolean isRenderInProgress() {
         return renderInProgress;
+    }
+
+    public boolean isRenderPaused() {
+        return renderPaused;
     }
 
     int previewInternalWidth() {
@@ -324,12 +385,35 @@ public class OutputRenderController {
         pendingRequest = req;
     }
 
+    public void togglePauseRender() {
+        if (!renderInProgress) {
+            return;
+        }
+        if (renderPaused) {
+            long pauseStart = renderPauseStartedNanos;
+            if (pauseStart > 0L) {
+                renderPausedAccumulatedNanos += Math.max(0L, System.nanoTime() - pauseStart);
+            }
+            renderPauseStartedNanos = 0L;
+            renderPaused = false;
+            progressMessage = "Render obnoven";
+        } else {
+            renderPauseStartedNanos = System.nanoTime();
+            renderPaused = true;
+            progressMessage = "Render pozastaven";
+        }
+        PreviewState state = buildViewportPreviewState(activeViewportPreviewJob);
+        viewportPreviewState.set(state);
+        viewportPreviewLines.set(buildViewportPreviewLines(state));
+    }
+
     public void cancelRender() {
         renderCancelRequested = true;
     }
 
     public void dispose() {
         renderCancelRequested = true;
+        renderPaused = false;
         clearViewportPreview();
     }
 
@@ -379,11 +463,22 @@ public class OutputRenderController {
         }
         renderInProgress = true;
         renderCancelRequested = false;
+        renderPaused = false;
+        renderPauseStartedNanos = 0L;
+        renderPausedAccumulatedNanos = 0L;
         progressCurrent = 0L;
         progressTarget = computeInitialProgressTarget(job);
         progressMessage = "Připravuji output render";
         renderStartNanos = System.nanoTime();
         progressUiLastUpdateNanos = 0L;
+        progressRateSampleNanos = renderStartNanos;
+        progressRateSampleUnits = 0L;
+        progressUnitsPerSecondSmoothed = 0.0;
+        progressAdvanceSampleNanos = renderStartNanos;
+        progressAdvanceSampleUnits = 0L;
+        progressInstantUnitsPerSecond = 0.0;
+        progressFastestUnitNanos = 0L;
+        progressSlowestUnitNanos = 0L;
         progressFrameNumber = job.stillFrame;
         progressFrameIndex = job.requestType == OutputRenderRequestType.STILL ? 0 : -1;
         progressFrameCount = job.frameCount;
@@ -439,7 +534,7 @@ public class OutputRenderController {
         job.internalScale = Math.max(0.25, Math.min(1.0, settings.internalScale));
         job.internalWidth = OutputRenderSupport.computeInternalDimension(job.width, job.internalScale);
         job.internalHeight = OutputRenderSupport.computeInternalDimension(job.height, job.internalScale);
-        job.workerCount = Math.max(1, Math.min(ThreadPool.recommendedWorkerCount(), settings.workerCount));
+        job.workerCount = Math.max(1, Math.min(ThreadPool.availableWorkerCount(), settings.workerCount));
         job.tileSize = Math.max(8, Math.min(128, settings.tileSize));
         job.targetSamples = Math.max(1, settings.targetSamples);
         job.samplesPerStep = Math.max(1, Math.min(64, settings.samplesPerStep));
@@ -620,6 +715,8 @@ public class OutputRenderController {
             }
             renderInProgress = false;
             renderCancelRequested = false;
+            renderPaused = false;
+            renderPauseStartedNanos = 0L;
             progressMessage = finalStatus;
             updateProgressDialog(finalStatus, progressCurrent, progressTarget);
             finishProgressDialog(finalStatus);
@@ -672,6 +769,7 @@ public class OutputRenderController {
         int digits = Math.max(4, Integer.toString(Math.max(Math.abs(job.frameStart), Math.abs(job.frameEnd))).length());
         int renderedFrames = 0;
         for (int i = 0; i < frameCount; i++) {
+            waitWhilePaused(job, "Sekvence");
             if (renderCancelRequested) {
                 break;
             }
@@ -712,6 +810,7 @@ public class OutputRenderController {
         progressCurrentFile = out.toString();
         try (AnimatedGifWriter writer = new AnimatedGifWriter(out, delayMs, job.gifLoopForever)) {
             for (int i = 0; i < frameCount; i++) {
+                waitWhilePaused(job, "GIF");
                 if (renderCancelRequested) {
                     break;
                 }
@@ -763,6 +862,7 @@ public class OutputRenderController {
                 job.aviJpegQuality
         )) {
             for (int i = 0; i < frameCount; i++) {
+                waitWhilePaused(job, "AVI");
                 if (renderCancelRequested) {
                     break;
                 }
@@ -904,11 +1004,16 @@ public class OutputRenderController {
             long target = Math.max(1, job.targetSamples);
             updateProgress(job, doneBase, total, phaseLabel + " | Path Tracing");
             while (!renderCancelRequested && pathRenderer.getAccumulatedSamples() < target) {
+                waitWhilePaused(job, phaseLabel + " | Path Tracing");
+                if (renderCancelRequested) {
+                    break;
+                }
                 pathRenderer.render(scene, renderCamera, outFb, renderTimeSeconds);
                 long done = Math.min(target, pathRenderer.getAccumulatedSamples());
                 updateProgress(job, doneBase + done, total, phaseLabel + " | Path Tracing");
                 publishViewportPreview(job, outFb, false);
             }
+            finalizeProgressiveOutput(pathRenderer, scene, renderCamera, outFb, renderTimeSeconds);
             publishViewportPreview(job, outFb, true);
             pathRenderer.setParameter("shutdown", true);
             return;
@@ -919,17 +1024,26 @@ public class OutputRenderController {
             long target = Math.max(1, job.targetSamples);
             updateProgress(job, doneBase, total, phaseLabel + " | Ray Tracing");
             while (!renderCancelRequested && rayRenderer.getAccumulatedSamples() < target) {
+                waitWhilePaused(job, phaseLabel + " | Ray Tracing");
+                if (renderCancelRequested) {
+                    break;
+                }
                 rayRenderer.render(scene, renderCamera, outFb, renderTimeSeconds);
                 long done = Math.min(target, rayRenderer.getAccumulatedSamples());
                 updateProgress(job, doneBase + done, total, phaseLabel + " | Ray Tracing");
                 publishViewportPreview(job, outFb, false);
             }
+            finalizeProgressiveOutput(rayRenderer, scene, renderCamera, outFb, renderTimeSeconds);
             publishViewportPreview(job, outFb, true);
             rayRenderer.setParameter("shutdown", true);
             return;
         }
 
         updateProgress(job, doneBase, total, phaseLabel + " | Raster");
+        waitWhilePaused(job, phaseLabel + " | Raster");
+        if (renderCancelRequested) {
+            return;
+        }
         renderer.render(scene, renderCamera, outFb, renderTimeSeconds);
         updateProgress(job, doneBase + doneRange, total, phaseLabel + " | Raster");
         publishViewportPreview(job, outFb, true);
@@ -1075,12 +1189,13 @@ public class OutputRenderController {
     private RayTracerRenderer createRayTracingRenderer(OutputRenderJob job, int width, int height) {
         RayTracerRenderer renderer = new RayTracerRenderer();
         renderer.init(width, height);
-        renderer.setParameter("autohardware", false);
+        renderer.setParameter("autohardware", true);
         renderer.setParameter("autoworkers", false);
-        renderer.setParameter("autotilesize", false);
+        renderer.setParameter("autotilesize", true);
         renderer.setParameter("workerCount", job.workerCount);
         renderer.setParameter("tileSize", job.tileSize);
         renderer.setParameter("samplesPerFrame", job.samplesPerStep);
+        renderer.setParameter("denoiseCadenceSamples", resolveOutputDenoiseCadenceSamples(job));
         renderer.setParameter("maxDepth", job.maxDepth);
         renderer.setParameter("directLighting", job.directLighting);
         renderer.setParameter("shadows", job.shadows);
@@ -1103,12 +1218,13 @@ public class OutputRenderController {
     private PathTracerRenderer createPathTracingRenderer(OutputRenderJob job, int width, int height) {
         PathTracerRenderer renderer = new PathTracerRenderer();
         renderer.init(width, height);
-        renderer.setParameter("autohardware", false);
+        renderer.setParameter("autohardware", true);
         renderer.setParameter("autoworkers", false);
-        renderer.setParameter("autotilesize", false);
+        renderer.setParameter("autotilesize", true);
         renderer.setParameter("workerCount", job.workerCount);
         renderer.setParameter("tileSize", job.tileSize);
         renderer.setParameter("samplesPerFrame", job.samplesPerStep);
+        renderer.setParameter("denoiseCadenceSamples", resolveOutputDenoiseCadenceSamples(job));
         renderer.setParameter("maxDepth", job.maxDepth);
         renderer.setParameter("directLighting", job.directLighting);
         renderer.setParameter("sky", job.sky);
@@ -1129,6 +1245,51 @@ public class OutputRenderController {
         renderer.setParameter("referenceClamp", job.referenceClampEnabled);
         renderer.setParameter("reset", true);
         return renderer;
+    }
+
+    private void finalizeProgressiveOutput(Renderer renderer,
+                                           Scene scene,
+                                           Camera renderCamera,
+                                           FrameBuffer outFb,
+                                           double renderTimeSeconds) {
+        if (renderer == null || scene == null || renderCamera == null || outFb == null || renderCancelRequested) {
+            return;
+        }
+        if (renderer instanceof RayTracerRenderer rayRenderer) {
+            if (rayRenderer.getAccumulatedSamples() <= 0L) {
+                return;
+            }
+            rayRenderer.setParameter("forceFullDenoiseResolve", true);
+            rayRenderer.setParameter("resolveOnly", true);
+            rayRenderer.render(scene, renderCamera, outFb, renderTimeSeconds);
+            return;
+        }
+        if (renderer instanceof PathTracerRenderer pathRenderer) {
+            if (pathRenderer.getAccumulatedSamples() <= 0L) {
+                return;
+            }
+            pathRenderer.setParameter("forceFullDenoiseResolve", true);
+            pathRenderer.setParameter("resolveOnly", true);
+            pathRenderer.render(scene, renderCamera, outFb, renderTimeSeconds);
+        }
+    }
+
+    private int resolveOutputDenoiseCadenceSamples(OutputRenderJob job) {
+        if (job == null || !job.denoise || !OutputRenderSupport.isSampleBasedMode(job.mode)) {
+            return 1;
+        }
+        long pixels = Math.max(1L, (long) job.internalWidth * (long) job.internalHeight);
+        int cadence = job.mode == RenderMode.PATH_TRACING ? 4 : 3;
+        if (pixels >= 160L * 90L) {
+            cadence++;
+        }
+        if (pixels >= 256L * 144L) {
+            cadence++;
+        }
+        if (job.workerCount >= 16) {
+            cadence++;
+        }
+        return Math.max(1, Math.min(Math.max(1, job.targetSamples), cadence));
     }
 
     private long computeInitialProgressTarget(OutputRenderJob job) {
@@ -1182,15 +1343,135 @@ public class OutputRenderController {
         return (System.nanoTime() - renderStartNanos) / 1_000_000_000.0;
     }
 
+    private double outputActiveElapsedSeconds() {
+        if (renderStartNanos <= 0L) {
+            return 0.0;
+        }
+        long now = System.nanoTime();
+        long pausedNanos = renderPausedAccumulatedNanos;
+        if (renderPaused && renderPauseStartedNanos > 0L) {
+            pausedNanos += Math.max(0L, now - renderPauseStartedNanos);
+        }
+        return Math.max(0.0, (now - renderStartNanos - pausedNanos) / 1_000_000_000.0);
+    }
+
+    private double averageUnitsPerSecond() {
+        double activeElapsed = outputActiveElapsedSeconds();
+        if (activeElapsed <= 1e-6 || progressCurrent <= 0L) {
+            return 0.0;
+        }
+        return progressCurrent / activeElapsed;
+    }
+
+    private double effectiveUnitsPerSecond() {
+        double recentRate = progressUnitsPerSecondSmoothed;
+        double averageRate = averageUnitsPerSecond();
+        if (recentRate > 1e-6 && averageRate > 1e-6) {
+            return recentRate * 0.68 + averageRate * 0.32;
+        }
+        return Math.max(recentRate, averageRate);
+    }
+
+    private double smoothedRemainingSeconds() {
+        long remainingUnits = Math.max(0L, progressTarget - progressCurrent);
+        if (remainingUnits <= 0L) {
+            return 0.0;
+        }
+        double effectiveRate = effectiveUnitsPerSecond();
+        if (effectiveRate > 1e-6) {
+            return remainingUnits / effectiveRate;
+        }
+        double activeElapsed = outputActiveElapsedSeconds();
+        if (progressCurrent <= 0L || activeElapsed <= 1e-6) {
+            return 0.0;
+        }
+        return activeElapsed * remainingUnits / Math.max(1L, progressCurrent);
+    }
+
+    private void noteProgressAdvance(long current) {
+        long now = System.nanoTime();
+        long sampleNanos = progressAdvanceSampleNanos;
+        long sampleUnits = progressAdvanceSampleUnits;
+        if (sampleNanos <= 0L) {
+            progressAdvanceSampleNanos = now;
+            progressAdvanceSampleUnits = current;
+            return;
+        }
+        long deltaUnits = current - sampleUnits;
+        long deltaNanos = now - sampleNanos;
+        if (deltaUnits <= 0L || deltaNanos <= 0L) {
+            return;
+        }
+        long unitNanos = Math.max(1L, Math.round(deltaNanos / (double) deltaUnits));
+        if (progressFastestUnitNanos <= 0L || unitNanos < progressFastestUnitNanos) {
+            progressFastestUnitNanos = unitNanos;
+        }
+        if (unitNanos > progressSlowestUnitNanos) {
+            progressSlowestUnitNanos = unitNanos;
+        }
+        progressInstantUnitsPerSecond = deltaUnits / (deltaNanos / 1_000_000_000.0);
+        progressAdvanceSampleNanos = now;
+        progressAdvanceSampleUnits = current;
+    }
+
+    private void refreshProgressRate(long current) {
+        long now = System.nanoTime();
+        long sampleNanos = progressRateSampleNanos;
+        long sampleUnits = progressRateSampleUnits;
+        if (sampleNanos <= 0L) {
+            progressRateSampleNanos = now;
+            progressRateSampleUnits = current;
+            return;
+        }
+        long deltaNanos = now - sampleNanos;
+        long deltaUnits = current - sampleUnits;
+        if (deltaUnits <= 0L || deltaNanos < 180_000_000L) {
+            return;
+        }
+        double instantaneousUnitsPerSecond = deltaUnits / (deltaNanos / 1_000_000_000.0);
+        if (instantaneousUnitsPerSecond > 1e-6) {
+            if (progressUnitsPerSecondSmoothed <= 1e-6) {
+                progressUnitsPerSecondSmoothed = instantaneousUnitsPerSecond;
+            } else {
+                progressUnitsPerSecondSmoothed = progressUnitsPerSecondSmoothed * 0.78
+                        + instantaneousUnitsPerSecond * 0.22;
+            }
+        }
+        progressRateSampleNanos = now;
+        progressRateSampleUnits = current;
+    }
+
+    private void waitWhilePaused(OutputRenderJob job, String phaseLabel) {
+        if (!renderPaused) {
+            return;
+        }
+        while (!renderCancelRequested && renderPaused) {
+            updateProgress(job, progressCurrent, progressTarget, phaseLabel + " | Pozastaveno");
+            try {
+                Thread.sleep(PAUSE_WAIT_SLICE_MS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                renderCancelRequested = true;
+                return;
+            }
+        }
+        progressRateSampleNanos = System.nanoTime();
+        progressRateSampleUnits = progressCurrent;
+        progressAdvanceSampleNanos = progressRateSampleNanos;
+        progressAdvanceSampleUnits = progressCurrent;
+    }
+
     private void updateProgress(OutputRenderJob job, long current, long total, String phase) {
         progressCurrent = Math.max(0L, current);
         progressTarget = Math.max(1L, total);
-        String modeName = job != null && job.mode != null ? job.mode.toString() : "OUTPUT";
-        progressMessage = modeName + " | " + phase;
+        progressMessage = phase == null ? "" : phase;
+        if (!renderPaused) {
+            noteProgressAdvance(progressCurrent);
+            refreshProgressRate(progressCurrent);
+        }
         long now = System.nanoTime();
-        long minNs = 40_000_000L; // 25 FPS UI updates max
         boolean force = progressCurrent <= 1L || progressCurrent >= progressTarget;
-        if (force || now - progressUiLastUpdateNanos >= minNs) {
+        if (force || now - progressUiLastUpdateNanos >= UI_PROGRESS_UPDATE_MIN_NS) {
             progressUiLastUpdateNanos = now;
             updateProgressDialog(progressMessage, progressCurrent, progressTarget);
         }
@@ -1202,7 +1483,9 @@ public class OutputRenderController {
         viewportPreviewPixels.set(new int[]{0xFF050608});
         viewportPreviewWidth = 1;
         viewportPreviewHeight = 1;
-        viewportPreviewLines.set(buildViewportPreviewLines(job));
+        PreviewState state = buildViewportPreviewState(job);
+        viewportPreviewState.set(state);
+        viewportPreviewLines.set(buildViewportPreviewLines(state));
     }
 
     private void updateProgressDialog(String message, long current, long total) {
@@ -1211,12 +1494,16 @@ public class OutputRenderController {
         }
         progressCurrent = Math.max(0L, current);
         progressTarget = Math.max(1L, total);
-        viewportPreviewLines.set(buildViewportPreviewLines(activeViewportPreviewJob));
+        PreviewState state = buildViewportPreviewState(activeViewportPreviewJob);
+        viewportPreviewState.set(state);
+        viewportPreviewLines.set(buildViewportPreviewLines(state));
     }
 
     private void finishProgressDialog(String status) {
         progressMessage = status;
-        viewportPreviewLines.set(buildViewportPreviewLines(activeViewportPreviewJob));
+        PreviewState state = buildViewportPreviewState(activeViewportPreviewJob);
+        viewportPreviewState.set(state);
+        viewportPreviewLines.set(buildViewportPreviewLines(state));
     }
 
     private void publishViewportPreview(OutputRenderJob job, FrameBuffer outFb, boolean force) {
@@ -1235,7 +1522,9 @@ public class OutputRenderController {
                 RuntimeInstrumentation.Counter.BYTES_COPIED,
                 (long) viewportPreviewWidth * (long) viewportPreviewHeight * 4L);
         viewportPreviewPixels.set(outFb.getColorBuffer().clone());
-        viewportPreviewLines.set(buildViewportPreviewLines(job));
+        PreviewState state = buildViewportPreviewState(job);
+        viewportPreviewState.set(state);
+        viewportPreviewLines.set(buildViewportPreviewLines(state));
     }
 
     private void clearViewportPreview() {
@@ -1243,6 +1532,7 @@ public class OutputRenderController {
         viewportPreviewWidth = 1;
         viewportPreviewHeight = 1;
         viewportPreviewLines.set(new String[0]);
+        viewportPreviewState.set(null);
         viewportPreviewLastPublishNanos = 0L;
         activeViewportPreviewJob = null;
         progressFrameNumber = 0;
@@ -1251,110 +1541,137 @@ public class OutputRenderController {
         progressFramesCompleted = 0;
         progressCurrentFile = "";
         progressOutputFolder = "";
+        progressRateSampleNanos = 0L;
+        progressRateSampleUnits = 0L;
+        progressUnitsPerSecondSmoothed = 0.0;
+        progressAdvanceSampleNanos = 0L;
+        progressAdvanceSampleUnits = 0L;
+        progressInstantUnitsPerSecond = 0.0;
+        progressFastestUnitNanos = 0L;
+        progressSlowestUnitNanos = 0L;
     }
 
-    private String buildProgressDetails(OutputRenderJob job) {
+    private PreviewState buildViewportPreviewState(OutputRenderJob job) {
         if (job == null) {
-            return "";
-        }
-        return OutputRenderSupport.requestTypeLabel(job.requestType)
-                + " | " + UiStrings.renderModeLabel(job.mode)
-                + " | " + job.width + "x" + job.height
-                + " -> " + job.internalWidth + "x" + job.internalHeight
-                + " | " + job.format.toUpperCase(Locale.ROOT);
-    }
-
-    private String[] buildViewportPreviewLines(OutputRenderJob job) {
-        if (job == null) {
-            return new String[]{
-                    "NÁHLED OUTPUT RENDERU",
-                    "Připravuji..."
-            };
+            return new PreviewState(
+                    "Připravuji render",
+                    "0 %",
+                    "Běží 0.0s · ETA 0.0s",
+                    0.0,
+                    renderPaused,
+                    renderInProgress,
+                    false);
         }
         double pct = (double) progressCurrent / Math.max(1L, progressTarget) * 100.0;
-        double elapsedSeconds = outputElapsedSeconds();
-        double avgFrameSeconds = progressFramesCompleted > 0
-                ? elapsedSeconds / Math.max(1, progressFramesCompleted)
-                : 0.0;
-        double remainingSeconds = progressCurrent > 0
-                ? elapsedSeconds * Math.max(0L, progressTarget - progressCurrent) / Math.max(1L, progressCurrent)
-                : 0.0;
-        String sampleLine = OutputRenderSupport.isSampleBasedMode(job.mode)
-                ? "Vzorky/snímek " + job.samplesPerStep + "  Cíl " + job.targetSamples + "  Max depth " + job.maxDepth
-                : "Jednoprůchodový renderer  |  Vlákna " + job.workerCount;
-        String lightingLine = switch (job.mode) {
-            case RAY_TRACING -> "Přímé světlo " + OutputRenderSupport.onOff(job.directLighting)
-                    + "  Stíny " + OutputRenderSupport.onOff(job.shadows)
-                    + "  Odrazy " + OutputRenderSupport.onOff(job.reflections)
-                    + "  Denoise " + OutputRenderSupport.onOff(job.denoise);
-            case PATH_TRACING -> "Přímé světlo " + OutputRenderSupport.onOff(job.directLighting)
-                    + "  Obloha " + OutputRenderSupport.onOff(job.sky)
-                    + "  Denoise " + OutputRenderSupport.onOff(job.denoise);
-            case WIREFRAME -> "Hloubkově skryté " + OutputRenderSupport.onOff(job.wireframeDepthHiddenLines)
-                    + "  Silueta " + OutputRenderSupport.onOff(job.wireframeSilhouetteBoost)
-                    + "  Přerušované " + OutputRenderSupport.onOff(job.wireframeDashedMode);
-            case DITHERING -> "ASCII".equalsIgnoreCase(job.ditherStyle)
-                    ? "Styl " + job.ditherStyle
-                    + "  Tóny " + job.ditherToneCount
-                    + "  Buňka " + job.ditherCellSize
-                    : "Styl " + job.ditherStyle
-                    + "  Tóny " + job.ditherToneCount;
-            case TEMPORAL_NOISE -> "Tempo " + OutputRenderSupport.fmt(job.temporalTickRate)
-                    + "  Blízkost " + OutputRenderSupport.fmt(job.temporalNearContribution)
-                    + "  Úhel " + OutputRenderSupport.fmt(job.temporalGrazingContribution)
-                    + "  Rychlost " + OutputRenderSupport.fmt(job.temporalMinSpeed)
-                    + ".." + OutputRenderSupport.fmt(job.temporalMaxSpeed)
-                    + "  Okraj " + OutputRenderSupport.fmt(job.temporalEdgeBlendStrength)
-                    + "  Zrno " + TemporalNoiseRenderer.grainCellSizePresetLabel(job.temporalGrainCellSize)
-                    + "  Paleta " + job.temporalPaletteLevels;
-            case HEX_MOSAIC -> "Theme " + OutputRenderSupport.safeUpper(job.hexWowMode)
-                    + "  Buňka " + OutputRenderSupport.fmt(job.hexCellSize)
-                    + "  Outline " + OutputRenderSupport.fmt(job.hexOutlineStrength);
-            default -> "Vlákna " + job.workerCount
-                    + "  Frustum " + OutputRenderSupport.onOff(job.frustumCulling)
-                    + "  Backface " + OutputRenderSupport.onOff(job.backfaceCulling);
-        };
-        String frameLine = job.requestType == OutputRenderRequestType.STILL
-                ? "Snímek " + job.stillFrame
-                : "Rozsah " + job.frameStart + ".." + job.frameEnd
-                + "  FPS " + OutputRenderSupport.fmt(job.frameRate)
-                + "  Počet " + job.frameCount;
-        String activeFrameLine = job.requestType == OutputRenderRequestType.STILL
-                ? "Aktuální snímek " + progressFrameNumber + " / 1"
-                : "Aktuální snímek " + progressFrameNumber + "  (" + (Math.max(0, progressFrameIndex) + 1)
-                + "/" + Math.max(1, progressFrameCount) + ")";
-        String primaryOutput = job.paths != null
-                ? job.paths.primaryOutputPreview(job.exportType, job.imageFormat)
-                : job.format;
+        double activeElapsedSeconds = outputActiveElapsedSeconds();
+        double remainingSeconds = smoothedRemainingSeconds();
+        String headline = buildPreviewHeadline(job);
+        String progressText = buildPreviewProgressText(job, pct);
+        String metricsText = buildPreviewMetricsText(job, activeElapsedSeconds, remainingSeconds);
+        return new PreviewState(
+                headline,
+                progressText,
+                metricsText,
+                Math.max(0.0, Math.min(1.0, progressCurrent / (double) Math.max(1L, progressTarget))),
+                renderPaused,
+                renderInProgress,
+                renderInProgress);
+    }
+
+    private String buildPreviewHeadline(OutputRenderJob job) {
+        if (job.requestType == OutputRenderRequestType.STILL) {
+            return UiStrings.Output.STILL_IMAGE;
+        }
+        return "Snímek " + progressFrameNumber
+                + " · " + (Math.max(0, progressFrameIndex) + 1)
+                + " / " + Math.max(1, progressFrameCount);
+    }
+
+    private String buildPreviewProgressText(OutputRenderJob job, double pct) {
+        if (OutputRenderSupport.isSampleBasedMode(job.mode)) {
+            long frameBase = job.requestType == OutputRenderRequestType.STILL
+                    ? 0L
+                    : (long) Math.max(0, progressFrameIndex) * Math.max(1L, job.targetSamples);
+            long frameSamples = Math.max(0L, progressCurrent - frameBase);
+            long frameTarget = Math.max(1L, job.targetSamples);
+            return String.format(
+                    Locale.ROOT,
+                    "%.1f %% · %d / %d vzorků%s",
+                    pct,
+                    Math.min(frameTarget, frameSamples),
+                    frameTarget,
+                    renderPaused ? " · pozastaveno" : "");
+        }
+        if (job.requestType == OutputRenderRequestType.STILL) {
+            return String.format(Locale.ROOT, "%.1f %% · dokončuji snímek%s", pct, renderPaused ? " · pozastaveno" : "");
+        }
+        return String.format(
+                Locale.ROOT,
+                "%.1f %% · %d / %d snímků%s",
+                pct,
+                Math.min(Math.max(0, progressFramesCompleted), Math.max(1, progressFrameCount)),
+                Math.max(1, progressFrameCount),
+                renderPaused ? " · pozastaveno" : "");
+    }
+
+    private String buildPreviewMetricsText(OutputRenderJob job, double activeElapsedSeconds, double remainingSeconds) {
+        String unit = progressUnitLabel(job);
+        String averageRate = formatRate(averageUnitsPerSecond(), unit);
+        String instantRate = formatRate(resolveDisplayedInstantRate(), unit);
+        String fastest = formatUnitDuration(progressFastestUnitNanos, unit);
+        String slowest = formatUnitDuration(progressSlowestUnitNanos, unit);
+        return "Běží " + OutputRenderSupport.formatDuration(activeElapsedSeconds)
+                + " · ETA " + OutputRenderSupport.formatDuration(remainingSeconds)
+                + " · Průměr " + averageRate
+                + " · Aktuálně " + instantRate
+                + " · Nejrychlejší " + fastest
+                + " · Nejpomalejší " + slowest;
+    }
+
+    private double resolveDisplayedInstantRate() {
+        double instant = progressInstantUnitsPerSecond;
+        if (instant > 1e-6) {
+            return instant;
+        }
+        return progressUnitsPerSecondSmoothed;
+    }
+
+    private String progressUnitLabel(OutputRenderJob job) {
+        if (job == null) {
+            return "jedn";
+        }
+        if (OutputRenderSupport.isSampleBasedMode(job.mode)) {
+            return "vz";
+        }
+        return job.frameCount <= 1 ? "render" : "sn";
+    }
+
+    private String formatRate(double unitsPerSecond, String unit) {
+        if (!Double.isFinite(unitsPerSecond) || unitsPerSecond <= 1e-6) {
+            return "-";
+        }
+        return String.format(Locale.ROOT, "%.2f %s/s", unitsPerSecond, unit);
+    }
+
+    private String formatUnitDuration(long unitNanos, String unit) {
+        if (unitNanos <= 0L) {
+            return "-";
+        }
+        double unitMs = unitNanos / 1_000_000.0;
+        if (unitMs < 1000.0) {
+            return String.format(Locale.ROOT, "%.0f ms/%s", unitMs, unit);
+        }
+        return OutputRenderSupport.formatDuration(unitMs / 1000.0) + "/" + unit;
+    }
+
+    private String[] buildViewportPreviewLines(PreviewState state) {
+        if (state == null) {
+            return new String[0];
+        }
         return new String[]{
-                "NÁHLED OUTPUT RENDERU",
-                buildProgressDetails(job),
-                "Stav " + progressMessage,
-                OutputRenderSupport.requestTypeLabel(job.requestType) + "  |  Renderer " + UiStrings.renderModeLabel(job.mode)
-                        + "  |  FPS " + OutputRenderSupport.fmt(job.frameRate),
-                frameLine,
-                activeFrameLine,
-                "Průběh " + progressCurrent + " / " + progressTarget
-                        + "  (" + String.format(Locale.ROOT, "%.2f%%", pct) + ")"
-                        + "  Uplynulo " + OutputRenderSupport.formatDuration(elapsedSeconds)
-                        + "  Průměr/snímek " + OutputRenderSupport.formatDuration(avgFrameSeconds)
-                        + "  ETA " + OutputRenderSupport.formatDuration(remainingSeconds),
-                "Složka " + (progressOutputFolder == null || progressOutputFolder.isBlank()
-                        ? job.paths.sessionFolder
-                        : progressOutputFolder),
-                "Soubor " + (progressCurrentFile == null || progressCurrentFile.isBlank()
-                        ? primaryOutput
-                        : progressCurrentFile),
-                "Výstup " + job.width + "x" + job.height
-                        + "  Interní " + job.internalWidth + "x" + job.internalHeight
-                        + "  Denoise " + OutputRenderSupport.onOff(job.denoise),
-                sampleLine,
-                lightingLine,
-                "Session " + job.paths.sessionFolder
-                        + "  Primární " + primaryOutput
-                        + "  Preview " + OutputRenderSupport.onOff(job.writePreviewImage)
-                        + "  Manifest " + OutputRenderSupport.onOff(job.writeManifest)
-                        + "  Log " + OutputRenderSupport.onOff(job.writeLogFile)
+                "RENDER: " + safeText(state.headline),
+                "PROGRES: " + safeText(state.progressText),
+                "METRIKY: " + safeText(state.metricsText)
         };
     }
 
@@ -1366,6 +1683,10 @@ public class OutputRenderController {
         request.frameEnd = settings.frameEnd;
         request.frameRate = settings.frameRate;
         return buildOutputRenderJob(request, false, false);
+    }
+
+    private static String safeText(String value) {
+        return value == null ? "" : value;
     }
 
 }

@@ -80,7 +80,6 @@ final class EngineRenderPanelSupport {
         if (engine == null || outputSettings == null) {
             return;
         }
-        outputSettings.workerCount = Math.max(1, engine.parallelWorkerCount);
         engine.outputRenderController.captureStylizedViewportSettings(engine);
         RenderMode mode = outputSettings.mode == null ? RenderMode.PATH_TRACING : outputSettings.mode;
         switch (mode) {

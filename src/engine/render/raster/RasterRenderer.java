@@ -564,8 +564,9 @@ public class RasterRenderer implements Renderer {
             localRasterizers = workerRasterizers;
         }
 
+        int scheduledWorkers = Math.max(1, Math.min(localRasterizers.length, countNonEmptyTiles(tileBins)));
         AtomicInteger tileCursor = new AtomicInteger();
-        Runnable[] tasks = new Runnable[localRasterizers.length];
+        Runnable[] tasks = new Runnable[scheduledWorkers];
         for (int i = 0; i < tasks.length; i++) {
             final TriangleRasterizer workerRasterizer = localRasterizers[i];
             tasks[i] = () -> renderTilesWorker(prepared, tileBins, output, workerRasterizer, tileCursor);
@@ -651,6 +652,19 @@ public class RasterRenderer implements Renderer {
                         state.sx, state.sy, state.sz, state.sw, state.attrs, state.ndcScratch);
             }
         }
+    }
+
+    private int countNonEmptyTiles(TileBins tileBins) {
+        if (tileBins == null || tileBins.bins == null || tileBins.bins.length == 0) {
+            return 1;
+        }
+        int count = 0;
+        for (LongList bin : tileBins.bins) {
+            if (bin != null && bin.size() > 0) {
+                count++;
+            }
+        }
+        return Math.max(1, count);
     }
 
     private TileBins buildTileBins(List<PreparedEntity> prepared, int width, int height) {

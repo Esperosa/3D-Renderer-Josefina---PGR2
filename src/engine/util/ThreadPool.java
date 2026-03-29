@@ -34,8 +34,12 @@ public class ThreadPool {
         this.executor = Executors.newFixedThreadPool(this.threadCount, factory);
     }
 
+    public static int availableWorkerCount() {
+        return Math.max(1, Runtime.getRuntime().availableProcessors());
+    }
+
     public static int recommendedWorkerCount() {
-        int cpu = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int cpu = availableWorkerCount();
         if (cpu <= 2) {
             return 1;
         }
@@ -50,6 +54,32 @@ public class ThreadPool {
             reserve = 1;
         }
         return Math.max(1, cpu - reserve);
+    }
+
+    public static int recommendedOutputWorkerCount() {
+        int cpu = availableWorkerCount();
+        if (cpu <= 2) {
+            return 1;
+        }
+        double systemCpuLoad = HardwareTelemetrySampler.sampleCpuOnly().systemCpuLoad();
+        int reserve;
+        if (cpu >= 32) {
+            reserve = 3;
+        } else if (cpu >= 16) {
+            reserve = 2;
+        } else {
+            reserve = 1;
+        }
+        if (Double.isFinite(systemCpuLoad)) {
+            if (systemCpuLoad >= 0.88) {
+                reserve += cpu >= 16 ? 2 : 1;
+            } else if (systemCpuLoad >= 0.74) {
+                reserve += 1;
+            } else if (systemCpuLoad <= 0.30) {
+                reserve = Math.max(1, reserve - 1);
+            }
+        }
+        return Math.max(1, cpu - Math.max(1, Math.min(cpu - 1, reserve)));
     }
 
  /**

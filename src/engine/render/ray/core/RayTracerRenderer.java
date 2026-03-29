@@ -102,6 +102,7 @@ public class RayTracerRenderer implements Renderer {
     private int autoSchedulingIntervalFrames = AUTO_SCHEDULING_INTERVAL_FRAMES_DEFAULT;
     private final AutoSchedulingBatch autoSchedulingBatch = new AutoSchedulingBatch(AUTO_SCHEDULING_INTERVAL_FRAMES_DEFAULT);
     private int samplesPerFrame = 1;
+    private int fullFrameDenoiseCadenceSamples = 1;
     private int maxDepth = 3;
     private int tileSize = 24;
     private boolean tileSizePinned = false;
@@ -122,6 +123,9 @@ public class RayTracerRenderer implements Renderer {
     private int denoiseTileOverlap = 16;
     private String denoiseRuntimeModeOverride = "AUTO";
     private String denoiseTilePresetOverride = "BALANCED";
+    private boolean pendingResolveOnly = false;
+    private boolean pendingForceFullDenoiseResolve = false;
+    private long lastFullDenoiseSample = 0L;
     private String denoiseRuntimePackageRootOverride = "";
     private boolean denoiseRuntimePackageRequired = false;
     private DenoiserRuntimePackageBridge.PackageStatus denoiseRuntimePackageStatus;
@@ -463,6 +467,9 @@ public class RayTracerRenderer implements Renderer {
             fillBackground(fb);
             return;
         }
+        if (consumeResolveOnlyRequest(outColor, fb)) {
+            return;
+        }
 
         long renderSetupStart = RuntimeInstrumentation.isEnabled() ? System.nanoTime() : 0L;
         final long frameSequence = ++previewFrameSequence;
@@ -717,6 +724,10 @@ public class RayTracerRenderer implements Renderer {
             }
             return;
         }
+        if (("denoisecadencesamples".equals(k) || "fullframedenoisecadence".equals(k)) && value instanceof Number) {
+            fullFrameDenoiseCadenceSamples = Math.max(1, Math.min(64, ((Number) value).intValue()));
+            return;
+        }
         if (("maxdepth".equals(k) || "maxbounces".equals(k) || "depth".equals(k)) && value instanceof Number) {
             int next = Math.max(1, Math.min(32, ((Number) value).intValue()));
             if (next != maxDepth) {
@@ -736,6 +747,14 @@ public class RayTracerRenderer implements Renderer {
         }
         if ("denoiseruntimemode".equals(k) && value != null) {
             denoiseRuntimeModeOverride = String.valueOf(value).trim().toUpperCase();
+            return;
+        }
+        if ("resolveonly".equals(k) && value instanceof Boolean) {
+            pendingResolveOnly = (Boolean) value;
+            return;
+        }
+        if (("forcefulldenoise".equals(k) || "forcefulldenoiseresolve".equals(k)) && value instanceof Boolean) {
+            pendingForceFullDenoiseResolve = (Boolean) value;
             return;
         }
         if ("denoisetilepreset".equals(k) && value != null) {
@@ -5434,7 +5453,10 @@ public class RayTracerRenderer implements Renderer {
         Arrays.fill(temporalHistoryAlbedo, 0.0f);
         temporalHistoryValid = false;
         accumulatedSamples = 0;
+        lastFullDenoiseSample = 0L;
         guidesReady = false;
+        pendingResolveOnly = false;
+        pendingForceFullDenoiseResolve = false;
         nextTemporalBlendScale = 1.0;
         nextTemporalBlendFrames = 0;
         activePolishIntegrandDepth = -1;
@@ -5467,7 +5489,10 @@ public class RayTracerRenderer implements Renderer {
         Arrays.fill(guideAlbedo, 0.0f);
         Arrays.fill(guideRoughness, 1.0f);
         accumulatedSamples = 0L;
+        lastFullDenoiseSample = 0L;
         guidesReady = false;
+        pendingResolveOnly = false;
+        pendingForceFullDenoiseResolve = false;
         carrierMotionTileCursor = 0;
         carrierMotionTileLayoutCols = -1;
         carrierMotionTileLayoutRows = -1;
@@ -6532,6 +6557,49 @@ public class RayTracerRenderer implements Renderer {
         applyDenoiseAndResolve(outColor, invSamples, temporalBlendScale, true);
     }
 
+    private boolean consumeResolveOnlyRequest(int[] outColor, FrameBuffer fb) {
+        if (!pendingResolveOnly) {
+            return false;
+        }
+        boolean forceFullDenoise = pendingForceFullDenoiseResolve;
+        pendingResolveOnly = false;
+        pendingForceFullDenoiseResolve = false;
+        if (accumulatedSamples <= 0L) {
+            if (fb != null) {
+                fillBackground(fb);
+            }
+            return true;
+        }
+        int count = Math.min(outColor.length, accumR.length);
+        double invSamples = 1.0 / Math.max(1L, accumulatedSamples);
+        if (denoiseEnabled) {
+            applyDenoiseAndResolve(outColor, invSamples, 1.0, forceFullDenoise);
+        } else {
+            resolveCarrierFromAccum(count);
+            writeCarrierResolvedToOutput(outColor, count);
+            invalidateTemporalHistory();
+        }
+        return true;
+    }
+
+    private boolean shouldRunFullFrameDenoisePass(boolean allowFullDenoise) {
+        if (!allowFullDenoise) {
+            return false;
+        }
+        if (!"FULL_FRAME".equals(denoiseRuntimeModeOverride)) {
+            return true;
+        }
+        int cadence = Math.max(1, fullFrameDenoiseCadenceSamples);
+        if (cadence <= 1 || accumulatedSamples <= 0L) {
+            return true;
+        }
+        return accumulatedSamples - lastFullDenoiseSample >= cadence;
+    }
+
+    private void noteFullFrameDenoisePass() {
+        lastFullDenoiseSample = Math.max(lastFullDenoiseSample, accumulatedSamples);
+    }
+
     private void applyDenoiseAndResolve(int[] outColor,
                                         double invSamples,
                                         double temporalBlendScale,
@@ -6547,7 +6615,8 @@ public class RayTracerRenderer implements Renderer {
             invalidateTemporalHistory();
             return;
         }
-        if (!allowFullDenoise && temporalHistoryValid && accumulatedSamples > 0L) {
+        boolean allowRuntimeFullDenoise = shouldRunFullFrameDenoisePass(allowFullDenoise);
+        if (!allowRuntimeFullDenoise && accumulatedSamples > 0L) {
             RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.PREVIEW_DENOISE_SKIPPED_FRAMES, 1L);
             denoiserTelemetry.onSkip("skip_motion_cadence", 0.0, Math.max(1.0, accumulatedSamples));
             resolveCarrierWithoutFullDenoise(
@@ -6706,6 +6775,7 @@ public class RayTracerRenderer implements Renderer {
                 denoiseFastMode,
                 passCap
         );
+        noteFullFrameDenoisePass();
         RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.CARRIER_DENOISE, carrierDenoiseStage);
         RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.DENOISE, denoiseStage);
 
