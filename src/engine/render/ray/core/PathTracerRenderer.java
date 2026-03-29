@@ -69,11 +69,11 @@ public class PathTracerRenderer implements Renderer {
     private static final double AUTO_PROCESS_CPU_LOW = 0.62;
     private static final double AUTO_PROCESS_CPU_HIGH = 0.95;
     private static final double AUTO_HW_EWMA_ALPHA = 0.24;
-    private static final long STILL_TIER1_MIN_SAMPLES = 8L;
-    private static final long STILL_TIER2_MIN_SAMPLES = 18L;
-    private static final long STILL_TIER3_MIN_SAMPLES = 32L;
-    private static final long STILL_TIER4_MIN_SAMPLES = 48L;
-    private static final long STILL_TIER5_MIN_SAMPLES = 64L;
+    private static final long STILL_TIER1_MIN_SAMPLES = 12L;
+    private static final long STILL_TIER2_MIN_SAMPLES = 28L;
+    private static final long STILL_TIER3_MIN_SAMPLES = 48L;
+    private static final long STILL_TIER4_MIN_SAMPLES = 72L;
+    private static final long STILL_TIER5_MIN_SAMPLES = 100L;
     private static final int PREVIEW_STILL_WARMUP_FRAMES = 2;
     private static final int PREVIEW_SMOOTH_ADJUST_INTERVAL_FRAMES = 30;
     private static final int PREVIEW_SMOOTH_BOOST_HOLD_FRAMES = 90;
@@ -463,23 +463,28 @@ public class PathTracerRenderer implements Renderer {
             }
         } else {
             AtomicInteger tileCursor = new AtomicInteger(0);
-            threadPool.submitAndWait(activeWorkers, workerIndex -> {
-                TraceContext ctx = new TraceContext();
-                SplitMix64 rng = new SplitMix64(seedForWorker(workerIndex, sampleTarget));
-                int chunkStart;
-                while ((chunkStart = tileCursor.getAndAdd(TILE_CLAIM_CHUNK)) < tileCount) {
-                    int chunkEnd = Math.min(tileCount, chunkStart + TILE_CLAIM_CHUNK);
-                    for (int tile = chunkStart; tile < chunkEnd; tile++) {
-                        if (!tileRenderPlan[tile]) {
-                            continue;
+            Runnable[] tasks = new Runnable[activeWorkers];
+            for (int w = 0; w < activeWorkers; w++) {
+                final int workerIndex = w;
+                tasks[w] = () -> {
+                    TraceContext ctx = new TraceContext();
+                    SplitMix64 rng = new SplitMix64(seedForWorker(workerIndex, sampleTarget));
+                    int chunkStart;
+                    while ((chunkStart = tileCursor.getAndAdd(TILE_CLAIM_CHUNK)) < tileCount) {
+                        int chunkEnd = Math.min(tileCount, chunkStart + TILE_CLAIM_CHUNK);
+                        for (int tile = chunkStart; tile < chunkEnd; tile++) {
+                            if (!tileRenderPlan[tile]) {
+                                continue;
+                            }
+                            long tileStartNanos = System.nanoTime();
+                            renderTile(tile, tileCols, tileW, tileH, fbWidth, fbHeight, cam, outColor,
+                                    captureGuides, effectiveSamplesPerFrame, effectiveMaxBounces, rng, ctx, previewPathMetrics);
+                            recordTileCost(frameTileCostNanos, frameTileCostSamples, frameTileCostMinNanos, frameTileCostMaxNanos, tileStartNanos);
                         }
-                        long tileStartNanos = System.nanoTime();
-                        renderTile(tile, tileCols, tileW, tileH, fbWidth, fbHeight, cam, outColor,
-                                captureGuides, effectiveSamplesPerFrame, effectiveMaxBounces, rng, ctx, previewPathMetrics);
-                        recordTileCost(frameTileCostNanos, frameTileCostSamples, frameTileCostMinNanos, frameTileCostMaxNanos, tileStartNanos);
                     }
-                }
-            });
+                };
+            }
+            threadPool.submitAndWait(tasks);
         }
         if (fullFrameCoverage) {
             accumulatedSamples = sampleTarget;
@@ -6143,6 +6148,9 @@ public class PathTracerRenderer implements Renderer {
 
     private boolean resolveRunFullDenoise(long frameSequence) {
         if (!previewQualityLadderEnabled || !previewMotionActive || referenceMode) {
+            if (previewQualityLadderEnabled && !previewMotionActive && activeStillEnvironmentSamples <= 0) {
+                return temporalHistoryValid ? frameSequence % 2L == 0L : true;
+            }
             return true;
         }
         int cadence = Math.max(1, previewMotionDenoiseCadence);

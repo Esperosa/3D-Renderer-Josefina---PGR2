@@ -263,9 +263,7 @@ public class Engine {
     boolean viewportCameraMotionActive;
     boolean viewportSceneMotionActive;
     boolean viewportMotionLatchedActive;
-    long viewportLastMotionNanos;
     long viewportMotionEntryBoostUntilNanos;
-    long viewportMotionStartupFloorUntilNanos;
     long viewportMotionHoldUntilNanos;
     int viewportMotionExitStableFrames;
     boolean viewportFallbackLockActive;
@@ -570,9 +568,7 @@ public class Engine {
         this.viewportCameraMotionActive = false;
         this.viewportSceneMotionActive = false;
         this.viewportMotionLatchedActive = false;
-        this.viewportLastMotionNanos = 0L;
         this.viewportMotionEntryBoostUntilNanos = 0L;
-        this.viewportMotionStartupFloorUntilNanos = 0L;
         this.viewportMotionHoldUntilNanos = 0L;
         this.viewportMotionExitStableFrames = 0;
         this.viewportFallbackLockActive = false;

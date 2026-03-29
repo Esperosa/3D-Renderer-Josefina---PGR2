@@ -26,13 +26,7 @@ public final class ViewportPerformanceConfigTests {
         testCriticalPreviewKeepsHeavyRendererScheduled();
         testPathViewportSelfHealsDenoiseQualityOnGentleMotion();
         testHeavyViewportMotionEntryAppliesImmediateDownshiftFloor();
-        testMotionEntryForcesBaselineDownshift();
-        testRayHeavyOverloadCanReachTwentyPercentScale();
-        testInteractionSignalTriggersMotionProfileImmediately();
-        testHeavyViewportIdleRecoveryIsSmooth();
-        testHeavyViewportIdleEventuallyRestoresFullFidelity();
-        testHeavyViewportIdleHardRestoreBreaksStuckMotionLatch();
-        testHeavyViewportOfflineFidelityLockForcesFullQuality();
+        testHeavyViewportIdleSnapRestoresFullScale();
         testHeavyViewportFreezesDynamicSceneWhenIdle();
         System.out.println("ViewportPerformanceConfigTests: ALL TESTS PASSED");
     }
@@ -160,18 +154,17 @@ public final class ViewportPerformanceConfigTests {
         engine.viewportTargetFps = 25.0;
         engine.interactiveRenderScale = 0.60;
         engine.viewportSmoothedFrameMs = 120.0;
-        engine.viewportCameraMotionActive = true;
 
         for (int i = 0; i < 44; i++) {
             EngineRenderRuntime.recordViewportFrameTime(engine, 120.0);
             EngineRenderRuntime.updateRealtimePerformanceState(engine, true);
         }
 
-        if (!engine.interactiveRenderScaleActive) {
-            throw new AssertionError("Heavy progressive viewport should activate adaptive scaling during sustained motion overload.");
+        if (engine.interactiveRenderScaleActive) {
+            throw new AssertionError("Heavy progressive viewport should keep a stable render scale to avoid resetting accumulation.");
         }
-        if (engine.viewportAdaptiveScaleApplied >= 0.90) {
-            throw new AssertionError("Heavy viewport should downshift internal preview scale under sustained motion overload.");
+        if (engine.viewportAdaptiveScaleApplied != 1.0) {
+            throw new AssertionError("Heavy viewport should keep full internal resolution while the quality ladder handles motion.");
         }
 
         long now = System.nanoTime();
@@ -209,19 +202,15 @@ public final class ViewportPerformanceConfigTests {
         engine.viewportCriticalPressureSeconds = 0.2;
         engine.viewportScalePressureSeconds = 0.4;
         engine.viewportSmoothedFrameMs = 47.0;
-        engine.lastViewportInteractionNanos = System.nanoTime();
         engine.viewportFastFrameMs = 56.0;
         engine.viewportPredictedFrameMs = 60.0;
-        engine.viewportHeavySmoothedFrameMs = 47.0;
-        engine.viewportHeavyFastFrameMs = 56.0;
-        engine.viewportHeavyPredictedFrameMs = 60.0;
         engine.viewportFrameDropStreak = 3;
         engine.viewportCriticalPreviewStartNanos = System.nanoTime() - 1_000_000_000L;
         engine.lastViewportInteractionNanos = System.nanoTime();
 
         EngineRenderRuntime.updateRealtimePerformanceState(engine, true);
-        if (!engine.viewportCriticalPreviewActive && engine.viewportCriticalPreviewStartNanos == 0L) {
-            throw new AssertionError("Heavy viewport should at least arm fallback countdown preemptively on rapid FPS collapse.");
+        if (!engine.viewportCriticalPreviewActive) {
+            throw new AssertionError("Heavy viewport should arm fallback preview preemptively on rapid FPS collapse.");
         }
     }
 
@@ -433,104 +422,7 @@ public final class ViewportPerformanceConfigTests {
         }
     }
 
-    private static void testMotionEntryForcesBaselineDownshift() {
-        Engine ray = new Engine();
-        ray.activeMode = RenderMode.RAY_TRACING;
-        ray.progressiveViewportEnabled = true;
-        ray.viewportTargetFps = 24.0;
-        ray.viewportDynamicResolutionTierIndex = 0;
-        ray.viewportHeavySmoothedFrameMs = 26.0;
-        ray.viewportHeavyFastFrameMs = 28.0;
-        ray.viewportHeavyPredictedFrameMs = 30.0;
-        ray.viewportSmoothedFrameMs = 26.0;
-        ray.viewportFastFrameMs = 28.0;
-        ray.viewportPredictedFrameMs = 30.0;
-        ray.viewportCameraMotionActive = true;
-
-        EngineRenderRuntime.updateRealtimePerformanceState(ray, true);
-
-        if (ray.viewportDynamicResolutionTierIndex < 5) {
-            throw new AssertionError("RAY motion start should clamp to an aggressive base downshift tier even without measured overload.");
-        }
-        if (ray.viewportAdaptiveScaleApplied > 0.80) {
-            throw new AssertionError("RAY motion start should immediately reduce preview scale before overload is observed.");
-        }
-
-        Engine path = new Engine();
-        path.activeMode = RenderMode.PATH_TRACING;
-        path.progressiveViewportEnabled = true;
-        path.viewportTargetFps = 24.0;
-        path.viewportDynamicResolutionTierIndex = 0;
-        path.viewportHeavySmoothedFrameMs = 24.0;
-        path.viewportHeavyFastFrameMs = 26.0;
-        path.viewportHeavyPredictedFrameMs = 28.0;
-        path.viewportSmoothedFrameMs = 24.0;
-        path.viewportFastFrameMs = 26.0;
-        path.viewportPredictedFrameMs = 28.0;
-        path.viewportCameraMotionActive = true;
-
-        EngineRenderRuntime.updateRealtimePerformanceState(path, true);
-
-        if (path.viewportDynamicResolutionTierIndex < 4) {
-            throw new AssertionError("PATH motion start should clamp to the baseline downshift tier immediately.");
-        }
-        if (path.viewportAdaptiveScaleApplied > 0.84) {
-            throw new AssertionError("PATH motion start should trim preview scale right when motion begins.");
-        }
-    }
-
-    private static void testRayHeavyOverloadCanReachTwentyPercentScale() {
-        Engine ray = new Engine();
-        ray.activeMode = RenderMode.RAY_TRACING;
-        ray.progressiveViewportEnabled = true;
-        ray.viewportTargetFps = 24.0;
-        ray.viewportDynamicResolutionTierIndex = 0;
-        ray.viewportCameraMotionActive = true;
-        ray.viewportHeavySmoothedFrameMs = 260.0;
-        ray.viewportHeavyFastFrameMs = 300.0;
-        ray.viewportHeavyPredictedFrameMs = 320.0;
-        ray.viewportSmoothedFrameMs = 260.0;
-        ray.viewportFastFrameMs = 300.0;
-        ray.viewportPredictedFrameMs = 320.0;
-
-        for (int i = 0; i < 12; i++) {
-            EngineRenderRuntime.updateRealtimePerformanceState(ray, true);
-        }
-
-        if (ray.viewportDynamicResolutionTierIndex < 9) {
-            throw new AssertionError("RAY heavy overload should be able to downshift to the lowest tier.");
-        }
-        if (ray.viewportAdaptiveScaleApplied > 0.21) {
-            throw new AssertionError("RAY heavy overload should allow preview scale near 20%.");
-        }
-    }
-
-    private static void testInteractionSignalTriggersMotionProfileImmediately() {
-        Engine ray = new Engine();
-        ray.activeMode = RenderMode.RAY_TRACING;
-        ray.progressiveViewportEnabled = true;
-        ray.viewportTargetFps = 24.0;
-        ray.viewportDynamicResolutionTierIndex = 0;
-        ray.viewportCameraMotionActive = false;
-        ray.viewportSceneMotionActive = false;
-        ray.viewportHeavySmoothedFrameMs = 28.0;
-        ray.viewportHeavyFastFrameMs = 30.0;
-        ray.viewportHeavyPredictedFrameMs = 32.0;
-        ray.viewportSmoothedFrameMs = 28.0;
-        ray.viewportFastFrameMs = 30.0;
-        ray.viewportPredictedFrameMs = 32.0;
-
-        EngineRenderRuntime.updateRealtimePerformanceState(ray, true);
-
-        if (ray.viewportDynamicResolutionTierIndex < 5) {
-            throw new AssertionError("Interaction-triggered motion must apply the entry downshift in the same update tick.");
-        }
-        if (ray.viewportAdaptiveScaleApplied > 0.50) {
-            throw new AssertionError("Interaction-triggered motion should start with startup floor quality near 50% in the same update tick.");
-        }
-    }
-
-    private static void testHeavyViewportIdleRecoveryIsSmooth() {
+    private static void testHeavyViewportIdleSnapRestoresFullScale() {
         Engine engine = new Engine();
         engine.activeMode = RenderMode.RAY_TRACING;
         engine.progressiveViewportEnabled = true;
@@ -543,7 +435,6 @@ public final class ViewportPerformanceConfigTests {
         engine.viewportSceneMotionActive = false;
         engine.renderModeSwitchTransitionActive = false;
         engine.safetyRecoveryActive = false;
-        engine.lastViewportInteractionNanos = System.nanoTime();
         engine.viewportSmoothedFrameMs = 80.0;
         engine.viewportFastFrameMs = 80.0;
         engine.viewportPredictedFrameMs = 80.0;
@@ -553,108 +444,11 @@ public final class ViewportPerformanceConfigTests {
 
         EngineRenderRuntime.updateRealtimePerformanceState(engine, false);
 
-        if (engine.viewportDynamicResolutionTierIndex <= 0) {
-            throw new AssertionError("Idle heavy viewport should avoid abrupt one-frame tier reset to full quality.");
-        }
-        if (engine.viewportAdaptiveScaleApplied <= 0.55 || engine.viewportAdaptiveScaleApplied >= 1.0) {
-            throw new AssertionError("Idle heavy viewport should recover scale smoothly, not stay stuck or snap to full in one frame.");
-        }
-    }
-
-    private static void testHeavyViewportIdleEventuallyRestoresFullFidelity() {
-        Engine engine = new Engine();
-        engine.activeMode = RenderMode.RAY_TRACING;
-        engine.progressiveViewportEnabled = true;
-        engine.viewportTargetFps = 25.0;
-        engine.viewportAdaptiveScaleCurrent = 0.45;
-        engine.viewportAdaptiveScaleApplied = 0.45;
-        engine.viewportDynamicResolutionTierIndex = 7;
-        engine.viewportMotionLatchedActive = false;
-        engine.viewportCameraMotionActive = false;
-        engine.viewportSceneMotionActive = false;
-        engine.renderModeSwitchTransitionActive = false;
-        engine.safetyRecoveryActive = false;
-        engine.viewportScalePressureSeconds = 0.0;
-        engine.viewportCriticalPressureSeconds = 0.0;
-        engine.renderScale = 0.60;
-        engine.lastViewportInteractionNanos = System.nanoTime() - 1_200_000_000L;
-        engine.viewportLastMotionNanos = System.nanoTime() - 1_200_000_000L;
-        engine.safetyViewportScaleClamp = 0.58;
-        engine.viewportSmoothedFrameMs = 22.0;
-        engine.viewportFastFrameMs = 21.0;
-        engine.viewportPredictedFrameMs = 22.0;
-        engine.viewportHeavySmoothedFrameMs = 22.0;
-        engine.viewportHeavyFastFrameMs = 21.0;
-        engine.viewportHeavyPredictedFrameMs = 22.0;
-
-        EngineRenderRuntime.updateRealtimePerformanceState(engine, false);
-
         if (engine.viewportDynamicResolutionTierIndex != 0) {
-            throw new AssertionError("Stable idle viewport should eventually restore dynamic resolution tier to full.");
+            throw new AssertionError("Idle heavy viewport should restore full dynamic-resolution tier immediately.");
         }
         if (Math.abs(engine.viewportAdaptiveScaleApplied - 1.0) > 1e-9) {
-            throw new AssertionError("Stable idle viewport should eventually restore full preview scale.");
-        }
-        if (Math.abs(EngineRenderRuntime.effectiveRenderScale(engine) - 1.0) > 1e-9) {
-            throw new AssertionError("Stable idle viewport should eventually restore effective full resolution scale.");
-        }
-        if (Math.abs(engine.safetyViewportScaleClamp - 1.0) > 1e-9) {
-            throw new AssertionError("Stable idle viewport should release safety scale clamp outside active recovery.");
-        }
-    }
-
-    private static void testHeavyViewportIdleHardRestoreBreaksStuckMotionLatch() {
-        Engine engine = new Engine();
-        engine.activeMode = RenderMode.PATH_TRACING;
-        engine.progressiveViewportEnabled = true;
-        engine.viewportMotionLatchedActive = true;
-        engine.viewportAdaptiveScaleCurrent = 0.40;
-        engine.viewportAdaptiveScaleApplied = 0.40;
-        engine.viewportDynamicResolutionTierIndex = 8;
-        engine.viewportScalePressureSeconds = 0.0;
-        engine.viewportCriticalPressureSeconds = 0.0;
-        engine.lastViewportInteractionNanos = System.nanoTime() - 1_500_000_000L;
-        engine.viewportLastMotionNanos = System.nanoTime() - 1_500_000_000L;
-
-        EngineRenderRuntime.updateRealtimePerformanceState(engine, false);
-
-        if (engine.viewportMotionLatchedActive) {
-            throw new AssertionError("Long idle should clear stale motion latch and restore offline quality mode.");
-        }
-        if (engine.viewportDynamicResolutionTierIndex != 0) {
-            throw new AssertionError("Long idle hard restore should force full resolution tier.");
-        }
-        if (Math.abs(engine.viewportAdaptiveScaleApplied - 1.0) > 1e-9) {
-            throw new AssertionError("Long idle hard restore should force full preview scale.");
-        }
-    }
-
-    private static void testHeavyViewportOfflineFidelityLockForcesFullQuality() {
-        Engine engine = new Engine();
-        engine.activeMode = RenderMode.PATH_TRACING;
-        engine.progressiveViewportEnabled = true;
-        engine.renderScale = 0.60;
-        engine.safetyViewportScaleClamp = 0.58;
-        engine.viewportAdaptiveScaleCurrent = 0.50;
-        engine.viewportAdaptiveScaleApplied = 0.50;
-        engine.viewportMotionLatchedActive = true;
-        engine.viewportScalePressureSeconds = 0.0;
-        engine.viewportCriticalPressureSeconds = 0.0;
-        engine.lastViewportInteractionNanos = System.nanoTime() - 2_000_000_000L;
-        engine.viewportLastMotionNanos = System.nanoTime() - 2_000_000_000L;
-        engine.viewportDisplayedMode = RenderMode.PATH_TRACING;
-
-        for (int i = 0; i < 240; i++) {
-            EngineRenderRuntime.recordViewportFrameTime(engine, 20.0, RenderMode.PATH_TRACING);
-        }
-
-        EngineRenderRuntime.updateRealtimePerformanceState(engine, false);
-
-        if (Math.abs(EngineRenderRuntime.effectiveRenderScale(engine) - 1.0) > 1e-9) {
-            throw new AssertionError("Offline fidelity lock should force effective full resolution scale.");
-        }
-        if (engine.viewportMotionLatchedActive) {
-            throw new AssertionError("Offline fidelity lock should clear stale motion latch.");
+            throw new AssertionError("Idle heavy viewport should snap back to full preview scale in one step.");
         }
     }
 }

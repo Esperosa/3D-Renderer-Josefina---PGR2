@@ -1,14 +1,14 @@
 package engine.util;
 
-import java.util.concurrent.CountDownLatch;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
-import java.util.function.IntConsumer;
 
 /**
  * Represents pevně velký thread pool pro paralelní vykreslování.
@@ -91,48 +91,43 @@ public class ThreadPool {
         if (tasks == null || tasks.length == 0) {
             return;
         }
-        int scheduled = 0;
+        RuntimeInstrumentation.FrameToken frameToken = RuntimeInstrumentation.captureCurrentToken();
+        LongAdder workerBusyNanos = new LongAdder();
+        List<Future<?>> futures = new ArrayList<>(tasks.length);
         for (Runnable task : tasks) {
             if (task != null) {
-                scheduled++;
+                futures.add(executor.submit(() -> {
+                    RuntimeInstrumentation.attachFrame(frameToken);
+                    long busyStart = System.nanoTime();
+                    try {
+                        task.run();
+                    } finally {
+                        workerBusyNanos.add(Math.max(0L, System.nanoTime() - busyStart));
+                        RuntimeInstrumentation.clearAttachedFrame(frameToken);
+                    }
+                }));
             }
         }
-        if (scheduled == 0) {
-            return;
-        }
-        BatchWaitState batch = new BatchWaitState(scheduled);
-        Runnable inlineTask = null;
-        for (Runnable task : tasks) {
-            if (task == null) {
-                continue;
-            }
-            if (inlineTask == null) {
-                inlineTask = task;
-            } else {
-                scheduleBatchTask(batch, task);
-            }
-        }
-        runBatchTaskInline(batch, inlineTask);
-        awaitBatch(batch);
-    }
 
- /**
- * Spustí opakovanou dávku pracovníků bez vytváření dočasného pole úloh.
- *
- * @param taskCount počet worker tasků
- * @param workerTask tělo worker tasku
- */
-    public void submitAndWait(int taskCount, IntConsumer workerTask) {
-        if (taskCount <= 0 || workerTask == null) {
-            return;
+        long waitStart = System.nanoTime();
+        for (Future<?> f : futures) {
+            try {
+                f.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("ThreadPool interrupted while waiting for tasks.", e);
+            } catch (ExecutionException e) {
+                throw new RuntimeException("ThreadPool task failed.", e.getCause());
+            }
         }
-        BatchWaitState batch = new BatchWaitState(taskCount);
-        for (int workerIndex = 1; workerIndex < taskCount; workerIndex++) {
-            final int index = workerIndex;
-            scheduleBatchTask(batch, () -> workerTask.accept(index));
-        }
-        runBatchTaskInline(batch, () -> workerTask.accept(0));
-        awaitBatch(batch);
+        long waitNanos = Math.max(0L, System.nanoTime() - waitStart);
+        long busyNanos = workerBusyNanos.sum();
+        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WORKER_WAIT_NS, waitNanos);
+        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WORKER_BUSY_NS, busyNanos);
+        long totalWindowNanos = waitNanos * Math.max(1, futures.size());
+        RuntimeInstrumentation.addCounter(
+                RuntimeInstrumentation.Counter.WORKER_IDLE_NS,
+                Math.max(0L, totalWindowNanos - busyNanos));
     }
 
  /**
@@ -156,73 +151,5 @@ public class ThreadPool {
  /** pool ukončím při vypnutí enginu. */
     public void shutdown() {
         executor.shutdownNow();
-    }
-
-    private void scheduleBatchTask(BatchWaitState batch, Runnable task) {
-        executor.execute(() -> {
-            runBatchTask(batch, task);
-        });
-    }
-
-    private void runBatchTaskInline(BatchWaitState batch, Runnable task) {
-        if (task == null) {
-            return;
-        }
-        runBatchTask(batch, task);
-    }
-
-    private void runBatchTask(BatchWaitState batch, Runnable task) {
-        RuntimeInstrumentation.attachFrame(batch.frameToken);
-        long busyStart = System.nanoTime();
-        try {
-            task.run();
-        } catch (Throwable t) {
-            batch.failure.compareAndSet(null, t);
-        } finally {
-            batch.workerBusyNanos.add(Math.max(0L, System.nanoTime() - busyStart));
-            RuntimeInstrumentation.clearAttachedFrame(batch.frameToken);
-            batch.latch.countDown();
-        }
-    }
-
-    private void awaitBatch(BatchWaitState batch) {
-        long waitStart = System.nanoTime();
-        try {
-            batch.latch.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("ThreadPool interrupted while waiting for tasks.", e);
-        }
-        long waitNanos = Math.max(0L, System.nanoTime() - waitStart);
-        long batchWallNanos = Math.max(0L, System.nanoTime() - batch.startNanos);
-        long busyNanos = batch.workerBusyNanos.sum();
-        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WORKER_WAIT_NS, waitNanos);
-        RuntimeInstrumentation.addCounter(RuntimeInstrumentation.Counter.WORKER_BUSY_NS, busyNanos);
-        long totalWindowNanos = batchWallNanos * Math.max(1, batch.taskCount);
-        RuntimeInstrumentation.addCounter(
-                RuntimeInstrumentation.Counter.WORKER_IDLE_NS,
-                Math.max(0L, totalWindowNanos - busyNanos));
-        Throwable failure = batch.failure.get();
-        if (failure != null) {
-            throw new RuntimeException("ThreadPool task failed.", failure);
-        }
-    }
-
-    private static final class BatchWaitState {
-        final RuntimeInstrumentation.FrameToken frameToken;
-        final LongAdder workerBusyNanos;
-        final CountDownLatch latch;
-        final AtomicReference<Throwable> failure;
-        final int taskCount;
-        final long startNanos;
-
-        BatchWaitState(int taskCount) {
-            this.frameToken = RuntimeInstrumentation.captureCurrentToken();
-            this.workerBusyNanos = new LongAdder();
-            this.latch = new CountDownLatch(taskCount);
-            this.failure = new AtomicReference<>();
-            this.taskCount = taskCount;
-            this.startNanos = System.nanoTime();
-        }
     }
 }
