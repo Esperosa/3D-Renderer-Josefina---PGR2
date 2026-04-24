@@ -1,6 +1,6 @@
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -101,8 +101,8 @@ public final class ProjectMetricsReport {
         projectCounts.put("Preview background režimy", MaterialPreviewRenderer.BackgroundMode.values().length);
         projectCounts.put("Preview render režimy", MaterialPreviewRenderer.PreviewMode.values().length);
         projectCounts.put("Typy exportu", reflectEnumSize("engine.core.OutputRenderRequestType"));
-        projectCounts.put("Základní primitiva", invokeStringArraySize("engine.core.EngineSceneActions", "basicPrimitiveTypes"));
-        projectCounts.put("Featured primitiva", invokeStringArraySize("engine.core.EngineSceneActions", "featuredPrimitiveTypes"));
+        projectCounts.put("Základní primitiva", reflectStringArrayFieldSize("engine.core.EngineSceneActions", "BASIC_PRIMITIVES"));
+        projectCounts.put("Featured primitiva", reflectStringArrayFieldSize("engine.core.EngineSceneActions", "FEATURED_PRIMITIVES"));
 
         ImportStats importStats = collectImportStats(repoRoot);
         Map<TestBucket, Integer> testBuckets = classifyTestSuites(suiteEntries);
@@ -162,11 +162,11 @@ public final class ProjectMetricsReport {
         return constants == null ? 0 : constants.length;
     }
 
-    private static int invokeStringArraySize(String fqcn, String methodName) throws Exception {
+    private static int reflectStringArrayFieldSize(String fqcn, String fieldName) throws Exception {
         Class<?> type = Class.forName(fqcn);
-        Method method = type.getDeclaredMethod(methodName);
-        method.setAccessible(true);
-        Object value = method.invoke(null);
+        Field field = type.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        Object value = field.get(null);
         if (value instanceof String[] array) {
             return array.length;
         }

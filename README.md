@@ -5,14 +5,14 @@
 [![Java](https://img.shields.io/badge/Java-17%2B-2f7ed8?logo=openjdk&logoColor=white)](README.md#rychlý-start)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-3a9f6f)](README.md#build-spuštění-a-testy)
 [![Render Modes](https://img.shields.io/badge/Render%20modes-9-8a4bd6)](README.md#rychlý-přehled)
-[![Tests](https://img.shields.io/badge/Automatické%20testy-50-cc7a00)](README.md#tvrdá-data-a-ověřené-statistiky)
+[![Tests](https://img.shields.io/badge/Automatické%20testy-59-cc7a00)](README.md#tvrdá-data-a-ověřené-statistiky)
 
 Čistě Java desktop editor a render sandbox zaměřený na počítačovou grafiku, CPU renderery, node-based materiály, editorové workflow a experimentální stylizované režimy. Program je navržený jako technický studentský projekt z grafiky: nesnaží se imitovat produkční DCC nebo produkční render engine, ale propojuje větší množství grafických subsystémů do jednoho konzistentního celku.
 
 Autor: **Jiří Pelikán**
 
 > [!NOTE]
-> Build a test postup odpovídá aktuálním skriptům v repu. Výkonové tabulky níže jsou reprodukovatelný full snapshot z tests run-project-metrics skriptů[^bench].
+> Build a test postup odpovídá aktuálním skriptům v repu. Výkonové tabulky níže jsou aktuální reprodukovatelný `quick` snapshot z `tests/run-project-metrics` skriptů[^bench]; `standard` a `full` režimy jsou dostupné pro hlubší měření.
 
 > [!TIP]
 > Pokud chceš jen rychlé pochopení projektu, jdi přes sekce Rychlý start, Rychlý přehled a Co program aktuálně umí.
@@ -114,7 +114,7 @@ Autor: **Jiří Pelikán**
 
 ```powershell
 .\build.ps1
-.\build.ps1 -Run
+.\build.ps1 -Run -Profile balanced
 .\tests\run-tests.ps1
 ```
 
@@ -144,7 +144,7 @@ Podrobný build, packaging a benchmark workflow je níže v [Build, spuštění 
 
 ## Tvrdá data a ověřené statistiky
 
-Tato sekce shrnuje čísla ověřená přímo nad aktuální codebase a referenční headless benchmarky vygenerované runnerem `tests/run-project-metrics.ps1` nebo `tests/run-project-metrics.sh`. Statistiky zdrojového stromu jsou rychle ověřitelné nad aktuálním repem; renderer benchmark tabulky níže používají `full` režim a fungují jako reprodukovatelný snapshot.
+Tato sekce shrnuje čísla ověřená přímo nad aktuální codebase a referenční headless benchmarky vygenerované runnerem `tests/run-project-metrics.ps1` nebo `tests/run-project-metrics.sh`. Statistiky zdrojového stromu jsou rychle ověřitelné nad aktuálním repem; renderer benchmark tabulky níže používají `quick` režim a fungují jako rychle reprodukovatelný snapshot.
 
 Krátká orientace:
 
@@ -156,13 +156,13 @@ Krátká orientace:
 
 | Metrika | Hodnota |
 | --- | ---: |
-| Java soubory v `src` | 225 |
-| Neblank Java řádky v `src` | 65 201 |
-| Java soubory v `tests` | 65 |
-| Neblank Java řádky v `tests` | 13 126 |
-| Automatické test suite entry pointy | 50 |
+| Java soubory v `src` | 227 |
+| Neblank Java řádky v `src` | 69 419 |
+| Java soubory v `tests` | 70 |
+| Neblank Java řádky v `tests` | 16 599 |
+| Automatické test suite entry pointy | 59 |
 | Render módy | 9 |
-| Node typy materiálového graphu | 24 |
+| Node typy materiálového graphu | 25 |
 | Materiálové presety | 9 |
 | Preview primitiva | 3 |
 | Preview light presety | 5 |
@@ -188,28 +188,28 @@ Krátká orientace:
 | Rendering | 19 |
 | Materiály | 3 |
 | Import / IO | 5 |
-| Editor / core | 7 |
+| Editor / core | 8 |
 | Kvalita / prezentace | 2 |
-| Ostatní | 14 |
+| Ostatní | 22 |
 
 ### Benchmark metodika a transparentní parametry
 
 | Parametr | Hodnota |
 | --- | --- |
-| Java runtime | `17.0.18` / `OpenJDK 64-Bit Server VM` |
+| Java runtime | `17.0.9` / `Java HotSpot(TM) 64-Bit Server VM` |
 | OS | Windows 11 / `amd64` |
-| Logické procesory | `16` |
-| Renderer benchmark mode | `full` |
+| Logické procesory | `24` |
+| Renderer benchmark mode | `quick` |
 | Izolace případů | samostatný child JVM proces pro každý case |
-| Core profily | `Single core = 1 worker`, `Scaled CPU (70%) = 12 worker` |
-| Viewport rozlišení | `320x180`, `640x360`, `1920x1080` |
-| Offline rozlišení | `160x90`, `320x180`, `640x360`, `1920x1080` |
+| Core profily | `Single core = 1 worker`, `Scaled CPU (70%) = 17 worker` |
+| Viewport rozlišení | `320x180`, `640x360` |
+| Offline rozlišení | `160x90`, `320x180` |
 | Workload fáze | first-frame = `init + první render` na čerstvé instanci po case primingu, steady-frame = render po warm-upu |
 | Workload profily | `static-steady` = statická scéna + statická kamera, `dynamic-sequence` = viewport sekvence s orbit kamerou a `scene.update(time)` |
 | Statistika | `min`, `median`, `mean`, `p90`, `max`, `stddev` z realných sample, žádný `median-z-mediánů` |
 | Kamera | perspective, `FOV 60 deg`, aspect podle rozlišení, pozice `(0.0, 1.3, 7.4 +/- bias)` |
-| Benchmark host JVM | `17.0.18` / `OpenJDK 64-Bit Server VM`, `Windows 11 10.0`, runtime processors `16`, max memory `7120 MB` |
-| Benchmark CPU descriptor | `AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD` |
+| Benchmark host JVM | `17.0.9` / `Java HotSpot(TM) 64-Bit Server VM`, `Windows 11 10.0`, runtime processors `24`, max memory `16320 MB` |
+| Benchmark CPU descriptor | `Intel64 Family 6 Model 183 Stepping 1, GenuineIntel` |
 | Per-case child metadata | `runtime_processors`, `max_memory_mb`, `java_*`, `os_*`, `cpu_descriptor` jsou v CSV po každém case; `Scaled CPU` child typicky vidí počet procesorů podle `ActiveProcessorCount` |
 | Poznámka | viewport a offline renderery mají oddělené resolution matice; interní optimalizace rendererů zůstávají zapnuté a CSV obsahuje i per-case runtime metadata |
 | Export benchmark zdroj | `8` předpřipravených PHONG frameů na daném rozlišení |
@@ -227,22 +227,22 @@ Krátká orientace:
 | Těžká scéna / málo světel | 9 | 2 | 21 228 |
 | Těžká scéna / více světel | 9 | 10 | 21 228 |
 
-### Referenční headless benchmark rendererů: `static-steady` workload v `full` režimu
+### Referenční headless benchmark rendererů: `static-steady` workload v `quick` režimu
 
-| Renderer | Family | Core profil | Počet case | First-frame geo median [ms] | Steady-frame geo median [ms] | Worst steady median [ms] |
-| --- | --- | --- | ---: | ---: | ---: | ---: |
-| Raster / PHONG | Viewport | Scaled CPU (70%) | 12 | 9.98 | 4.36 | 12.43 |
-| Hex Mosaic | Viewport | Scaled CPU (70%) | 12 | 44.32 | 7.90 | 28.51 |
-| Temporal Noise | Viewport | Scaled CPU (70%) | 12 | 67.24 | 8.72 | 28.99 |
-| Dithering | Viewport | Scaled CPU (70%) | 12 | 25.45 | 16.33 | 57.99 |
-| Ray Tracing | Offline | Scaled CPU (70%) | 16 | 71.96 | 36.00 | 561.02 |
-| Path Tracing | Offline | Scaled CPU (70%) | 16 | 183.33 | 129.00 | 2687.38 |
-| Raster / PHONG | Viewport | Single core | 12 | 14.76 | 9.82 | 63.85 |
-| Temporal Noise | Viewport | Single core | 12 | 67.13 | 11.64 | 42.61 |
-| Hex Mosaic | Viewport | Single core | 12 | 48.16 | 14.00 | 81.52 |
-| Dithering | Viewport | Single core | 12 | 35.47 | 23.93 | 120.07 |
-| Ray Tracing | Offline | Single core | 16 | 153.44 | 107.55 | 2689.46 |
-| Path Tracing | Offline | Single core | 16 | 711.32 | 625.35 | 18375.13 |
+| Renderer | Core profil | Počet case | First-frame geo median [ms] | Steady-frame geo median [ms] | Worst steady median [ms] |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Temporal Noise | Scaled CPU (70%) | 8 | 26.51 | 4.56 | 7.45 |
+| Raster / PHONG | Scaled CPU (70%) | 8 | 12.26 | 5.14 | 6.71 |
+| Hex Mosaic | Scaled CPU (70%) | 8 | 22.79 | 5.45 | 7.65 |
+| Dithering | Scaled CPU (70%) | 8 | 17.43 | 9.46 | 14.21 |
+| Ray Tracing | Scaled CPU (70%) | 8 | 36.85 | 12.89 | 25.37 |
+| Path Tracing | Scaled CPU (70%) | 8 | 74.04 | 39.13 | 103.01 |
+| Raster / PHONG | Single core | 8 | 7.79 | 5.30 | 10.99 |
+| Temporal Noise | Single core | 8 | 27.20 | 5.69 | 8.51 |
+| Hex Mosaic | Single core | 8 | 22.74 | 7.26 | 13.05 |
+| Dithering | Single core | 8 | 21.80 | 13.25 | 28.21 |
+| Ray Tracing | Single core | 8 | 55.66 | 30.53 | 113.33 |
+| Path Tracing | Single core | 8 | 156.44 | 121.40 | 545.68 |
 
 ### Dynamic viewport audit pro reálnější závěr
 
@@ -250,56 +250,62 @@ Krátká orientace:
 
 | Renderer | Core profil | Scéna | Rozlišení | Static steady [ms] | Dynamic steady [ms] | Slowdown | Static first [ms] | Dynamic first [ms] |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Raster / PHONG | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 12.43 | 12.57 | 1.01x | 18.73 | 16.92 |
-| Hex Mosaic | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 28.51 | 28.99 | 1.02x | 171.64 | 169.22 |
-| Dithering | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 57.99 | 58.05 | 1.00x | 72.69 | 71.95 |
-| Temporal Noise | Scaled CPU (70%) | Těžká scéna / více světel | 1920x1080 | 27.65 | 216.17 | 7.82x | 293.02 | 260.82 |
-| Raster / PHONG | Single core | Těžká scéna / více světel | 1920x1080 | 63.85 | 61.70 | 0.97x | 67.04 | 58.59 |
-| Hex Mosaic | Single core | Těžká scéna / více světel | 1920x1080 | 81.52 | 78.01 | 0.96x | 204.52 | 203.13 |
-| Dithering | Single core | Těžká scéna / více světel | 1920x1080 | 120.07 | 115.71 | 0.96x | 126.23 | 119.26 |
-| Temporal Noise | Single core | Těžká scéna / více světel | 1920x1080 | 42.48 | 242.75 | 5.71x | 308.77 | 280.54 |
+| Raster / PHONG | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 6.31 | 6.54 | 1.04x | 28.61 | 26.32 |
+| Hex Mosaic | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 7.65 | 6.66 | 0.87x | 48.79 | 51.56 |
+| Dithering | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 13.79 | 14.41 | 1.04x | 28.94 | 32.84 |
+| Temporal Noise | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 7.05 | 27.82 | 3.94x | 47.40 | 45.32 |
+| Raster / PHONG | Single core | Těžká scéna / více světel | 640x360 | 10.99 | 11.48 | 1.04x | 13.85 | 15.63 |
+| Hex Mosaic | Single core | Těžká scéna / více světel | 640x360 | 13.00 | 14.74 | 1.13x | 39.24 | 40.67 |
+| Dithering | Single core | Těžká scéna / více světel | 640x360 | 28.21 | 25.14 | 0.89x | 38.29 | 33.01 |
+| Temporal Noise | Single core | Těžká scéna / více světel | 640x360 | 8.51 | 35.91 | 4.22x | 47.41 | 55.88 |
 
-Poměry kolem `0.9x až 1.1x` mimo `Temporal Noise` nečti jako „pohyb kamerou pomáhá“. To je běžný rozptyl delšího CPU benchmarku. Důležitá informace je, že tyto rendery zůstávají zhruba ve stejné třídě náročnosti, zatímco `Temporal Noise` se v dynamice propadá výrazně nahoru.
+Poměry kolem `0.9x až 1.1x` mimo `Temporal Noise` nečti jako „pohyb kamerou pomáhá“. To je běžný rozptyl CPU benchmarku. Důležitá informace je, že tyto rendery zůstávají zhruba ve stejné třídě náročnosti, zatímco `Temporal Noise` se v dynamice propadá výrazně nahoru.
 
-### Stress case na maximálním rozlišení (`static-steady`, `heavy-many`)
+### Stress case na maximálním rozlišení daného `quick` režimu (`static-steady`, `heavy-many`)
 
-| Renderer | Core profil | First median [ms] | Steady median [ms] | Steady p90 [ms] |
-| --- | --- | ---: | ---: | ---: |
-| Raster / PHONG | Scaled CPU (70%) | 18.73 | 12.43 | 13.45 |
-| Temporal Noise | Scaled CPU (70%) | 293.02 | 27.65 | 29.87 |
-| Hex Mosaic | Scaled CPU (70%) | 171.64 | 28.51 | 31.04 |
-| Dithering | Scaled CPU (70%) | 72.69 | 57.99 | 58.81 |
-| Path Tracing | Scaled CPU (70%) | 2865.78 | 2687.38 | 2860.27 |
-| Ray Tracing | Scaled CPU (70%) | 574.12 | 561.02 | 588.91 |
+| Renderer | Core profil | Scéna | Rozlišení | First median [ms] | Steady median [ms] | Steady p90 [ms] |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Dithering | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 28.94 | 13.79 | 14.82 |
+| Hex Mosaic | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 48.79 | 7.65 | 10.68 |
+| Path Tracing | Scaled CPU (70%) | Těžká scéna / více světel | 320x180 | 174.20 | 103.01 | 104.64 |
+| Raster / PHONG | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 28.61 | 6.31 | 8.08 |
+| Ray Tracing | Scaled CPU (70%) | Těžká scéna / více světel | 320x180 | 81.10 | 25.37 | 25.69 |
+| Temporal Noise | Scaled CPU (70%) | Těžká scéna / více světel | 640x360 | 47.40 | 7.05 | 8.66 |
+| Dithering | Single core | Těžká scéna / více světel | 640x360 | 38.29 | 28.21 | 31.83 |
+| Hex Mosaic | Single core | Těžká scéna / více světel | 640x360 | 39.24 | 13.00 | 14.80 |
+| Path Tracing | Single core | Těžká scéna / více světel | 320x180 | 601.03 | 545.68 | 545.78 |
+| Raster / PHONG | Single core | Těžká scéna / více světel | 640x360 | 13.85 | 10.99 | 12.18 |
+| Ray Tracing | Single core | Těžká scéna / více světel | 320x180 | 172.41 | 113.33 | 113.60 |
+| Temporal Noise | Single core | Těžká scéna / více světel | 640x360 | 47.41 | 8.51 | 10.21 |
 
 ### Graf 1: Viewport `static-steady` škálování podle rozlišení
 
-`full` mode, `Scaled CPU (70%)`, průměr steady median přes všechny 4 benchmark scénáře v `static-steady` workloadu.
+`quick` mode, `Scaled CPU (70%)`, průměr steady median přes všechny 4 benchmark scénáře v `static-steady` workloadu.
 
 ```mermaid
 xychart-beta
   title "Viewport static-steady median podle rozlišení"
-  x-axis ["320x180", "640x360", "1920x1080"]
-  y-axis "Median [ms]" 0 --> 70
-  line "Raster / PHONG" [3.82, 3.69, 7.93]
-  line "Temporal Noise" [4.52, 6.19, 26.45]
-  line "Hex Mosaic" [4.41, 5.24, 24.27]
-  line "Dithering" [8.03, 11.84, 51.09]
+  x-axis ["320x180", "640x360"]
+  y-axis "Median [ms]" 0 --> 25
+  line "Raster / PHONG" [5.01, 5.68]
+  line "Temporal Noise" [4.25, 5.60]
+  line "Hex Mosaic" [5.38, 5.98]
+  line "Dithering" [7.92, 12.22]
 ```
 
-Graf ukazuje statický steady-state baseline viewport family. `Raster / PHONG` zůstává referenční minimum, `Temporal Noise` a `Hex Mosaic` se lámají hlavně ve fullHD a `Dithering` je nejcitlivější na růst počtu pixelů.
+Graf ukazuje statický steady-state baseline viewport family v rychlém kontrolním režimu. `Raster / PHONG` zůstává referenční minimum a `Dithering` je i v quick snapshotu nejcitlivější viewport režim z této skupiny.
 
 ### Graf 2: Offline `static-steady` škálování podle rozlišení
 
-`full` mode, `Scaled CPU (70%)`, průměr steady median přes všechny 4 benchmark scénáře.
+`quick` mode, `Scaled CPU (70%)`, průměr steady median přes všechny 4 benchmark scénáře.
 
 ```mermaid
 xychart-beta
   title "Offline static-steady median podle rozlišení"
-  x-axis ["160x90", "320x180", "640x360", "1920x1080"]
-  y-axis "Median [ms]" 0 --> 1700
-  line "Path Tracing" [35.11, 56.10, 172.56, 1508.33]
-  line "Ray Tracing" [9.36, 13.13, 37.10, 424.58]
+  x-axis ["160x90", "320x180"]
+  y-axis "Median [ms]" 0 --> 130
+  line "Path Tracing" [37.09, 58.95]
+  line "Ray Tracing" [10.89, 17.03]
 ```
 
 Je zde vidět násobení s počtem pixelů i odlišný charakter obou offline rendererů v aktuální konfiguraci benchmarku. V tomto měření vychází `Path Tracing` výrazně náročněji než `Ray Tracing`.
@@ -312,35 +318,35 @@ Je zde vidět násobení s počtem pixelů i odlišný charakter obou offline re
 xychart-beta
   title "First-frame vs. steady-frame v nejtěžším static stress case"
   x-axis ["Raster", "Temporal", "Hex", "Dither", "Path", "Ray"]
-  y-axis "Median [ms]" 0 --> 3000
-  line "First-frame" [18.73, 293.02, 171.64, 72.69, 2865.78, 574.12]
-  line "Steady-frame" [12.43, 27.65, 28.51, 57.99, 2687.38, 561.02]
+  y-axis "Median [ms]" 0 --> 180
+  line "First-frame" [28.61, 47.40, 48.79, 28.94, 174.20, 81.10]
+  line "Steady-frame" [6.31, 7.05, 7.65, 13.79, 103.01, 25.37]
 ```
 
 Tenhle graf je důležitý hlavně pro interpretaci `Temporal Noise` a `Hex Mosaic`: první snímek je výrazně dražší než ustálený běh, protože se budují pomocné mapy a analýza. U offline rendererů je rozdíl mezi first a steady menší, protože dominantní cena je samotný tracing.
 
 ### Graf 4: Static vs. dynamic steady-frame audit
 
-`heavy-many`, `1920x1080`, `Scaled CPU (70%)`, jen viewport family.
+`heavy-many`, `640x360`, `Scaled CPU (70%)`, jen viewport family.
 
 ```mermaid
 xychart-beta
   title "Static vs. dynamic steady-frame audit"
   x-axis ["Raster", "Temporal", "Hex", "Dither"]
-  y-axis "Median [ms]" 0 --> 280
-  line "Static steady" [12.43, 27.65, 28.51, 57.99]
-  line "Dynamic steady" [12.57, 216.17, 28.99, 58.05]
+  y-axis "Median [ms]" 0 --> 50
+  line "Static steady" [6.31, 7.05, 7.65, 13.79]
+  line "Dynamic steady" [6.54, 27.82, 6.66, 14.41]
 ```
 
-Tenhle graf je klíčový pro reálný závěr. Ve statickém workloadu vypadá `Temporal Noise` velmi dobře, ale jakmile benchmark mezi framy hýbe kamerou a aktualizuje scénu, steady cost vyskočí výrazně nahoru. Ostatní viewport renderery zůstávají přibližně tam, kde byly.
+Tenhle graf je klíčový pro reálný závěr. Ve statickém workloadu vypadá `Temporal Noise` velmi dobře, ale jakmile benchmark mezi framy hýbe kamerou a aktualizuje scénu, steady cost vyskočí výrazně nahoru. Ostatní viewport renderery zůstávají v quick snapshotu přibližně tam, kde byly.
 
 ### Co z benchmarku jde reálně vyvozovat
 
 - `Raster / PHONG` je referenční rychlý viewport baseline. Jedna klasická raster pipeline bez dodatečné full-screen syntézy se v datech chová přesně tak, jak odpovídá jeho složitosti.
-- `Temporal Noise` má dva legitimní režimy chování. Ve `static-steady` workloadu padá nízko díky reuse analýzy, ale `dynamic-sequence` ukazuje, že pro pohyb kamerou to není levný renderer; ve fullHD heavy-many roste steady median na `216.17 ms` (`Scaled CPU`) a `242.75 ms` (`Single core`).
+- `Temporal Noise` má dva legitimní režimy chování. Ve `static-steady` workloadu padá nízko díky reuse analýzy, ale `dynamic-sequence` ukazuje, že pro pohyb kamerou to není levný renderer; v quick heavy-many auditu roste steady median na `27.82 ms` (`Scaled CPU`) a `35.91 ms` (`Single core`).
 - `Hex Mosaic` a `Dithering` jsou záměrně měřené se zapnutými interními passy. Benchmark tedy neporovnává „stejný shader ve stejné pipeline“, ale reálné defaultní workloady těch rendererů.
-- `Ray Tracing` a `Path Tracing` jsou uváděné odděleně od viewport family. Jejich absolutní časy jsou ovlivněné BVH, shadow rays, přímým světlem a `1 SPP` nastavením; porovnání má smysl hlavně uvnitř offline family.
-- V aktuálním `full` snapshotu je `Ray Tracing` levnější než `Path Tracing`, zejména ve vyšších rozlišeních.
+- `Ray Tracing` a `Path Tracing` jsou uváděné odděleně od viewport family. Jejich absolutní časy jsou ovlivněné BVH, shadow rays, přímým světlem a výchozím viewport cadence (`Ray = 4 samples/frame`, `Path = 1 sample/frame`); porovnání má smysl hlavně uvnitř offline family.
+- V aktuálním `quick` snapshotu je `Ray Tracing` levnější než `Path Tracing`.
 - `Scaled CPU (70%)` je záměrně kompromisní profil pro reálné desktop použití. Benchmark tak netlačí počítač na plných `100 %` všech jader a výsledky jsou bližší tomu, co dává smysl pro editorový provoz.
 - To pořád není laboratorní benchmark. Není tu affinity pinning, multi-machine cross-check ani thermal governance. Na závěr v rámci tohoto repa to ale už stačí: statický baseline, dynamický audit i per-case runtime metadata jsou transparentní a reprodukovatelné.
 
@@ -361,7 +367,7 @@ Použité symboly:
 | Temporal Noise | first-frame přibližně `O(Raster_unlit + P + neighborhood analysis)`, steady ve statické scéně blíž k `O(Raster_unlit + P)`, v dynamice zase blíž k first-frame cost | statická kamera ho zvýhodní, dynamická sekvence odhalí skutečnou cenu re-analýzy |
 | Hex Mosaic | `O(Raster + P + C)` | base raster + per-pixel akumulace do buněk + compose; roste víc s pixely než čistý raster |
 | Ray Tracing | first-frame přibližně `O(T log T + P * D * (BVH + L * shadowBVH))`, steady bez rebuildů hlavně `O(P * D * (BVH + L * shadowBVH))` | světla a shadow rays bolí víc než samotný růst geometrie |
-| Path Tracing | `O(T log T + P * E[D] * (BVH + L * shadowBVH))` | stejný řád jako ray tracer; v aktuálním full benchmarku vychází náročněji |
+| Path Tracing | `O(T log T + P * E[D] * (BVH + L * shadowBVH))` | stejný řád jako ray tracer; v aktuálním quick benchmarku vychází náročněji |
 
 Tyhle tvary nejsou formální důkaz přesné complexity každého řádku kódu; jsou to zjednodušené dominantní modely, které odpovídají tomu, co renderery v téhle codebase skutečně dělají a co benchmark naměřil.
 
@@ -371,11 +377,11 @@ Tato tabulka měří čistě zápis formátu nad připravenými snímky. Nejde t
 
 | Formát | 640x360 median [ms] | 640x360 velikost | 1280x720 median [ms] | 1280x720 velikost | 1920x1080 median [ms] | 1920x1080 velikost |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PNG still | 19.25 | 0.02 MB | 45.33 | 0.08 MB | 61.85 | 0.20 MB |
-| JPG still | 16.32 | 0.01 MB | 23.06 | 0.02 MB | 34.75 | 0.04 MB |
-| PNG sequence | 77.30 | 0.12 MB | 220.01 | 0.62 MB | 466.52 | 1.64 MB |
-| GIF | 206.09 | 0.31 MB | 724.14 | 0.91 MB | 1610.70 | 1.87 MB |
-| AVI MJPEG | 56.12 | 0.06 MB | 152.85 | 0.18 MB | 288.72 | 0.35 MB |
+| PNG still | 22.88 | 0.02 MB | 39.25 | 0.08 MB | 103.60 | 0.20 MB |
+| JPG still | 20.44 | 0.01 MB | 24.83 | 0.02 MB | 51.77 | 0.04 MB |
+| PNG sequence | 93.09 | 0.12 MB | 291.42 | 0.62 MB | 681.77 | 1.64 MB |
+| GIF | 265.64 | 0.31 MB | 914.21 | 0.91 MB | 1970.45 | 1.87 MB |
+| AVI MJPEG | 71.75 | 0.06 MB | 210.33 | 0.18 MB | 398.29 | 0.35 MB |
 
 > Benchmark tabulka je určená jako reprodukovatelný referenční údaj pro tento repozitář, ne jako absolutní srovnání s jinými enginy. Smysl tabulek je ukázat relativní náklad rendererů v rámci stejné codebase, stejného runneru a transparentně popsaných workloadů.
 
@@ -471,6 +477,12 @@ flowchart LR
 | Hex Mosaic | velikost buňky, kvantizace, outline, wow strength, theme, edge aware, škálování vzdáleností, debug buněk |
 | Ray Tracing | vzorky / snímek, tile size, diffuse/glossy/transmission/volume/transparent depth, přímé světlo, stíny, odrazy, denoise |
 | Path Tracing | vzorky / snímek, tile size, diffuse/glossy/transmission/volume/transparent depth, přímé světlo, obloha, denoise |
+
+Výchozí cadence viewportu je `Ray Tracing = 4 samples/frame` a `Path Tracing = 1 sample/frame`. `PgDown` / `PgUp` pořád mění aktivní renderer v rozsahu `1..64`.
+
+Karta `Render` v pravém panelu se přestavuje podle aktivního rendereru. Nezůstává tedy ve stavu „bez dalších voleb“ po přepnutí režimu: Wireframe, Dither/ASCII, Temporal Noise, Hex, Ray Tracing i Path Tracing mají vlastní sadu ovladačů a sdílené globální volby zůstávají oddělené.
+
+Adaptivní internal render scale ovlivňuje pouze vykreslený obraz scény. Editorové vrstvy, které musí zůstat čitelné, se kreslí do samostatné full-resolution overlay vrstvy: ground grid, selection outline, světla, force ikony, output rámeček, camera wire a transform gizmo se nedownscalují spolu s ray/path preview.
 
 ### Dither / ASCII
 
@@ -1395,8 +1407,9 @@ flowchart TD
 | Toolbar | rychlé render módy, navigace, runtime přepínače |
 | Viewport | hlavní pracovní plocha |
 | Properties panel | scéna, prostředí, zobrazení, objekt, render, výstup |
-| Bottom dock | časová osa a materiálový workspace |
+| Bottom dock | výchozí časová osa a přepínatelný materiálový workspace |
 | Materiálový workspace | preview, graph, inspector, summary |
+| Editor overlay | full-resolution mřížka, výběr, světla, force ikony, output frame a gizmo mimo downscaled render buffer |
 
 ### Pravý panel
 
@@ -1408,6 +1421,10 @@ Pravý panel obsahuje karty:
 - `Object`
 - `Render`
 - `Output`
+
+`Render` karta je mode-aware: po přepnutí render režimu se obnoví bez restartu panelu a ukazuje přesně volby aktivního rendereru. `Object` karta drží operace dostupné i pro světla a force fieldy, zatímco číselné transformace zůstávají navázané na entity, kde dávají smysl.
+
+Spodní dock startuje v režimu časové osy. Klávesové zkratky časové osy fungují i ve chvíli, kdy má focus přímo timeline panel, takže ovládání animace není závislé jen na viewport canvasu.
 
 ## Ovládání a zkratky
 
@@ -1552,7 +1569,15 @@ Primární build a test workflow nepoužívá Maven ani Gradle. Repo ale obsahuj
 
 ```powershell
 .\build.ps1
-.\build.ps1 -Run
+.\build.ps1 -Run -Profile balanced
+```
+
+`build.ps1` podporuje profily `safe`, `balanced` a `fast`. Profil `balanced` odpovídá běžnému spuštění přes VS Code/PowerShell: zachová normální UI běh, ale používá šetrnější JIT nastavení pro problematické tracing hotpathy. Po buildu lze editor spustit i přímo s aplikačními argumenty:
+
+```powershell
+java -cp .\build\classes Main --fullscreen
+java -cp .\build\classes Main --internal-render=960x540
+java -cp .\build\classes Main --package-smoke
 ```
 
 ### Windows offline installer
@@ -1591,14 +1616,14 @@ Během buildu se zároveň ověří:
 ### Reprodukce README statistik a benchmarků
 
 ```powershell
-.\tests\run-project-metrics.ps1 -BenchmarkMode full
+.\tests\run-project-metrics.ps1 -BenchmarkMode quick
 ```
 
 ```bash
-./tests/run-project-metrics.sh full
+./tests/run-project-metrics.sh quick
 ```
 
-Build skripty kompilují projekt do lokální ignorované složky `build/`. Test runner kompiluje hlavní zdrojáky a testy odděleně, takže nezávisí na starých `out/` nebo `out_tests/` artefaktech. `BenchmarkMode` podporuje `quick`, `standard` a `full`; README benchmark tabulky jsou vygenerované z `full`.
+Build skripty kompilují projekt do lokální ignorované složky `build/`. Test runner kompiluje hlavní zdrojáky a testy odděleně, takže nezávisí na starých `out/` nebo `out_tests/` artefaktech. `BenchmarkMode` podporuje `quick`, `standard` a `full`; README benchmark tabulky jsou vygenerované z `quick`, aby šly rychle ověřit i před release buildem. Pro hlubší výkonovou zprávu spusť `standard` nebo `full`.
 
 ## Struktura repozitáře
 

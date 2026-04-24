@@ -93,6 +93,9 @@ final class EditorShortcutRouter implements KeyEventDispatcher {
             EngineTimelineController.setCurrentFrame(engine, engine.timelineStartFrame);
             return true;
         }
+        if (context == EditorFocusContext.TIMELINE && handleTimelineShortcut(engine, actionId)) {
+            return true;
+        }
         if (EditorActionId.DELETE.equals(actionId)
                 && (context == EditorFocusContext.VIEWPORT
                 || context == EditorFocusContext.OUTLINER
@@ -104,6 +107,38 @@ final class EditorShortcutRouter implements KeyEventDispatcher {
                 || context == EditorFocusContext.OUTLINER
                 || context == EditorFocusContext.GENERIC_EDITOR)) {
             return frameCurrentSelection(engine);
+        }
+        return false;
+    }
+
+    private static boolean handleTimelineShortcut(Engine engine, String actionId) {
+        if (EditorActionId.TIMELINE_PLAY_PAUSE.equals(actionId)) {
+            engine.toggleAnimationPlayback();
+            return true;
+        }
+        if (EditorActionId.TIMELINE_PREVIOUS_FRAME.equals(actionId)) {
+            engine.stepTimelineFrame(-1);
+            return true;
+        }
+        if (EditorActionId.TIMELINE_NEXT_FRAME.equals(actionId)) {
+            engine.stepTimelineFrame(1);
+            return true;
+        }
+        if (EditorActionId.TIMELINE_ADD_KEY.equals(actionId)) {
+            engine.addTimelineKeyForSelection();
+            return true;
+        }
+        if (EditorActionId.TIMELINE_REMOVE_KEY.equals(actionId)) {
+            engine.removeTimelineKeyForSelection();
+            return true;
+        }
+        if (EditorActionId.TIMELINE_ADD_ALL_KEYS.equals(actionId)) {
+            EngineTimelineController.addKeyForAllAnimatables(engine);
+            return true;
+        }
+        if (EditorActionId.TIMELINE_ADD_RELEASE_KEY.equals(actionId)) {
+            engine.addTimelineReleaseKeyForSelection();
+            return true;
         }
         return false;
     }

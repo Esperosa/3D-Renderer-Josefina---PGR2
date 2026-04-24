@@ -36,6 +36,8 @@ import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBuffer;
+import java.awt.image.DataBufferInt;
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -148,6 +150,7 @@ public class Window {
     private int width;
     private int height;
     private BufferedImage backBuffer;
+    private BufferedImage overlayBackBuffer;
     private final Cursor defaultCursor;
     private final Cursor hiddenCursor;
     private final Font overlayFont;
@@ -453,6 +456,21 @@ public class Window {
     }
 
     public void blit(int[] pixels, int srcWidth, int srcHeight, boolean drawViewportChrome) {
+        blit(pixels, srcWidth, srcHeight, drawViewportChrome, null, 0, 0);
+    }
+
+    public void blit(int[] pixels, int srcWidth, int srcHeight, int[] overlayPixels, int overlayWidth, int overlayHeight) {
+        blit(pixels, srcWidth, srcHeight, true, overlayPixels, overlayWidth, overlayHeight);
+    }
+
+    private void blit(
+            int[] pixels,
+            int srcWidth,
+            int srcHeight,
+            boolean drawViewportChrome,
+            int[] overlayPixels,
+            int overlayWidth,
+            int overlayHeight) {
         if (srcWidth <= 0 || srcHeight <= 0) {
             return;
         }
@@ -472,7 +490,23 @@ public class Window {
         RuntimeInstrumentation.addCounter(
                 RuntimeInstrumentation.Counter.BYTES_COPIED,
                 Math.max(0L, (long) srcWidth * (long) srcHeight * 4L));
-        backBuffer.setRGB(0, 0, srcWidth, srcHeight, pixels, 0, srcWidth);
+        copyPixelsToImage(backBuffer, pixels, srcWidth * srcHeight);
+        boolean hasOverlay = drawViewportChrome
+                && overlayPixels != null
+                && overlayWidth > 0
+                && overlayHeight > 0
+                && overlayPixels.length >= overlayWidth * overlayHeight;
+        if (hasOverlay) {
+            if (overlayBackBuffer == null
+                    || overlayBackBuffer.getWidth() != overlayWidth
+                    || overlayBackBuffer.getHeight() != overlayHeight) {
+                overlayBackBuffer = new BufferedImage(overlayWidth, overlayHeight, BufferedImage.TYPE_INT_ARGB);
+            }
+            RuntimeInstrumentation.addCounter(
+                    RuntimeInstrumentation.Counter.BYTES_COPIED,
+                    Math.max(0L, (long) overlayWidth * (long) overlayHeight * 4L));
+            copyPixelsToImage(overlayBackBuffer, overlayPixels, overlayWidth * overlayHeight);
+        }
 
         BufferStrategy strategy = ensureBufferStrategy();
         if (strategy == null) {
@@ -496,6 +530,10 @@ public class Window {
                     g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
                 }
                 g2.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
+                if (hasOverlay) {
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                    g2.drawImage(overlayBackBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
+                }
                 long hudStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.HUD_UI);
                 if (drawViewportChrome && cursorCaptured) {
                     drawCrosshair(g2, canvas.getWidth(), canvas.getHeight());
@@ -541,6 +579,21 @@ public class Window {
             return canvas.getBufferStrategy();
         } catch (IllegalStateException ex) {
             return null;
+        }
+    }
+
+    private static void copyPixelsToImage(BufferedImage image, int[] pixels, int pixelCount) {
+        if (image == null || pixels == null || pixelCount <= 0) {
+            return;
+        }
+        DataBuffer dataBuffer = image.getRaster().getDataBuffer();
+        if (dataBuffer instanceof DataBufferInt) {
+            int[] dst = ((DataBufferInt) dataBuffer).getData();
+            System.arraycopy(pixels, 0, dst, 0, Math.min(Math.min(pixelCount, pixels.length), dst.length));
+        } else {
+            int width = image.getWidth();
+            int height = image.getHeight();
+            image.setRGB(0, 0, width, height, pixels, 0, width);
         }
     }
 
@@ -606,6 +659,7 @@ public class Window {
         width = Math.max(1, w);
         height = Math.max(1, h);
         backBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        overlayBackBuffer = null;
         canvas.setPreferredSize(new Dimension(width, height));
         frame.pack();
         syncResponsiveLayout();

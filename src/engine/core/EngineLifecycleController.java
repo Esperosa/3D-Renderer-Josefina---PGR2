@@ -438,15 +438,21 @@ final class EngineLifecycleController {
                 RuntimeInstrumentation.recordMode(engine.activeMode, viewportRenderMode);
                 EngineRenderRuntime.synchronizeDisplayedPreviewLayerPolicy(engine, viewportRenderMode);
                 boolean renderModeSwitchFadePhase = isRenderModeSwitchFadePhase(engine, System.nanoTime());
+                FrameBuffer viewportOverlayFrameBuffer = prepareViewportOverlayFrameBuffer(engine);
+                FrameBuffer selectionOverlayTarget = viewportOverlayFrameBuffer != null
+                        ? viewportOverlayFrameBuffer
+                        : engine.frameBuffer;
+                boolean selectionOverlayEnabled = shouldDrawSelectionOverlay(engine, viewportRenderMode, selectionOverlayTarget);
+                boolean viewportOverlayDrawn = false;
                 if (!renderModeSwitchFadePhase) {
                     try {
                         long selectionPrepassStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.SELECTION_PREPASS);
-                        if (engine.selectedEntity != null && engine.activeMode != RenderMode.TEMPORAL_NOISE) {
+                        if (selectionOverlayEnabled) {
                             SelectionOverlayUtil.computeSelectionCoveragePass(
                                     engine.selectedEntity,
                                     engine.camera,
-                                    engine.frameBuffer.getWidth(),
-                                    engine.frameBuffer.getHeight()
+                                    selectionOverlayTarget.getWidth(),
+                                    selectionOverlayTarget.getHeight()
                             );
                         }
                         RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.SELECTION_PREPASS, selectionPrepassStage);
@@ -475,10 +481,19 @@ final class EngineLifecycleController {
                         if (engine.waterRenderEnabled) {
                             WaterParticleRenderer.render(engine.waterSimulation, engine.camera, engine.frameBuffer);
                         }
-                        if (engine.selectedEntity != null && engine.activeMode != RenderMode.TEMPORAL_NOISE) {
-                            SelectionOverlayUtil.drawCachedSelectionOutline(engine.frameBuffer);
+                        if (viewportOverlayFrameBuffer != null) {
+                            viewportOverlayFrameBuffer.clear(0x00000000, 1.0f);
+                            if (selectionOverlayEnabled) {
+                                SelectionOverlayUtil.drawCachedSelectionOutline(viewportOverlayFrameBuffer);
+                            }
+                            EngineViewportOverlay.drawEditorDebugOverlays(engine, viewportOverlayFrameBuffer);
+                            viewportOverlayDrawn = true;
+                        } else {
+                            if (selectionOverlayEnabled) {
+                                SelectionOverlayUtil.drawCachedSelectionOutline(engine.frameBuffer);
+                            }
+                            EngineViewportOverlay.drawEditorDebugOverlays(engine, engine.frameBuffer);
                         }
-                        EngineViewportOverlay.drawEditorDebugOverlays(engine, engine.frameBuffer);
                         RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.OVERLAYS, overlayStage);
                     } catch (Throwable renderFailure) {
                         System.out.println("Render failure in mode " + engine.activeMode + ": " + renderFailure.getMessage());
@@ -508,10 +523,20 @@ final class EngineLifecycleController {
                 RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.HUD_UI, hudStage);
                 updateRenderModeSwitchOverlay(engine, System.nanoTime());
                 long blitStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.BLIT_PRESENT);
-                renderWindow.blit(
-                        engine.frameBuffer.getColorBuffer(),
-                        engine.frameBuffer.getWidth(),
-                        engine.frameBuffer.getHeight());
+                if (viewportOverlayDrawn && viewportOverlayFrameBuffer != null) {
+                    renderWindow.blit(
+                            engine.frameBuffer.getColorBuffer(),
+                            engine.frameBuffer.getWidth(),
+                            engine.frameBuffer.getHeight(),
+                            viewportOverlayFrameBuffer.getColorBuffer(),
+                            viewportOverlayFrameBuffer.getWidth(),
+                            viewportOverlayFrameBuffer.getHeight());
+                } else {
+                    renderWindow.blit(
+                            engine.frameBuffer.getColorBuffer(),
+                            engine.frameBuffer.getWidth(),
+                            engine.frameBuffer.getHeight());
+                }
                 RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.BLIT_PRESENT, blitStage);
                 if (engine.startupFirstPresentedFrameNanos == 0L) {
                     engine.startupFirstPresentedFrameNanos = System.nanoTime();
@@ -633,6 +658,57 @@ final class EngineLifecycleController {
         shutdown(engine);
     }
 
+    private static FrameBuffer prepareViewportOverlayFrameBuffer(Engine engine) {
+        if (engine == null || engine.window == null || engine.window.getCanvas() == null) {
+            if (engine != null) {
+                engine.viewportOverlayFrameBuffer = null;
+            }
+            return null;
+        }
+        int width = Math.max(1, engine.window.getCanvas().getWidth());
+        int height = Math.max(1, engine.window.getCanvas().getHeight());
+        if (width <= 0 || height <= 0) {
+            engine.viewportOverlayFrameBuffer = null;
+            return null;
+        }
+        if (engine.viewportOverlayFrameBuffer == null) {
+            engine.viewportOverlayFrameBuffer = new FrameBuffer(width, height);
+        } else if (engine.viewportOverlayFrameBuffer.getWidth() != width
+                || engine.viewportOverlayFrameBuffer.getHeight() != height) {
+            engine.viewportOverlayFrameBuffer.resize(width, height);
+        }
+        return engine.viewportOverlayFrameBuffer;
+    }
+
+    private static boolean shouldDrawSelectionOverlay(Engine engine, RenderMode viewportRenderMode, FrameBuffer target) {
+        if (engine == null
+                || engine.selectedEntity == null
+                || engine.selectedEntity.getMesh() == null
+                || engine.camera == null
+                || target == null
+                || engine.activeMode == RenderMode.TEMPORAL_NOISE) {
+            return false;
+        }
+        boolean activeTransform = engine.transformMode != Engine.TransformMode.NONE
+                || engine.gizmoDragActive
+                || engine.draggingSelectedObject;
+        if (activeTransform) {
+            return true;
+        }
+        boolean movingViewport = engine.viewportCameraMotionActive
+                || engine.viewportSceneMotionActive
+                || engine.viewportMotionLatchedActive
+                || engine.viewportNavigationPreviewActive;
+        if (!movingViewport) {
+            return true;
+        }
+        long overlayPixels = Math.max(1L, (long) target.getWidth() * (long) target.getHeight());
+        int[] indices = engine.selectedEntity.getMesh().getIndices();
+        int triangleCount = indices == null ? 0 : indices.length / 3;
+        boolean heavyMode = viewportRenderMode == RenderMode.RAY_TRACING || viewportRenderMode == RenderMode.PATH_TRACING;
+        return !heavyMode && overlayPixels < 1_200_000L && triangleCount < 12_000;
+    }
+
     static void setRenderMode(Engine engine, RenderMode mode) {
         if (engine == null || mode == null) {
             return;
@@ -672,6 +748,9 @@ final class EngineLifecycleController {
         }
         System.out.println("Render mode: " + engine.activeMode);
         engine.refreshUiIndicators();
+        if (engine.window != null) {
+            EngineViewportRenderTabBuilder.build(engine);
+        }
     }
 
     private static String formatRenderModeLabel(RenderMode mode) {

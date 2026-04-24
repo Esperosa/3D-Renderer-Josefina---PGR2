@@ -25,6 +25,7 @@ final class EngineObjectInspectorController {
         }
         Engine.SceneItemRef outlinerRef = EngineSceneInspector.selectedOutlinerRef(engine);
         if (engine.selectedEntity == null) {
+            boolean operationsVisible = engine.selectedLight != null || engine.selectedForceField != null;
             if (engine.selectedLight != null) {
                 engine.objectHeaderLabel.setText("Světlo · " + engine.getLightName(engine.selectedLight));
             } else if (engine.selectedForceField != null) {
@@ -34,11 +35,11 @@ final class EngineObjectInspectorController {
             } else {
                 engine.objectHeaderLabel.setText("Bez výběru");
             }
-            setItemSectionVisibility(engine, false);
+            setItemSectionVisibility(engine, false, operationsVisible);
             styleTransformFields(engine, false, false);
             return;
         }
-        setItemSectionVisibility(engine, true);
+        setItemSectionVisibility(engine, true, true);
 
         boolean hasExactTransformKey = engine.sceneTimeline != null
                 && engine.sceneTimeline.hasEntityKey(engine.selectedEntity, engine.timelineCurrentFrame);
@@ -142,12 +143,16 @@ final class EngineObjectInspectorController {
         styleField(engine.scaleZField, keyed, releaseKey);
     }
 
-    private static void setItemSectionVisibility(Engine engine, boolean entitySelected) {
+    private static void setItemSectionVisibility(Engine engine, boolean transformVisible, boolean operationsVisible) {
         if (engine.itemTransformSection != null) {
-            engine.itemTransformSection.setVisible(entitySelected);
+            engine.itemTransformSection.setVisible(transformVisible);
         }
         if (engine.itemOperationsSection != null) {
-            engine.itemOperationsSection.setVisible(entitySelected);
+            engine.itemOperationsSection.setVisible(operationsVisible);
+        }
+        if (engine.itemTransformSection != null && engine.itemTransformSection.getParent() != null) {
+            engine.itemTransformSection.getParent().revalidate();
+            engine.itemTransformSection.getParent().repaint();
         }
     }
 

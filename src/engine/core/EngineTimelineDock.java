@@ -113,7 +113,7 @@ final class EngineTimelineDock {
         engine.timelineDockStatusLabel.setForeground(UiTheme.ACCENT);
         statusPanel.add(engine.timelineDockStatusLabel);
         statusPanel.add(Box.createHorizontalGlue());
-        JLabel hint = new JLabel("Posuv: klik nebo tah | Home: začátek | Insert: klíč | Shift+Insert: smazat");
+        JLabel hint = new JLabel("Posuv: klik/tah | Space: play | ←/→: snímek | Insert/K: klíč | Shift+K: release");
         hint.setForeground(UiTheme.TEXT_MUTED);
         statusPanel.add(hint);
 
@@ -191,9 +191,12 @@ final class EngineTimelineDock {
             setPreferredSize(new Dimension(200, 40));
             setMinimumSize(new Dimension(100, 34));
             setOpaque(false);
+            setFocusable(true);
+            EditorFocusContext.mark(this, EditorFocusContext.TIMELINE);
             MouseAdapter mouse = new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
+                    requestFocusInWindow();
                     dragging = true;
                     scrubTo(e.getX());
                 }

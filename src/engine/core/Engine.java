@@ -151,6 +151,7 @@ public class Engine {
     boolean axisSnapRestoreOrthographicProjection;
     CameraController cameraController;
     FrameBuffer frameBuffer;
+    FrameBuffer viewportOverlayFrameBuffer;
     Input input;
     EditorShortcutRouter editorShortcutRouter;
     PhysicsWorld physicsWorld;

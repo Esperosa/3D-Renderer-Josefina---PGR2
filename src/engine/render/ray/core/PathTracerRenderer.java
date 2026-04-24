@@ -506,6 +506,12 @@ public class PathTracerRenderer implements Renderer {
 
         if (denoiseEnabled) {
             applyDenoiseAndResolve(outColor, invSamples, temporalBlendScale, runFullDenoise, frameTemporalMask);
+        } else {
+            int count = Math.min(outColor.length, accumR.length);
+            for (int i = 0; i < count; i++) {
+                writeResolvedPixel(outColor, i);
+            }
+            invalidateTemporalHistory();
         }
 
         if (autoHardwareScheduling) {

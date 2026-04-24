@@ -790,7 +790,10 @@ final class EngineRenderRuntime {
         if (engine == null) {
             return;
         }
-        boolean motionActive = engine.viewportCameraMotionActive || engine.viewportSceneMotionActive;
+        boolean motionActive = interactionActive
+                || engine.viewportMotionLatchedActive
+                || engine.viewportCameraMotionActive
+                || engine.viewportSceneMotionActive;
         boolean motionEntryBoostActive = motionActive && now > 0L && now < engine.viewportMotionEntryBoostUntilNanos;
         if (engine.rayTracerRenderer != null) {
             boolean movingRay = activeMode == RenderMode.RAY_TRACING && motionActive;
@@ -825,6 +828,9 @@ final class EngineRenderRuntime {
             boolean pathCritical = movingPath && criticalFallbackActive;
             boolean pathEmergencyByTier = movingPath && movingTier >= 5;
             boolean pathUltraEmergencyByTier = movingPath && movingTier >= 6;
+            boolean pathHugeViewportEmergency = movingPath
+                    && movingTier >= 6
+                    && currentBaseViewportMegaPixels(engine) >= HEAVY_HUGE_VIEWPORT_MP;
             boolean pathEmergency = movingPath && (pathEmergencyByTier
                     || engine.viewportFrameDropStreak >= 2
                     || engine.viewportHeavyPredictedFrameMs >= VIEWPORT_SOFT_FLOOR_MS * 1.13);
@@ -841,7 +847,7 @@ final class EngineRenderRuntime {
             String pathDenoiseRuntimeMode = pathCritical
                     ? "TILED"
                     : (pathGentleRecovery ? "FULL_FRAME" : (movingPath ? "AUTO" : "FULL_FRAME"));
-            boolean pathDenoiseEnabled = !pathCritical;
+            boolean pathDenoiseEnabled = !pathCritical && !pathHugeViewportEmergency;
             double pathInteractiveTargetMs = (pathCritical || pathEmergency) ? 15.0 : VIEWPORT_TARGET_MS_PATH_INTERACTIVE;
             engine.pathTracerRenderer.setParameter("autohardware", true);
             engine.pathTracerRenderer.setParameter("autoworkers", true);
@@ -1879,44 +1885,50 @@ final class EngineRenderRuntime {
             return 0;
         }
         double safeMs = Math.max(1.0, instantMotionMs);
+        double targetFps = engine == null
+                ? MAX_VIEWPORT_TARGET_FPS
+                : clamp(engine.viewportTargetFps, MIN_VIEWPORT_TARGET_FPS, MAX_VIEWPORT_TARGET_FPS);
+        double targetMs = 1000.0 / targetFps;
+        double normalizedMs = safeMs * ((1000.0 / MAX_VIEWPORT_TARGET_FPS) / Math.max(1e-6, targetMs));
         int floorTier;
         if (activeMode == RenderMode.RAY_TRACING) {
-            if (safeMs >= 150.0) {
+            if (normalizedMs >= 150.0) {
                 floorTier = 11;
-            } else if (safeMs >= 120.0) {
+            } else if (normalizedMs >= 120.0) {
                 floorTier = 10;
-            } else if (safeMs >= 92.0) {
+            } else if (normalizedMs >= 92.0) {
                 floorTier = 9;
-            } else if (safeMs >= 70.0) {
+            } else if (normalizedMs >= 70.0) {
                 floorTier = 8;
-            } else if (safeMs >= 54.0) {
+            } else if (normalizedMs >= 54.0) {
                 floorTier = 7;
-            } else if (safeMs >= 44.0) {
+            } else if (normalizedMs >= 44.0) {
                 floorTier = 6;
-            } else if (safeMs >= 36.0) {
+            } else if (normalizedMs >= 36.0) {
                 floorTier = 5;
             } else {
                 floorTier = 3;
             }
         } else {
-            if (safeMs >= 165.0) {
+            if (normalizedMs >= 165.0) {
                 floorTier = 11;
-            } else if (safeMs >= 135.0) {
+            } else if (normalizedMs >= 135.0) {
                 floorTier = 10;
-            } else if (safeMs >= 108.0) {
+            } else if (normalizedMs >= 108.0) {
                 floorTier = 9;
-            } else if (safeMs >= 82.0) {
+            } else if (normalizedMs >= 82.0) {
                 floorTier = 8;
-            } else if (safeMs >= 62.0) {
+            } else if (normalizedMs >= 62.0) {
                 floorTier = 7;
-            } else if (safeMs >= 48.0) {
+            } else if (normalizedMs >= 48.0) {
                 floorTier = 6;
-            } else if (safeMs >= 38.0) {
+            } else if (normalizedMs >= 38.0) {
                 floorTier = 5;
             } else {
                 floorTier = 3;
             }
         }
+        floorTier = Math.max(floorTier, resolveRatioMotionFloorTier(activeMode, safeMs, targetMs, currentBaseViewportMegaPixels(engine), motionEntryBoostActive));
         if (motionEntryBoostActive) {
             floorTier = Math.max(
                     floorTier,
@@ -1926,11 +1938,51 @@ final class EngineRenderRuntime {
             if (engine.viewportFrameDropStreak >= 1) {
                 floorTier++;
             }
-            if (currentViewportMegaPixels(engine) >= HEAVY_LARGE_VIEWPORT_MP) {
+            double baseViewportMegaPixels = currentBaseViewportMegaPixels(engine);
+            if (baseViewportMegaPixels >= HEAVY_HUGE_VIEWPORT_MP) {
+                floorTier += activeMode == RenderMode.PATH_TRACING ? 2 : 1;
+            } else if (baseViewportMegaPixels >= HEAVY_LARGE_VIEWPORT_MP) {
                 floorTier++;
             }
         }
         return clampDynamicResolutionTierIndex(floorTier);
+    }
+
+    private static int resolveRatioMotionFloorTier(
+            RenderMode activeMode,
+            double measuredMs,
+            double targetMs,
+            double viewportMegaPixels,
+            boolean motionEntryBoostActive) {
+        if (!isHeavyViewportMode(activeMode) || measuredMs <= 0.0 || targetMs <= 0.0) {
+            return 0;
+        }
+        double overload = measuredMs / Math.max(1e-6, targetMs);
+        if (!Double.isFinite(overload) || overload <= 1.02) {
+            return activeMode == RenderMode.RAY_TRACING ? 2 : 1;
+        }
+        double safety = activeMode == RenderMode.RAY_TRACING ? 0.80 : 0.86;
+        if (motionEntryBoostActive) {
+            safety *= activeMode == RenderMode.RAY_TRACING ? 0.86 : 0.90;
+        }
+        if (viewportMegaPixels >= HEAVY_HUGE_VIEWPORT_MP) {
+            safety *= 0.86;
+        } else if (viewportMegaPixels >= HEAVY_LARGE_VIEWPORT_MP) {
+            safety *= 0.92;
+        }
+        double targetScale = Math.sqrt(1.0 / overload) * safety;
+        targetScale = clamp(targetScale, HEAVY_MOTION_MIN_DYNAMIC_SCALE, 1.0);
+        return firstDynamicResolutionTierAtOrBelow(targetScale);
+    }
+
+    private static int firstDynamicResolutionTierAtOrBelow(double scale) {
+        double safeScale = clamp(scale, HEAVY_MOTION_MIN_DYNAMIC_SCALE, 1.0);
+        for (int i = 0; i < DYNAMIC_RESOLUTION_TIERS.length; i++) {
+            if (DYNAMIC_RESOLUTION_TIERS[i] <= safeScale + 1e-9) {
+                return i;
+            }
+        }
+        return DYNAMIC_RESOLUTION_MAX_INDEX;
     }
 
     private static int resolveHeavyIdleWarmupFloorTier(Engine engine, RenderMode activeMode, int samples) {
@@ -1970,6 +2022,18 @@ final class EngineRenderRuntime {
         int height = Math.max(0, engine.frameBuffer.getHeight());
         if (width <= 0 || height <= 0) {
             return 0.0;
+        }
+        return ((long) width * (long) height) / 1_000_000.0;
+    }
+
+    private static double currentBaseViewportMegaPixels(Engine engine) {
+        if (engine == null) {
+            return 0.0;
+        }
+        int width = Math.max(0, engine.baseWidth);
+        int height = Math.max(0, engine.baseHeight);
+        if (width <= 0 || height <= 0) {
+            return currentViewportMegaPixels(engine);
         }
         return ((long) width * (long) height) / 1_000_000.0;
     }

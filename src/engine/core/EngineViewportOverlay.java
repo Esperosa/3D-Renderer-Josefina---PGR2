@@ -21,6 +21,20 @@ final class EngineViewportOverlay {
     private static int cachedSceneObjectCount = 0;
     private static long cachedSceneTriangleCount = 0L;
     private static long cachedSceneVertexCount = 0L;
+    private static final double GRID_DEPTH_BIAS = 0.0035;
+    private static final double GRID_MAX_ALPHA_MOTION_MULTIPLIER = 0.45;
+    private static final int GRID_SEGMENTS_PER_LINE = 36;
+    private static final int GRID_MIN_HALF_LINES = 8;
+    private static final int GRID_MAX_HALF_LINES = 22;
+    private static final int GRID_USABLE_DEPTH_SAMPLES_X = 8;
+    private static final int GRID_USABLE_DEPTH_SAMPLES_Y = 6;
+
+    private static final class GridPoint {
+        int x;
+        int y;
+        double depth;
+        boolean valid;
+    }
 
     private EngineViewportOverlay() {
     }
@@ -74,6 +88,7 @@ final class EngineViewportOverlay {
         }
         drawOutputCameraWireOverlay(engine, fb);
         if (engine.editorOverlayEnabled) {
+            drawEditorGroundGrid(engine, fb);
             drawSceneItemWireIcons(engine, fb);
             if (engine.selectionSupportsTransform()
                     && engine.navigationPreset == Engine.NavigationPreset.BLENDER
@@ -135,10 +150,11 @@ final class EngineViewportOverlay {
     }
 
     static Engine.SceneItemRef pickOutputCameraWireUnderMouse(Engine engine, int mouseX, int mouseY) {
+        FrameBuffer viewportFb = overlayInteractionFrameBuffer(engine);
         if (engine == null
                 || engine.outputCameraEntity == null
                 || engine.camera == null
-                || engine.frameBuffer == null) {
+                || viewportFb == null) {
             return null;
         }
         if (engine.navigationPreset != Engine.NavigationPreset.BLENDER) {
@@ -153,8 +169,8 @@ final class EngineViewportOverlay {
 
         int fx = canvasToFramebufferX(engine, mouseX);
         int fy = canvasToFramebufferY(engine, mouseY);
-        int w = engine.frameBuffer.getWidth();
-        int h = engine.frameBuffer.getHeight();
+        int w = viewportFb.getWidth();
+        int h = viewportFb.getHeight();
         Mat4 vp = engine.camera.getProjectionMatrix().multiply(engine.camera.getViewMatrix());
 
         Vec3[] local = outputCameraWireLocal();
@@ -230,10 +246,18 @@ final class EngineViewportOverlay {
         int x1 = x0 + frameW - 1;
         int y1 = y0 + frameH - 1;
 
-        OverlayDrawUtil.darkenRegion(pixels, w, h, 0, 0, w, y0, 0.52);
-        OverlayDrawUtil.darkenRegion(pixels, w, h, 0, y1 + 1, w, h, 0.52);
-        OverlayDrawUtil.darkenRegion(pixels, w, h, 0, y0, x0, y1 + 1, 0.52);
-        OverlayDrawUtil.darkenRegion(pixels, w, h, x1 + 1, y0, w, y1 + 1, 0.52);
+        if (isViewportOverlayBuffer(engine, fb)) {
+            int dimOverlay = 0x85000000;
+            OverlayDrawUtil.fillRegion(pixels, w, h, 0, 0, w, y0, dimOverlay);
+            OverlayDrawUtil.fillRegion(pixels, w, h, 0, y1 + 1, w, h, dimOverlay);
+            OverlayDrawUtil.fillRegion(pixels, w, h, 0, y0, x0, y1 + 1, dimOverlay);
+            OverlayDrawUtil.fillRegion(pixels, w, h, x1 + 1, y0, w, y1 + 1, dimOverlay);
+        } else {
+            OverlayDrawUtil.darkenRegion(pixels, w, h, 0, 0, w, y0, 0.52);
+            OverlayDrawUtil.darkenRegion(pixels, w, h, 0, y1 + 1, w, h, 0.52);
+            OverlayDrawUtil.darkenRegion(pixels, w, h, 0, y0, x0, y1 + 1, 0.52);
+            OverlayDrawUtil.darkenRegion(pixels, w, h, x1 + 1, y0, w, y1 + 1, 0.52);
+        }
         OverlayDrawUtil.drawDashedRect(pixels, w, h, x0, y0, x1, y1, 0xFF68C9FF, 0xFFFFA84E, 8, 4);
     }
 
@@ -252,6 +276,247 @@ final class EngineViewportOverlay {
                 camRight.x, camRight.y, camRight.z,
                 camUp.x, camUp.y, camUp.z,
                 camForward.x, camForward.y, camForward.z);
+    }
+
+    private static void drawEditorGroundGrid(Engine engine, FrameBuffer fb) {
+        if (engine == null || fb == null || engine.camera == null) {
+            return;
+        }
+        FrameBuffer depthSource = engine.frameBuffer;
+        if (!hasUsableDepthBuffer(depthSource)) {
+            return;
+        }
+        int w = fb.getWidth();
+        int h = fb.getHeight();
+        int[] pixels = fb.getColorBuffer();
+        if (w <= 1 || h <= 1 || pixels == null) {
+            return;
+        }
+
+        double floorY = engine.floorEntity != null
+                ? engine.floorEntity.getTransform().getPosition().y + 0.006
+                : 0.0;
+        Vec3 cam = engine.camera.getPosition();
+        double spacing = resolveGridSpacing(cam, floorY);
+        int halfLines = resolveGridHalfLines(spacing);
+        double originX = Math.floor(cam.x / spacing) * spacing;
+        double originZ = Math.floor(cam.z / spacing) * spacing;
+        double span = halfLines * spacing;
+        Mat4 vp = engine.camera.getProjectionMatrix().multiply(engine.camera.getViewMatrix());
+        boolean overlayTarget = isViewportOverlayBuffer(engine, fb);
+        double alphaMultiplier = gridAlphaMultiplier(engine);
+
+        for (int i = -halfLines; i <= halfLines; i++) {
+            double x = originX + i * spacing;
+            double z = originZ + i * spacing;
+            boolean majorX = isMajorGridLine(x, spacing);
+            boolean majorZ = isMajorGridLine(z, spacing);
+            drawProjectedGridLineDepthTested(
+                    pixels, w, h, depthSource, vp, overlayTarget,
+                    new Vec3(x, floorY, originZ - span),
+                    new Vec3(x, floorY, originZ + span),
+                    adjustAlpha(majorX ? 0x64A8C7E7 : 0x2A7D92AA, alphaMultiplier));
+            drawProjectedGridLineDepthTested(
+                    pixels, w, h, depthSource, vp, overlayTarget,
+                    new Vec3(originX - span, floorY, z),
+                    new Vec3(originX + span, floorY, z),
+                    adjustAlpha(majorZ ? 0x64A8C7E7 : 0x2A7D92AA, alphaMultiplier));
+        }
+    }
+
+    private static void drawProjectedGridLineDepthTested(
+            int[] pixels,
+            int w,
+            int h,
+            FrameBuffer depthSource,
+            Mat4 vp,
+            boolean overlayTarget,
+            Vec3 a,
+            Vec3 b,
+            int color) {
+        GridPoint previous = null;
+        for (int i = 0; i <= GRID_SEGMENTS_PER_LINE; i++) {
+            double t = i / (double) GRID_SEGMENTS_PER_LINE;
+            Vec3 world = new Vec3(
+                    a.x + (b.x - a.x) * t,
+                    a.y + (b.y - a.y) * t,
+                    a.z + (b.z - a.z) * t);
+            GridPoint current = projectGridPoint(world, vp, w, h);
+            if (previous != null && previous.valid && current.valid) {
+                drawDepthTestedScreenLine(pixels, w, h, depthSource, previous, current, color, overlayTarget);
+            }
+            previous = current;
+        }
+    }
+
+    private static GridPoint projectGridPoint(Vec3 world, Mat4 vp, int width, int height) {
+        GridPoint point = new GridPoint();
+        int[] out = new int[2];
+        double[] depth = new double[1];
+        if (!projectWorldPointWithDepth(world, vp, width, height, out, depth)) {
+            return point;
+        }
+        point.x = out[0];
+        point.y = out[1];
+        point.depth = depth[0];
+        point.valid = Double.isFinite(point.depth);
+        return point;
+    }
+
+    private static void drawDepthTestedScreenLine(
+            int[] pixels,
+            int w,
+            int h,
+            FrameBuffer depthSource,
+            GridPoint a,
+            GridPoint b,
+            int color,
+            boolean overlayTarget) {
+        int dx = b.x - a.x;
+        int dy = b.y - a.y;
+        int steps = Math.max(Math.abs(dx), Math.abs(dy));
+        if (steps <= 0) {
+            plotGridPixel(pixels, w, h, depthSource, a.x, a.y, a.depth, color, overlayTarget);
+            return;
+        }
+        double invSteps = 1.0 / steps;
+        for (int i = 0; i <= steps; i++) {
+            double t = i * invSteps;
+            int x = (int) Math.round(a.x + dx * t);
+            int y = (int) Math.round(a.y + dy * t);
+            double depth = a.depth + (b.depth - a.depth) * t;
+            plotGridPixel(pixels, w, h, depthSource, x, y, depth, color, overlayTarget);
+        }
+    }
+
+    private static void plotGridPixel(
+            int[] pixels,
+            int w,
+            int h,
+            FrameBuffer depthSource,
+            int x,
+            int y,
+            double gridDepth,
+            int color,
+            boolean overlayTarget) {
+        if (x < 0 || y < 0 || x >= w || y >= h || !Double.isFinite(gridDepth)) {
+            return;
+        }
+        if (!gridDepthVisible(depthSource, x, y, w, h, gridDepth)) {
+            return;
+        }
+        int idx = y * w + x;
+        if (overlayTarget) {
+            pixels[idx] = color;
+        } else {
+            double alpha = ((color >>> 24) & 0xFF) / 255.0;
+            pixels[idx] = OverlayDrawUtil.blendToColor(pixels[idx], color, alpha);
+        }
+    }
+
+    private static boolean gridDepthVisible(
+            FrameBuffer depthSource,
+            int overlayX,
+            int overlayY,
+            int overlayWidth,
+            int overlayHeight,
+            double gridDepth) {
+        if (depthSource == null || depthSource.getDepthBuffer() == null) {
+            return false;
+        }
+        int depthWidth = depthSource.getWidth();
+        int depthHeight = depthSource.getHeight();
+        if (depthWidth <= 0 || depthHeight <= 0) {
+            return false;
+        }
+        int sx = scaleIndex(overlayX, overlayWidth, depthWidth);
+        int sy = scaleIndex(overlayY, overlayHeight, depthHeight);
+        float sceneDepth = depthSource.getDepth(sx, sy);
+        if (!Float.isFinite(sceneDepth) || sceneDepth >= 0.9995f) {
+            return false;
+        }
+        return gridDepth <= sceneDepth + GRID_DEPTH_BIAS;
+    }
+
+    private static int scaleIndex(int value, int sourceSize, int targetSize) {
+        if (targetSize <= 1 || sourceSize <= 1) {
+            return 0;
+        }
+        double t = value / (double) (sourceSize - 1);
+        int scaled = (int) Math.round(t * (targetSize - 1));
+        return Math.max(0, Math.min(targetSize - 1, scaled));
+    }
+
+    private static boolean hasUsableDepthBuffer(FrameBuffer fb) {
+        if (fb == null || fb.getDepthBuffer() == null || fb.getWidth() <= 0 || fb.getHeight() <= 0) {
+            return false;
+        }
+        int w = fb.getWidth();
+        int h = fb.getHeight();
+        for (int sy = 0; sy < GRID_USABLE_DEPTH_SAMPLES_Y; sy++) {
+            int y = GRID_USABLE_DEPTH_SAMPLES_Y <= 1
+                    ? h / 2
+                    : (int) Math.round(sy * (h - 1) / (double) (GRID_USABLE_DEPTH_SAMPLES_Y - 1));
+            for (int sx = 0; sx < GRID_USABLE_DEPTH_SAMPLES_X; sx++) {
+                int x = GRID_USABLE_DEPTH_SAMPLES_X <= 1
+                        ? w / 2
+                        : (int) Math.round(sx * (w - 1) / (double) (GRID_USABLE_DEPTH_SAMPLES_X - 1));
+                float depth = fb.getDepth(x, y);
+                if (Float.isFinite(depth) && depth < 0.9995f) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static double resolveGridSpacing(Vec3 cameraPosition, double floorY) {
+        if (cameraPosition == null) {
+            return 1.0;
+        }
+        double height = Math.max(0.0, Math.abs(cameraPosition.y - floorY));
+        double raw = Math.max(1.0, height * 0.16);
+        if (raw <= 1.5) {
+            return 1.0;
+        }
+        if (raw <= 3.5) {
+            return 2.0;
+        }
+        if (raw <= 7.5) {
+            return 5.0;
+        }
+        return 10.0;
+    }
+
+    private static int resolveGridHalfLines(double spacing) {
+        double safeSpacing = Math.max(1.0, spacing);
+        return Math.max(GRID_MIN_HALF_LINES, Math.min(GRID_MAX_HALF_LINES, (int) Math.round(22.0 / safeSpacing)));
+    }
+
+    private static boolean isMajorGridLine(double coordinate, double spacing) {
+        double majorSpacing = Math.max(5.0, spacing * 5.0);
+        double normalized = coordinate / majorSpacing;
+        return Math.abs(normalized - Math.rint(normalized)) < 1e-4;
+    }
+
+    private static double gridAlphaMultiplier(Engine engine) {
+        if (engine == null) {
+            return 1.0;
+        }
+        boolean motion = engine.viewportCameraMotionActive
+                || engine.viewportSceneMotionActive
+                || engine.viewportMotionLatchedActive
+                || engine.viewportNavigationPreviewActive;
+        if (!motion) {
+            return 1.0;
+        }
+        return GRID_MAX_ALPHA_MOTION_MULTIPLIER;
+    }
+
+    private static int adjustAlpha(int color, double multiplier) {
+        int alpha = (color >>> 24) & 0xFF;
+        int next = (int) Math.round(alpha * Math.max(0.0, Math.min(1.0, multiplier)));
+        return (color & 0x00FFFFFF) | (Math.max(0, Math.min(255, next)) << 24);
     }
 
     static void drawSceneItemWireIcons(Engine engine, FrameBuffer fb) {
@@ -424,13 +689,14 @@ final class EngineViewportOverlay {
     }
 
     static Engine.SceneItemRef pickOverlayItemUnderMouse(Engine engine, int mouseX, int mouseY) {
-        if (engine.frameBuffer == null || engine.camera == null || engine.scene == null) {
+        FrameBuffer viewportFb = overlayInteractionFrameBuffer(engine);
+        if (viewportFb == null || engine.camera == null || engine.scene == null) {
             return null;
         }
         int fx = canvasToFramebufferX(engine, mouseX);
         int fy = canvasToFramebufferY(engine, mouseY);
-        int w = engine.frameBuffer.getWidth();
-        int h = engine.frameBuffer.getHeight();
+        int w = viewportFb.getWidth();
+        int h = viewportFb.getHeight();
         Mat4 vp = engine.camera.getProjectionMatrix().multiply(engine.camera.getViewMatrix());
         double iconPixelScale = overlayPixelScaleFromCanvas(engine, w, h);
         int pickPadding = Math.max(2, scaledPixels(iconPixelScale, 4));
@@ -603,15 +869,16 @@ final class EngineViewportOverlay {
     }
 
     static boolean tryActivateGizmoHandleAtCanvas(Engine engine, int mouseX, int mouseY) {
+        FrameBuffer viewportFb = overlayInteractionFrameBuffer(engine);
         if (engine.navigationPreset != Engine.NavigationPreset.BLENDER
                 || !engine.selectionSupportsTransform()
-                || engine.frameBuffer == null) {
+                || viewportFb == null) {
             return false;
         }
         double gizmoPixelScale = overlayPixelScaleFromCanvas(
-            engine, engine.frameBuffer.getWidth(), engine.frameBuffer.getHeight());
+            engine, viewportFb.getWidth(), viewportFb.getHeight());
         Engine.GizmoScreenData gizmo = computeGizmoScreenData(
-            engine, engine.frameBuffer.getWidth(), engine.frameBuffer.getHeight(), gizmoPixelScale);
+            engine, viewportFb.getWidth(), viewportFb.getHeight(), gizmoPixelScale);
         if (gizmo == null || !gizmo.valid || gizmo.axes == null) {
             return false;
         }
@@ -681,11 +948,12 @@ final class EngineViewportOverlay {
     }
 
     static int canvasToFramebufferX(Engine engine, int canvasX) {
-        if (engine.window == null || engine.frameBuffer == null) {
+        FrameBuffer viewportFb = overlayInteractionFrameBuffer(engine);
+        if (engine.window == null || viewportFb == null) {
             return canvasX;
         }
         int cw = Math.max(1, engine.window.getCanvas().getWidth());
-        int fw = Math.max(1, engine.frameBuffer.getWidth());
+        int fw = Math.max(1, viewportFb.getWidth());
         double t = cw > 1 ? (double) canvasX / (double) (cw - 1) : 0.0;
         int x = (int) Math.round(t * (fw - 1));
         if (x < 0) {
@@ -695,11 +963,12 @@ final class EngineViewportOverlay {
     }
 
     static int canvasToFramebufferY(Engine engine, int canvasY) {
-        if (engine.window == null || engine.frameBuffer == null) {
+        FrameBuffer viewportFb = overlayInteractionFrameBuffer(engine);
+        if (engine.window == null || viewportFb == null) {
             return canvasY;
         }
         int ch = Math.max(1, engine.window.getCanvas().getHeight());
-        int fh = Math.max(1, engine.frameBuffer.getHeight());
+        int fh = Math.max(1, viewportFb.getHeight());
         double t = ch > 1 ? (double) canvasY / (double) (ch - 1) : 0.0;
         int y = (int) Math.round(t * (fh - 1));
         if (y < 0) {
@@ -730,6 +999,20 @@ final class EngineViewportOverlay {
             return (int) Math.max(1, Math.round(Math.max(1.0, pixels)));
         }
         return (int) Math.max(1, Math.round(Math.max(1.0, pixels * scale)));
+    }
+
+    private static FrameBuffer overlayInteractionFrameBuffer(Engine engine) {
+        if (engine == null) {
+            return null;
+        }
+        if (engine.viewportOverlayFrameBuffer != null) {
+            return engine.viewportOverlayFrameBuffer;
+        }
+        return engine.frameBuffer;
+    }
+
+    private static boolean isViewportOverlayBuffer(Engine engine, FrameBuffer fb) {
+        return engine != null && fb != null && fb == engine.viewportOverlayFrameBuffer;
     }
 
     static int distanceSq(int x0, int y0, int x1, int y1) {

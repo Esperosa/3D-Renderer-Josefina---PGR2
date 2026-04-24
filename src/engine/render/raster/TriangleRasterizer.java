@@ -42,6 +42,7 @@ public class TriangleRasterizer {
         int height = fb.getHeight();
         int[] colorBuffer = fb.getColorBuffer();
         float[] depthBuffer = fb.getDepthBuffer();
+        int pixelLimit = Math.min(colorBuffer.length, depthBuffer.length);
         boolean gBufferEnabled = fb.isGBufferEnabled();
         int[] objectIdBuffer = gBufferEnabled ? fb.getObjectIdBuffer() : null;
         int[] faceIdBuffer = gBufferEnabled ? fb.getFaceIdBuffer() : null;
@@ -103,6 +104,9 @@ public class TriangleRasterizer {
                     continue;
                 }
                 int idx = y * width + x;
+                if (idx < 0 || idx >= pixelLimit) {
+                    continue;
+                }
                 if (depth >= depthBuffer[idx]) {
                     if (sample) {
                         depthNs += (System.nanoTime() - depthStart) * sampleScale;
@@ -167,6 +171,16 @@ public class TriangleRasterizer {
                 colorBuffer[idx] = argb;
 
                 if (gBufferEnabled) {
+                    if (objectIdBuffer == null
+                            || faceIdBuffer == null
+                            || normalBuffer == null
+                            || worldPosBuffer == null
+                            || idx >= objectIdBuffer.length
+                            || idx >= faceIdBuffer.length
+                            || idx * 3 + 2 >= normalBuffer.length
+                            || idx * 3 + 2 >= worldPosBuffer.length) {
+                        continue;
+                    }
                     int objectId = -1;
                     int faceId = -1;
                     if (attrCount > 14) {

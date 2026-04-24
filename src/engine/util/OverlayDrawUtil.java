@@ -25,6 +25,22 @@ public final class OverlayDrawUtil {
         }
     }
 
+    public static void fillRegion(int[] pixels, int w, int h, int x0, int y0, int x1, int y1, int argb) {
+        int ax0 = Math.max(0, x0);
+        int ay0 = Math.max(0, y0);
+        int ax1 = Math.min(w, x1);
+        int ay1 = Math.min(h, y1);
+        if (ax0 >= ax1 || ay0 >= ay1) {
+            return;
+        }
+        for (int y = ay0; y < ay1; y++) {
+            int row = y * w;
+            for (int x = ax0; x < ax1; x++) {
+                pixels[row + x] = argb;
+            }
+        }
+    }
+
     public static void drawDashedRect(
             int[] pixels,
             int w,

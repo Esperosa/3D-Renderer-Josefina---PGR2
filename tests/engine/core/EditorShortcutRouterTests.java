@@ -31,6 +31,7 @@ public final class EditorShortcutRouterTests {
         testTextFieldDeleteDoesNotLeakIntoEditorActions();
         testEscapeCancelsTransientSceneGesture();
         testTimelineHomeResetsCurrentFrame();
+        testTimelinePanelShortcutsControlPlaybackScrubAndKeys();
         System.out.println("EditorShortcutRouterTests: ALL TESTS PASSED");
         System.exit(0);
     }
@@ -205,6 +206,38 @@ public final class EditorShortcutRouterTests {
 
         assertTrue(route(engine, timeline, KeyEvent.VK_HOME, 0), "Home v timeline musí být zpracováno");
         assertEquals(10, engine.timelineCurrentFrame, "Home v timeline musí skočit na začátek rozsahu");
+    }
+
+    private static void testTimelinePanelShortcutsControlPlaybackScrubAndKeys() {
+        Engine engine = createEngine();
+        Entity entity = addEntity(engine, "TimelineEntity");
+        engine.setCurrentEntitySelection(entity);
+        engine.timelineStartFrame = 1;
+        engine.timelineEndFrame = 10;
+        engine.timelineCurrentFrame = 4;
+
+        JPanel timeline = new JPanel();
+        EditorFocusContext.mark(timeline, EditorFocusContext.TIMELINE);
+
+        boolean playbackBefore = engine.animationPlaybackEnabled;
+        assertTrue(route(engine, timeline, KeyEvent.VK_SPACE, 0), "Space v timeline musí přepnout playback");
+        assertEquals(!playbackBefore, engine.animationPlaybackEnabled, "Space musí přepnout přehrávání animace");
+        assertTrue(route(engine, timeline, KeyEvent.VK_RIGHT, 0), "Šipka doprava v timeline musí projít");
+        assertEquals(5, engine.timelineCurrentFrame, "Šipka doprava musí posunout o snímek vpřed");
+        assertTrue(route(engine, timeline, KeyEvent.VK_LEFT, 0), "Šipka doleva v timeline musí projít");
+        assertEquals(4, engine.timelineCurrentFrame, "Šipka doleva musí posunout o snímek zpět");
+
+        assertTrue(route(engine, timeline, KeyEvent.VK_INSERT, 0), "Insert v timeline musí vložit klíč");
+        assertTrue(engine.sceneTimeline.hasEntityKey(entity, engine.timelineCurrentFrame),
+                "Insert musí vložit klíč aktuálního výběru");
+        assertTrue(route(engine, timeline, KeyEvent.VK_INSERT, InputEvent.SHIFT_DOWN_MASK),
+                "Shift+Insert v timeline musí smazat klíč");
+        assertFalse(engine.sceneTimeline.hasEntityKey(entity, engine.timelineCurrentFrame),
+                "Shift+Insert musí smazat klíč aktuálního výběru");
+        assertTrue(route(engine, timeline, KeyEvent.VK_K, InputEvent.SHIFT_DOWN_MASK),
+                "Shift+K v timeline musí vložit release klíč");
+        assertTrue(engine.sceneTimeline.hasEntityReleaseKey(entity, engine.timelineCurrentFrame),
+                "Shift+K musí vložit release klíč aktuálního výběru");
     }
 
     private static boolean route(Engine engine, Component focusOwner, int keyCode, int modifiers) {

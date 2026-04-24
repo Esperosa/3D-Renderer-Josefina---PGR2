@@ -258,11 +258,12 @@ final class EngineScenePanels {
         engine.itemTransformSection.add(Box.createRigidArea(new Dimension(0, UiTheme.SPACE_3)));
         engine.itemTransformSection.add(engine.actionButton(UiStrings.Object.APPLY_TRANSFORM, engine::applyObjectInspectorValues));
 
-        engine.itemOperationsSection = engine.addCollapsibleSection(itemTab, UiStrings.Object.OPERATIONS, false);
+        engine.itemOperationsSection = engine.addCollapsibleSection(itemTab, UiStrings.Object.OPERATIONS, true);
         engine.itemOperationsSection.add(engine.actionButton(UiStrings.Object.FOCUS_SELECTION_ACTION, () -> {
-            if (engine.selectedEntity != null) {
-                engine.cameraController.frameTarget(engine.selectedEntity.getTransform().getPosition());
-                engine.camera.lookAt(engine.selectedEntity.getTransform().getPosition());
+            Vec3 pivot = EngineViewportOverlay.selectionPivotPosition(engine);
+            if (pivot != null && engine.cameraController != null && engine.camera != null) {
+                engine.cameraController.frameTarget(pivot);
+                engine.camera.lookAt(pivot);
             }
         }));
         engine.itemOperationsSection.add(Box.createRigidArea(new Dimension(0, 4)));
