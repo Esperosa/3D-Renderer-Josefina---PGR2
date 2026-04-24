@@ -2,7 +2,6 @@ package engine.render.ray.core;
 
 
 
-import engine.render.ray.bvh.*;
 final class PathTracerTransport {
     private final PathTracerRenderer owner;
 

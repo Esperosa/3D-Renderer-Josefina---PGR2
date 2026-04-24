@@ -91,7 +91,6 @@ public class Window {
     private static final Color TAB_BORDER = UiTheme.BORDER_SUBTLE;
     private static final Color ICON_FG = UiTheme.ACCENT;
     private static final Color OVERLAY_FG = UiTheme.ACCENT;
-    private static final Color OVERLAY_SHADOW = new Color(0, 0, 0);
     private static final int AXIS_WIDGET_BOX_SIZE = 146;
     private static final int AXIS_WIDGET_MARGIN = 28;
     private static final int AXIS_WIDGET_ANCHOR_X = 96;
@@ -1117,6 +1116,10 @@ public class Window {
 
     private AxisWidgetBasis resolveAxisWidgetBasis() {
         Vec3 right = new Vec3(worldAxisRightX, worldAxisRightY, worldAxisRightZ).normalize();
+        Vec3 suppliedUp = new Vec3(worldAxisUpX, worldAxisUpY, worldAxisUpZ).normalize();
+        if (suppliedUp.lengthSquared() < 1e-8) {
+            suppliedUp = new Vec3(0.0, 1.0, 0.0);
+        }
         Vec3 viewDirection = new Vec3(-worldAxisForwardX, -worldAxisForwardY, -worldAxisForwardZ).normalize();
         if (viewDirection.lengthSquared() < 1e-8) {
             viewDirection = new Vec3(0.0, 0.0, 1.0);
@@ -1124,13 +1127,21 @@ public class Window {
 
         right = right.sub(viewDirection.mul(right.dot(viewDirection))).normalize();
         if (right.lengthSquared() < 1e-8) {
-            right = viewDirection.cross(Vec3.UP).normalize();
+            right = suppliedUp.cross(viewDirection).normalize();
             if (right.lengthSquared() < 1e-8) {
                 right = new Vec3(1.0, 0.0, 0.0);
             }
         }
 
-        Vec3 up = viewDirection.cross(right).normalize();
+        Vec3 up = suppliedUp.sub(viewDirection.mul(suppliedUp.dot(viewDirection))).normalize();
+        if (up.lengthSquared() < 1e-8) {
+            up = viewDirection.cross(right).normalize();
+        } else {
+            Vec3 correctedRight = up.cross(viewDirection).normalize();
+            if (correctedRight.lengthSquared() >= 1e-8) {
+                right = correctedRight;
+            }
+        }
         if (up.lengthSquared() < 1e-8) {
             up = new Vec3(0.0, 1.0, 0.0);
         }

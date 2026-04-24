@@ -263,6 +263,7 @@ public class RayTracerRenderer implements Renderer {
     private double environmentYawSin = 0.0;
     private double environmentPitchCos = 1.0;
     private double environmentPitchSin = 0.0;
+    @SuppressWarnings("unused")
     private String environmentMapKey = "";
     private EnvironmentMap environmentMap;
 
@@ -322,11 +323,16 @@ public class RayTracerRenderer implements Renderer {
     private int polishHeight = 1;
     private boolean activeHybridBaseReducedShading = false;
     private double activeHybridBaseShadingScale = 1.0;
+    @SuppressWarnings("unused")
     private PreviewCameraResetSupport.MotionDelta currentCameraMotionDelta = PreviewCameraResetSupport.MotionDelta.NONE;
     private PreviewCameraResetSupport.ResetKind currentCameraResetKind = null;
+    @SuppressWarnings("unused")
     private boolean framePolishIntegrandChanged = false;
+    @SuppressWarnings("unused")
     private boolean framePolishScaleChanged = false;
+    @SuppressWarnings("unused")
     private boolean framePolishTierChanged = false;
+    @SuppressWarnings("unused")
     private boolean framePolishRebuildChanged = false;
     private int carrierMotionTileCursor = 0;
     private int carrierMotionTileLayoutCols = -1;
@@ -709,11 +715,11 @@ public class RayTracerRenderer implements Renderer {
             return;
         }
         if (("previewmotionpolishscale".equals(k) || "motionpolishscale".equals(k)) && value instanceof Number) {
-            previewMotionPolishScale = clamp(((Number) value).doubleValue(), 0.08, 1.0);
+            previewMotionPolishScale = clamp(((Number) value).doubleValue(), 0.02, 1.0);
             return;
         }
         if (("previewmotionbaseshadingscale".equals(k) || "motionbaseshadingscale".equals(k)) && value instanceof Number) {
-            previewMotionBaseShadingScale = clamp(((Number) value).doubleValue(), 0.18, 1.0);
+            previewMotionBaseShadingScale = clamp(((Number) value).doubleValue(), 0.10, 1.0);
             return;
         }
         if (("samplesperframe".equals(k) || "spp".equals(k)) && value instanceof Number) {
@@ -1244,6 +1250,7 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private void executeHybridBaseCarrierPass(Scene scene,
                                               Camera camera,
                                               FrameBuffer target,
@@ -1934,6 +1941,7 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private void copyHybridBaseGuides(int fbWidth, int fbHeight) {
         long guideStart = RuntimeInstrumentation.isEnabled() ? System.nanoTime() : 0L;
         int count = Math.min(safePixelCount(fbWidth, fbHeight), guideDepth.length);
@@ -2048,6 +2056,7 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private void tracePolish(RayTraceContext ctx, RaySplitMix64 rng, int effectivePolishSecondaryDepth) {
         ctx.outR = 0.0;
         ctx.outG = 0.0;
@@ -2095,8 +2104,6 @@ public class RayTracerRenderer implements Renderer {
         double radianceR = 0.0;
         double radianceG = 0.0;
         double radianceB = 0.0;
-        double advancedOpticsWeight = resolveAdvancedOpticsWeight();
-        double causticCarry = 0.0;
         int secondaryDepth = 0;
 
         while (secondaryDepth < effectivePolishSecondaryDepth) {
@@ -2815,6 +2822,7 @@ public class RayTracerRenderer implements Renderer {
         return true;
     }
 
+    @SuppressWarnings("unused")
     private void traceRay(RayTraceContext ctx, RaySplitMix64 rng, int effectiveMaxDepth) {
         double ox = ctx.rayOx;
         double oy = ctx.rayOy;
@@ -4419,7 +4427,6 @@ public class RayTracerRenderer implements Renderer {
             float[] uvs = mesh.getUVs();
             float[] uv2s = mesh.getUV2s();
             PhongMaterial material = toPhongMaterial(entity.getMaterial());
-            Texture texture = material.getDiffuseTexture();
             Mat4 model = entity.getWorldMatrix();
             Mat3 normalMatrix;
             try {
@@ -5190,6 +5197,7 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private boolean shouldRunPolishTrace(PreviewQualityTierPlan plan, long frameSequence) {
         if (plan == null) {
             return false;
@@ -5218,12 +5226,14 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private boolean shouldUseHybridMovingBaseLayer(PreviewQualityTierPlan plan) {
      // Tady hybrid moving base v pohybu stale dela viditelne chyby korektnosti
      // (flipped faces a chybejici environment/floor), proto drzim pohyb na ciste RT carrier ceste.
         return false;
     }
 
+    @SuppressWarnings("unused")
     private void configureHybridBaseRendererForPreviewPlan(boolean useHybridMovingBaseLayer) {
         boolean movingHybrid = useHybridMovingBaseLayer && previewMotionActive;
         activeHybridBaseShadingScale = movingHybrid ? clamp(previewMotionBaseShadingScale, 0.18, 1.0) : 1.0;
@@ -5649,6 +5659,7 @@ public class RayTracerRenderer implements Renderer {
     // Tady je still-reference handoff odstraneny; nechavam no-op kvuli stabilite call site mist.
     }
 
+    @SuppressWarnings("unused")
     private void ensureHybridBaseResources(int targetWidth, int targetHeight) {
         int safeWidth = Math.max(1, targetWidth);
         int safeHeight = Math.max(1, targetHeight);
@@ -5759,6 +5770,7 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private boolean prepareHybridMovingPolishComposite(boolean polishUpdatedThisFrame) {
         if (!polishLayerActive) {
             return false;
@@ -5827,6 +5839,7 @@ public class RayTracerRenderer implements Renderer {
                 1L);
     }
 
+    @SuppressWarnings("unused")
     private void composePackedPolishIntoHybridOutput(int[] outColor,
                                                      int count,
                                                      int[] objectId,
@@ -6221,6 +6234,7 @@ public class RayTracerRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private void resolvePolishIntoOutput(int[] outColor, int count, boolean polishUpdatedThisFrame) {
         if (outColor == null || count <= 0 || !polishLayerActive) {
             return;
@@ -6549,10 +6563,12 @@ public class RayTracerRenderer implements Renderer {
         return denoiseRuntimePackageStatus;
     }
 
+    @SuppressWarnings("unused")
     private void applyDenoiseAndResolve(int[] outColor, double invSamples) {
         applyDenoiseAndResolve(outColor, invSamples, 1.0, true);
     }
 
+    @SuppressWarnings("unused")
     private void applyDenoiseAndResolve(int[] outColor, double invSamples, double temporalBlendScale) {
         applyDenoiseAndResolve(outColor, invSamples, temporalBlendScale, true);
     }

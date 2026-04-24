@@ -17,8 +17,8 @@ public final class ViewportPerformanceConfigTests {
         testRasterViewportKeepsFullScaleWhenOnBudget();
         testRasterViewportAdaptiveScaleOnlyUnderPressure();
         testHeavyViewportKeepsRendererUntilCriticalFallback();
-        testHeavyViewportKeepsStableScaleUntilCriticalFallback();
-        testHeavyViewportPreemptiveFallbackArmsOnRapidDrop();
+        testHeavyViewportDropsScaleImmediatelyForLiveMotion();
+        testHeavyViewportRapidDropKeepsLiveRenderer();
         testHeavyViewportWarmupSeedsPredictor();
         testHeavyViewportWarmupSeedDecaysAfterStabilization();
         testWarmupIgnoresModelFallbackFrames();
@@ -26,6 +26,7 @@ public final class ViewportPerformanceConfigTests {
         testCriticalPreviewKeepsHeavyRendererScheduled();
         testPathViewportSelfHealsDenoiseQualityOnGentleMotion();
         testHeavyViewportMotionEntryAppliesImmediateDownshiftFloor();
+        testHeavyViewportMotionAllowsEmergencyPreviewDimensions();
         testHeavyViewportIdleSnapRestoresFullScale();
         testHeavyViewportFreezesDynamicSceneWhenIdle();
         System.out.println("ViewportPerformanceConfigTests: ALL TESTS PASSED");
@@ -88,8 +89,8 @@ public final class ViewportPerformanceConfigTests {
         engine.viewportNavigationFallbackMode = RenderMode.RAY_TRACING;
         engine.safetyRecoveryActive = true;
         RenderMode sanitizedFallback = EngineRenderRuntime.resolveViewportRenderMode(engine, true);
-        if (sanitizedFallback != RenderMode.MODEL) {
-            throw new AssertionError("Safety fallback mode must still sanitize heavy fallback targets to MODEL.");
+        if (sanitizedFallback != RenderMode.PATH_TRACING) {
+            throw new AssertionError("Safety recovery must keep heavy viewport in the active live renderer.");
         }
         engine.safetyRecoveryActive = false;
 
@@ -146,25 +147,36 @@ public final class ViewportPerformanceConfigTests {
         }
     }
 
-    private static void testHeavyViewportKeepsStableScaleUntilCriticalFallback() {
+    private static void testHeavyViewportDropsScaleImmediatelyForLiveMotion() {
         Engine engine = new Engine();
         engine.activeMode = RenderMode.PATH_TRACING;
+        engine.viewportDisplayedMode = RenderMode.PATH_TRACING;
         engine.progressiveViewportEnabled = true;
         engine.viewportNavigationPreviewEnabled = true;
         engine.viewportTargetFps = 25.0;
         engine.interactiveRenderScale = 0.60;
         engine.viewportSmoothedFrameMs = 120.0;
+        engine.viewportFastFrameMs = 120.0;
+        engine.viewportPredictedFrameMs = 120.0;
+        engine.viewportHeavySmoothedFrameMs = 120.0;
+        engine.viewportHeavyFastFrameMs = 120.0;
+        engine.viewportHeavyPredictedFrameMs = 120.0;
+        engine.viewportCameraMotionActive = true;
 
         for (int i = 0; i < 44; i++) {
             EngineRenderRuntime.recordViewportFrameTime(engine, 120.0);
             EngineRenderRuntime.updateRealtimePerformanceState(engine, true);
         }
 
-        if (engine.interactiveRenderScaleActive) {
-            throw new AssertionError("Heavy progressive viewport should keep a stable render scale to avoid resetting accumulation.");
+        if (!engine.interactiveRenderScaleActive) {
+            throw new AssertionError("Heavy progressive viewport should immediately downscale for live motion.");
         }
-        if (engine.viewportAdaptiveScaleApplied != 1.0) {
-            throw new AssertionError("Heavy viewport should keep full internal resolution while the quality ladder handles motion.");
+        if (engine.viewportAdaptiveScaleApplied > 0.60) {
+            throw new AssertionError("Heavy viewport should enter a low internal resolution immediately during motion.");
+        }
+        RenderMode liveMode = EngineRenderRuntime.resolveViewportRenderMode(engine, true);
+        if (liveMode != RenderMode.PATH_TRACING) {
+            throw new AssertionError("Heavy viewport motion must stay in the active live renderer.");
         }
 
         long now = System.nanoTime();
@@ -193,9 +205,10 @@ public final class ViewportPerformanceConfigTests {
         }
     }
 
-    private static void testHeavyViewportPreemptiveFallbackArmsOnRapidDrop() {
+    private static void testHeavyViewportRapidDropKeepsLiveRenderer() {
         Engine engine = new Engine();
         engine.activeMode = RenderMode.RAY_TRACING;
+        engine.viewportDisplayedMode = RenderMode.RAY_TRACING;
         engine.progressiveViewportEnabled = true;
         engine.viewportNavigationPreviewEnabled = true;
         engine.viewportTargetFps = 25.0;
@@ -207,10 +220,18 @@ public final class ViewportPerformanceConfigTests {
         engine.viewportFrameDropStreak = 3;
         engine.viewportCriticalPreviewStartNanos = System.nanoTime() - 1_000_000_000L;
         engine.lastViewportInteractionNanos = System.nanoTime();
+        engine.viewportCameraMotionActive = true;
 
         EngineRenderRuntime.updateRealtimePerformanceState(engine, true);
-        if (!engine.viewportCriticalPreviewActive) {
-            throw new AssertionError("Heavy viewport should arm fallback preview preemptively on rapid FPS collapse.");
+        if (engine.viewportDynamicResolutionTierIndex < 4) {
+            throw new AssertionError("Heavy viewport should downshift quality immediately on rapid FPS collapse.");
+        }
+        if (engine.viewportAdaptiveScaleApplied > 0.60) {
+            throw new AssertionError("Heavy viewport should apply a low live scale immediately on rapid FPS collapse.");
+        }
+        RenderMode mode = EngineRenderRuntime.resolveViewportRenderMode(engine, true);
+        if (mode != RenderMode.RAY_TRACING) {
+            throw new AssertionError("Rapid FPS collapse must keep the active live renderer instead of a model fallback.");
         }
     }
 
@@ -381,6 +402,7 @@ public final class ViewportPerformanceConfigTests {
     private static void testHeavyViewportMotionEntryAppliesImmediateDownshiftFloor() {
         Engine ray = new Engine();
         ray.activeMode = RenderMode.RAY_TRACING;
+        ray.viewportDisplayedMode = RenderMode.RAY_TRACING;
         ray.progressiveViewportEnabled = true;
         ray.viewportTargetFps = 25.0;
         ray.viewportDynamicResolutionTierIndex = 0;
@@ -390,18 +412,20 @@ public final class ViewportPerformanceConfigTests {
         ray.viewportSmoothedFrameMs = 96.0;
         ray.viewportFastFrameMs = 112.0;
         ray.viewportPredictedFrameMs = 118.0;
+        ray.viewportCameraMotionActive = true;
 
         EngineRenderRuntime.updateRealtimePerformanceState(ray, true);
 
         if (ray.viewportDynamicResolutionTierIndex < 6) {
             throw new AssertionError("RAY motion entry should immediately jump to a strong downshift floor on obvious overload.");
         }
-        if (ray.viewportAdaptiveScaleApplied > 0.45) {
+        if (ray.viewportAdaptiveScaleApplied > 0.26) {
             throw new AssertionError("RAY motion entry should reduce preview scale immediately under obvious overload.");
         }
 
         Engine path = new Engine();
         path.activeMode = RenderMode.PATH_TRACING;
+        path.viewportDisplayedMode = RenderMode.PATH_TRACING;
         path.progressiveViewportEnabled = true;
         path.viewportTargetFps = 25.0;
         path.viewportDynamicResolutionTierIndex = 0;
@@ -411,14 +435,37 @@ public final class ViewportPerformanceConfigTests {
         path.viewportSmoothedFrameMs = 72.0;
         path.viewportFastFrameMs = 84.0;
         path.viewportPredictedFrameMs = 90.0;
+        path.viewportCameraMotionActive = true;
 
         EngineRenderRuntime.updateRealtimePerformanceState(path, true);
 
         if (path.viewportDynamicResolutionTierIndex < 5) {
             throw new AssertionError("PATH motion entry should immediately jump to a protective downshift floor on obvious overload.");
         }
-        if (path.viewportAdaptiveScaleApplied > 0.50) {
+        if (path.viewportAdaptiveScaleApplied > 0.34) {
             throw new AssertionError("PATH motion entry should reduce preview scale immediately under obvious overload.");
+        }
+    }
+
+    private static void testHeavyViewportMotionAllowsEmergencyPreviewDimensions() {
+        Engine engine = new Engine();
+        engine.activeMode = RenderMode.PATH_TRACING;
+        engine.progressiveViewportEnabled = true;
+        engine.baseWidth = 704;
+        engine.baseHeight = 440;
+        engine.viewportAdaptiveScaleApplied = 0.25;
+        engine.viewportAdaptiveScaleCurrent = 0.25;
+        engine.interactiveRenderScaleActive = true;
+        engine.viewportInteractionActiveLast = true;
+        engine.viewportMotionLatchedActive = true;
+
+        int width = EngineRenderRuntime.scaledWidth(engine);
+        int height = EngineRenderRuntime.scaledHeight(engine);
+        if (width >= 320 || height >= 200) {
+            throw new AssertionError("Heavy live motion should be allowed below the static 320x200 preview floor.");
+        }
+        if (width != 176 || height != 110) {
+            throw new AssertionError("Unexpected emergency heavy motion preview size: " + width + "x" + height);
         }
     }
 
@@ -435,12 +482,12 @@ public final class ViewportPerformanceConfigTests {
         engine.viewportSceneMotionActive = false;
         engine.renderModeSwitchTransitionActive = false;
         engine.safetyRecoveryActive = false;
-        engine.viewportSmoothedFrameMs = 80.0;
-        engine.viewportFastFrameMs = 80.0;
-        engine.viewportPredictedFrameMs = 80.0;
-        engine.viewportHeavySmoothedFrameMs = 80.0;
-        engine.viewportHeavyFastFrameMs = 80.0;
-        engine.viewportHeavyPredictedFrameMs = 80.0;
+        engine.viewportSmoothedFrameMs = 45.0;
+        engine.viewportFastFrameMs = 45.0;
+        engine.viewportPredictedFrameMs = 45.0;
+        engine.viewportHeavySmoothedFrameMs = 45.0;
+        engine.viewportHeavyFastFrameMs = 45.0;
+        engine.viewportHeavyPredictedFrameMs = 45.0;
 
         EngineRenderRuntime.updateRealtimePerformanceState(engine, false);
 
@@ -449,6 +496,29 @@ public final class ViewportPerformanceConfigTests {
         }
         if (Math.abs(engine.viewportAdaptiveScaleApplied - 1.0) > 1e-9) {
             throw new AssertionError("Idle heavy viewport should snap back to full preview scale in one step.");
+        }
+
+        Engine pressured = new Engine();
+        pressured.activeMode = RenderMode.PATH_TRACING;
+        pressured.progressiveViewportEnabled = true;
+        pressured.viewportTargetFps = 25.0;
+        pressured.viewportAdaptiveScaleCurrent = 0.55;
+        pressured.viewportAdaptiveScaleApplied = 0.55;
+        pressured.viewportDynamicResolutionTierIndex = 5;
+        pressured.viewportHeavySmoothedFrameMs = 120.0;
+        pressured.viewportHeavyFastFrameMs = 120.0;
+        pressured.viewportHeavyPredictedFrameMs = 120.0;
+        pressured.viewportSmoothedFrameMs = 120.0;
+        pressured.viewportFastFrameMs = 120.0;
+        pressured.viewportPredictedFrameMs = 120.0;
+
+        EngineRenderRuntime.updateRealtimePerformanceState(pressured, false);
+
+        if (pressured.viewportDynamicResolutionTierIndex == 0) {
+            throw new AssertionError("Idle heavy viewport should not force full resolution while frame time is over budget.");
+        }
+        if (pressured.viewportAdaptiveScaleApplied >= 1.0) {
+            throw new AssertionError("Idle heavy viewport should keep a reduced preview scale under sustained pressure.");
         }
     }
 }

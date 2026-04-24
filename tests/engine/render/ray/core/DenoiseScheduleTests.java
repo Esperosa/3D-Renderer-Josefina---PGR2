@@ -1,7 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.preview.*;
-import engine.render.ray.bvh.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 

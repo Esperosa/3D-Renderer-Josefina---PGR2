@@ -15,6 +15,7 @@ engine.render.ray.core.EnvironmentMapTests
 engine.render.ray.core.NoiseQualityMetricsTests
 engine.core.SceneTimelineReleaseTests
 engine.core.EngineSceneImportFocusTests
+engine.core.EngineStartupAssetTests
 engine.core.UndoRedoHistoryTests
 engine.core.WorldPresetHistoryTests
 engine.core.WorldLightStrengthTests
@@ -28,17 +29,18 @@ engine.core.EngineSafetyControllerTests
 engine.core.EngineSafetyRendererCoverageTests
 engine.core.PathTracingReferenceModeTests
 engine.core.ViewportRenderStressProfileTests
+engine.core.ViewportPerformanceConfigTests
 engine.core.OutputRenderPerformanceEvidenceTests
-engine.core.EditorWorkflowPerformanceEvidenceTests
 engine.core.AdaptiveSchedulerEvidenceTests
 engine.core.PreviewRuntimeInstrumentationTests
-engine.core.PreviewQualityRegressionTests
 engine.core.EngineCameraProjectionTests
 engine.core.WindowResponsiveLayoutTests
+engine.core.WindowIconAssetTests
 engine.core.EngineToolbarLayoutTests
 engine.ui.UiThemePopupMenuTests
 engine.ui.UiThemeToolbarResponsiveTests
 engine.ui.UiBuilderPropertyPanelTests
+NumericInputParsingTests
 ObjMaterialImportTests
 ObjMultiMaterialImportTests
 GltfMaterialExtensionImportTests
@@ -46,6 +48,7 @@ SimulationMaturityTests
 ProjectPresentationTests
 AdvancedMaterialRenderSmokeTests
 MaterialNodeGraphTests
+ModelPreviewRenderTests
 RayDenoiseSmokeTests
 RasterTiledParallelTests
 PrimitiveLibraryTests

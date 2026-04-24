@@ -497,14 +497,18 @@ final class EngineLifecycleController {
                     }
                 }
                 long hudStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.HUD_UI);
-                engine.window.setOverlayText(EngineSafetyController.augmentOverlay(
+                Window renderWindow = engine.window;
+                if (renderWindow == null) {
+                    continue;
+                }
+                renderWindow.setOverlayText(EngineSafetyController.augmentOverlay(
                         engine,
                         engine.debugOverlayEnabled ? EngineViewportOverlay.buildDebugHudLines(engine) : null
                 ));
                 RuntimeInstrumentation.endStage(RuntimeInstrumentation.Stage.HUD_UI, hudStage);
                 updateRenderModeSwitchOverlay(engine, System.nanoTime());
                 long blitStage = RuntimeInstrumentation.startStage(RuntimeInstrumentation.Stage.BLIT_PRESENT);
-                engine.window.blit(
+                renderWindow.blit(
                         engine.frameBuffer.getColorBuffer(),
                         engine.frameBuffer.getWidth(),
                         engine.frameBuffer.getHeight());

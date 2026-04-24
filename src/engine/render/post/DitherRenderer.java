@@ -461,6 +461,7 @@ public class DitherRenderer implements Renderer {
         }
     }
 
+    @SuppressWarnings("unused")
     private void prepareDitherLuminance(FrameBuffer sourceFb, int w, int h) {
         FrameBuffer detailReference = detailFrame != null
                 && detailFrame.getWidth() == w

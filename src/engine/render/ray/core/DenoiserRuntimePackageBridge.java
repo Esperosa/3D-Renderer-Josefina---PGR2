@@ -1,6 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.bvh.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;

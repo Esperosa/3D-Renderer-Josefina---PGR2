@@ -1,7 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.preview.*;
-import engine.render.ray.bvh.*;
 import engine.camera.PerspectiveCamera;
 import engine.geometry.MeshGenerator;
 import engine.material.PhongMaterial;

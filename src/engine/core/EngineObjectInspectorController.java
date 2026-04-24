@@ -1,7 +1,6 @@
 package engine.core;
 
 import engine.math.Vec3;
-import engine.ui.UiStrings;
 import engine.ui.UiTheme;
 import engine.util.UiBuilder;
 

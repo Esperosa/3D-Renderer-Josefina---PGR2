@@ -88,8 +88,8 @@ public final class EngineSafetyControllerTests {
         engine.safetyRecoveryActive = false;
         engine.safetyLastRecoveryNanos = System.nanoTime();
         RenderMode guardedMode = EngineRenderRuntime.resolveViewportRenderMode(engine, true);
-        if (guardedMode == RenderMode.PATH_TRACING || guardedMode == RenderMode.RAY_TRACING) {
-            throw new AssertionError("Heavy mode should stay guarded immediately after recovery.");
+        if (guardedMode != RenderMode.PATH_TRACING) {
+            throw new AssertionError("Heavy mode should stay in the active live renderer immediately after recovery.");
         }
 
         engine.safetyLastRecoveryNanos = System.nanoTime() - 2_000_000_000L;

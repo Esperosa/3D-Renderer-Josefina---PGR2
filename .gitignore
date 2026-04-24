@@ -5,7 +5,8 @@
 /out_tests_tmp/
 /renders/
 /.codex_backups/
-/.vscode/
+/.vscode/*
+!/.vscode/settings.json
 /.settings/
 /.classpath
 /.project

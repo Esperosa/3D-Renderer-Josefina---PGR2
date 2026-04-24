@@ -37,7 +37,9 @@ public class RasterRenderer implements Renderer {
     private TriangleRasterizer[] workerRasterizers;
     private int workerCount;
     private boolean parallelEnabled;
+    @SuppressWarnings("unused")
     private int bufferWidth;
+    @SuppressWarnings("unused")
     private int bufferHeight;
     private int tileSize;
     private boolean flatShading;
@@ -103,6 +105,7 @@ public class RasterRenderer implements Renderer {
         double u1;
         double v1;
 
+        @SuppressWarnings("unused")
         ClipVertex set(ClipVertex other) {
             clip.set(other.clip);
             worldPos.set(other.worldPos);
@@ -187,6 +190,7 @@ public class RasterRenderer implements Renderer {
     private static final class TileBins {
         final LongList[] bins;
         final int tileCols;
+        @SuppressWarnings("unused")
         final int tileRows;
         final int tileWidth;
         final int tileHeight;
@@ -1353,6 +1357,7 @@ public class RasterRenderer implements Renderer {
                 .normalizeInPlace();
     }
 
+    @SuppressWarnings("unused")
     private static Vec3 buildFallbackTangent(Vec3 normal) {
         return buildFallbackTangent(normal, new Vec3(), new Vec3());
     }

@@ -1,6 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.bvh.*;
 final class DenoiseSupport {
 
     private static final double NOISE_FLOOR = 0.025;

@@ -1,6 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.bvh.*;
 final class AutoSchedulingBatch {
 
     private int intervalFrames;

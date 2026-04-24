@@ -6,7 +6,6 @@ import java.awt.PointerInfo;
 
 import engine.camera.Camera;
 import engine.camera.CameraController;
-import engine.camera.OrthographicCamera;
 import engine.camera.PerspectiveCamera;
 import engine.math.Vec3;
 import engine.scene.Entity;

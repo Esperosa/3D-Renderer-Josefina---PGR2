@@ -1,6 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.bvh.*;
 final class PathSampleRegularizer {
 
     private static final double MIN_BRANCH_PROBABILITY = 0.02;

@@ -1,6 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.bvh.*;
 import engine.material.PhongMaterial;
 import engine.scene.PointLight;
 import java.util.concurrent.atomic.LongAdder;

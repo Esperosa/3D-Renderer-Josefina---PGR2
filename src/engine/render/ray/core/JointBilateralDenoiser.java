@@ -1,6 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.bvh.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 
@@ -914,6 +913,7 @@ final class JointBilateralDenoiser {
         return 1.0 - MAX_STABLE_STRENGTH_REDUCTION * stability;
     }
 
+    @SuppressWarnings("unused")
     private static double resolveEffectiveBlend(double baseStrength,
                                                 double noise,
                                                 int passIndex,
@@ -1091,6 +1091,9 @@ final class JointBilateralDenoiser {
     }
 
     private static double resolveInverseSampleCount(FilterContext context, int pixelIndex) {
+        if (context.sampleCounts == null) {
+            return context.invSamples;
+        }
         int sampleCount = resolvePixelSampleCount(context, pixelIndex);
         return AdaptiveSamplingSupport.inverseSampleCount(sampleCount, context.sampleCount);
     }

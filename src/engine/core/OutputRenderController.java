@@ -1620,12 +1620,33 @@ public class OutputRenderController {
         String instantRate = formatRate(resolveDisplayedInstantRate(), unit);
         String fastest = formatUnitDuration(progressFastestUnitNanos, unit);
         String slowest = formatUnitDuration(progressSlowestUnitNanos, unit);
-        return "Běží " + OutputRenderSupport.formatDuration(activeElapsedSeconds)
+        String metrics = "Běží " + OutputRenderSupport.formatDuration(activeElapsedSeconds)
                 + " · ETA " + OutputRenderSupport.formatDuration(remainingSeconds)
                 + " · Průměr " + averageRate
                 + " · Aktuálně " + instantRate
                 + " · Nejrychlejší " + fastest
                 + " · Nejpomalejší " + slowest;
+        String currentFile = progressCurrentFile;
+        if (currentFile != null && !currentFile.isBlank()) {
+            metrics += " · Soubor " + compactProgressPath(currentFile);
+        }
+        String outputFolder = progressOutputFolder;
+        if (outputFolder != null && !outputFolder.isBlank()) {
+            metrics += " · Složka " + compactProgressPath(outputFolder);
+        }
+        return metrics;
+    }
+
+    private static String compactProgressPath(String path) {
+        try {
+            Path fileName = Path.of(path).getFileName();
+            if (fileName != null) {
+                return fileName.toString();
+            }
+        } catch (RuntimeException ignored) {
+            // Progress labels should never fail rendering because of a malformed path string.
+        }
+        return path;
     }
 
     private double resolveDisplayedInstantRate() {

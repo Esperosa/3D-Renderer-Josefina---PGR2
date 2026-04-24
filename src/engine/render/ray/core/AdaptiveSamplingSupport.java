@@ -1,6 +1,5 @@
 package engine.render.ray.core;
 
-import engine.render.ray.bvh.*;
 final class AdaptiveSamplingSupport {
 
     private AdaptiveSamplingSupport() {

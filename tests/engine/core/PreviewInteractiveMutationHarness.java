@@ -182,6 +182,7 @@ public final class PreviewInteractiveMutationHarness {
         Thread.sleep(800L);
     }
 
+    @SuppressWarnings("unused")
     private static SoakResult runMutationSoak(Engine engine,
                                               Thread engineThread,
                                               AtomicReference<Throwable> engineFailure) throws Exception {
@@ -1043,6 +1044,7 @@ public final class PreviewInteractiveMutationHarness {
         }
     }
 
+    @SuppressWarnings("unused")
     private static void animateMaterialMemoryCamera(Engine engine, int tick, RenderMode mode) {
         if (!(engine.camera instanceof engine.camera.PerspectiveCamera camera)) {
             return;
@@ -1060,6 +1062,7 @@ public final class PreviewInteractiveMutationHarness {
                 0.28 + Math.cos(tick * 0.06) * 0.08));
     }
 
+    @SuppressWarnings("unused")
     private static ScenarioEntity createTransientScenarioEntity(int tick) {
         MaterialScenarioProfile profile = MaterialScenarioProfile.values()[Math.floorMod(tick, MaterialScenarioProfile.values().length)];
         Entity entity = new Entity(

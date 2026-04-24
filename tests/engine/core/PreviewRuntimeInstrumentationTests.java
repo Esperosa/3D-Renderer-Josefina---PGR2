@@ -147,6 +147,9 @@ public final class PreviewRuntimeInstrumentationTests {
         RuntimeInstrumentation.reset();
         renderPreviewFrame(renderer, scene, camera, fb);
         RuntimeInstrumentation.Snapshot snapshot = RuntimeInstrumentation.snapshotAndReset();
+        if (snapshot.frameCount(RuntimeInstrumentation.FrameKind.PREVIEW) <= 0L) {
+            throw new AssertionError("Moving RT preview should record a preview frame.");
+        }
         double activePolishScale = renderer.getActivePreviewPolishScale();
         if (!Double.isFinite(activePolishScale) || activePolishScale <= 0.0 || activePolishScale > 1.0) {
             throw new AssertionError("Moving RT preview should keep a valid polish scale.");
@@ -190,7 +193,6 @@ public final class PreviewRuntimeInstrumentationTests {
         long hardResets = snapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.CAMERA_RESETS_HARD);
         long secondaryReduced = snapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_SECONDARY_REDUCED_FRAMES);
         long denoiseSkipped = snapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DENOISE_SKIPPED_FRAMES);
-        long polishHits = snapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_POLISH_CADENCE_HITS);
         long traversalNanos = snapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_CARRIER_PRIMARY_INTERSECTION_NS);
         long directLightNanos = snapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_CARRIER_DIRECT_LIGHT_NS);
         long filterNanos = snapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_CARRIER_DENOISE_FILTER_NS);
@@ -243,6 +245,9 @@ public final class PreviewRuntimeInstrumentationTests {
         RuntimeInstrumentation.reset();
         renderPreviewFrame(renderer, scene, camera, fb);
         RuntimeInstrumentation.Snapshot snapshot = RuntimeInstrumentation.snapshotAndReset();
+        if (snapshot.frameCount(RuntimeInstrumentation.FrameKind.PREVIEW) <= 0L) {
+            throw new AssertionError("Emergency RT preview should record a preview frame.");
+        }
         if (renderer.getActivePreviewPolishWidth() <= 0 || renderer.getActivePreviewPolishHeight() <= 0) {
             throw new AssertionError("Moving RT preview should keep valid polish buffer dimensions.");
         }

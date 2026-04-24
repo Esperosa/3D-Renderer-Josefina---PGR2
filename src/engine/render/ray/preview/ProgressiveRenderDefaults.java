@@ -1,6 +1,5 @@
 package engine.render.ray.preview;
 
-import engine.render.ray.bvh.*;
 /**
  * Centralni vychozi konfigurace kvality pro progresivni ray/path rendering.
  */

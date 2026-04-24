@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import engine.math.Vec3;
 import engine.render.ray.core.PathTracerRenderer;
 import engine.render.ray.core.RayTracerRenderer;
 import engine.util.RuntimeInstrumentation;
@@ -21,7 +22,7 @@ public final class PreviewInteractiveSessionHarness {
     private static final long RT_HIGH_STILL_CAPTURE_SAMPLES = 130L;
     private static final long PT_STILL_ENTRY_SAMPLES = 6L;
     private static final long PT_STILL_CAPTURE_SAMPLES = 18L;
-    private static final int[] DYNAMIC_TIER_PERCENTS = {100, 90, 80, 70, 60, 50, 40, 33};
+    private static final int[] DYNAMIC_TIER_PERCENTS = {100, 90, 80, 70, 60, 50, 40, 33, 25, 20, 16, 12};
 
     private PreviewInteractiveSessionHarness() {
     }
@@ -61,6 +62,11 @@ public final class PreviewInteractiveSessionHarness {
 
             if ("STARTUP_FOCUS".equalsIgnoreCase(captureProfile) || "STARTUP".equalsIgnoreCase(captureProfile)) {
                 runStartupFocusCapture(engine, mode);
+                return;
+            }
+            if (captureProfile.startsWith("INPUT_LATENCY")) {
+                long sampleTarget = parseInputLatencySampleTarget(captureProfile, 12L);
+                runInputLatencyCapture(engine, canvas, mode, sampleTarget, Math.max(900L, motionCaptureMs));
                 return;
             }
 
@@ -279,6 +285,10 @@ public final class PreviewInteractiveSessionHarness {
             long tier50Frames = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_50_FRAMES);
             long tier40Frames = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_40_FRAMES);
             long tier33Frames = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_33_FRAMES);
+            long tier25Frames = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_25_FRAMES);
+            long tier20Frames = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_20_FRAMES);
+            long tier16Frames = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_16_FRAMES);
+            long tier12Frames = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_12_FRAMES);
             long switches = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_SWITCHES);
             long downshifts = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_DOWNSHIFTS);
             long upshifts = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_UPSHIFTS);
@@ -287,7 +297,7 @@ public final class PreviewInteractiveSessionHarness {
             System.out.println(String.format(
                     Locale.ROOT,
                     "Interactive[dynamic_moving][dynamic_moving_test] activated_tiers=%s downshifts=%d upshifts=%d total_switches=%d oscillation_detected=%s",
-                    activatedTierList(tier100Frames, tier90Frames, tier80Frames, tier70Frames, tier60Frames, tier50Frames, tier40Frames, tier33Frames),
+                    activatedTierList(tier100Frames, tier90Frames, tier80Frames, tier70Frames, tier60Frames, tier50Frames, tier40Frames, tier33Frames, tier25Frames, tier20Frames, tier16Frames, tier12Frames),
                     downshifts,
                     upshifts,
                     switches,
@@ -337,6 +347,96 @@ public final class PreviewInteractiveSessionHarness {
         setSyntheticMotion(engine, false);
         setPreviewMotionOverride(engine, mode, false);
         Thread.sleep(250L);
+    }
+
+    private static long parseInputLatencySampleTarget(String captureProfile, long fallback) {
+        if (captureProfile == null || captureProfile.isBlank()) {
+            return fallback;
+        }
+        int underscore = captureProfile.lastIndexOf('_');
+        if (underscore < 0 || underscore >= captureProfile.length() - 1) {
+            return fallback;
+        }
+        try {
+            return Math.max(1L, Long.parseLong(captureProfile.substring(underscore + 1)));
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private static void runInputLatencyCapture(Engine engine,
+                                               Canvas canvas,
+                                               RenderMode mode,
+                                               long sampleTarget,
+                                               long captureAfterMoveMs) throws Exception {
+        resetPreviewAccumulation(engine, mode);
+        waitForAccumulatedSamples(engine, mode, sampleTarget, 90_000L);
+        PreviewState beforeState = capturePreviewState(engine, mode);
+        int beforeRenderW = engine != null && engine.frameBuffer != null ? engine.frameBuffer.getWidth() : 0;
+        int beforeRenderH = engine != null && engine.frameBuffer != null ? engine.frameBuffer.getHeight() : 0;
+        double beforeScale = engine != null ? engine.effectiveRenderScale() : 0.0;
+        double beforeHeavyMs = engine != null ? engine.viewportHeavySmoothedFrameMs : 0.0;
+        Vec3 startPosition = engine != null && engine.camera != null ? engine.camera.getPosition() : Vec3.ZERO;
+
+        RuntimeInstrumentation.reset();
+        long keyDispatchStart = System.nanoTime();
+        dispatchKey(canvas, KeyEvent.KEY_PRESSED, KeyEvent.VK_W);
+        long keyDispatchDone = System.nanoTime();
+
+        long firstInputSeenNanos = 0L;
+        long firstMotionLatchedNanos = 0L;
+        long firstCameraMoveNanos = 0L;
+        long deadline = keyDispatchDone + 5_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            long now = System.nanoTime();
+            if (firstInputSeenNanos == 0L && engine != null && engine.input != null && engine.input.isKeyDown(KeyEvent.VK_W)) {
+                firstInputSeenNanos = now;
+            }
+            if (firstMotionLatchedNanos == 0L && engine != null && engine.viewportCameraMotionActive) {
+                firstMotionLatchedNanos = now;
+            }
+            Vec3 currentPosition = engine != null && engine.camera != null ? engine.camera.getPosition() : Vec3.ZERO;
+            if (firstCameraMoveNanos == 0L && currentPosition.sub(startPosition).lengthSquared() > 1e-8) {
+                firstCameraMoveNanos = now;
+                break;
+            }
+            Thread.sleep(1L);
+        }
+
+        Thread.sleep(captureAfterMoveMs);
+        dispatchKey(canvas, KeyEvent.KEY_RELEASED, KeyEvent.VK_W);
+        RuntimeInstrumentation.Snapshot snapshot = RuntimeInstrumentation.snapshotAndReset();
+        PreviewState afterState = capturePreviewState(engine, mode);
+        printSnapshot("input_latency", mode, engine, snapshot, afterState);
+
+        long inputSeenLatencyNs = firstInputSeenNanos == 0L ? -1L : firstInputSeenNanos - keyDispatchDone;
+        long motionLatencyNs = firstMotionLatchedNanos == 0L ? -1L : firstMotionLatchedNanos - keyDispatchDone;
+        long cameraLatencyNs = firstCameraMoveNanos == 0L ? -1L : firstCameraMoveNanos - keyDispatchDone;
+        System.out.println(String.format(
+                Locale.ROOT,
+                "Interactive[input_latency][start] mode=%s target_samples=%d before_samples=%d before_quality=%s before_render=%dx%d before_effective_scale=%.2f before_heavy_frame_ms=%.3f key_dispatch_ms=%.3f input_seen_ms=%.3f motion_latched_ms=%.3f camera_moved_ms=%.3f after_quality=%s after_samples=%d after_render=%dx%d after_effective_scale=%.2f",
+                mode,
+                sampleTarget,
+                beforeState == null ? 0L : beforeState.accumulatedSamples(),
+                beforeState == null ? "UNKNOWN" : beforeState.qualityTier(),
+                beforeRenderW,
+                beforeRenderH,
+                beforeScale,
+                beforeHeavyMs,
+                (keyDispatchDone - keyDispatchStart) / 1_000_000.0,
+                nanosToMs(inputSeenLatencyNs),
+                nanosToMs(motionLatencyNs),
+                nanosToMs(cameraLatencyNs),
+                afterState == null ? "UNKNOWN" : afterState.qualityTier(),
+                afterState == null ? 0L : afterState.accumulatedSamples(),
+                engine != null && engine.frameBuffer != null ? engine.frameBuffer.getWidth() : 0,
+                engine != null && engine.frameBuffer != null ? engine.frameBuffer.getHeight() : 0,
+                engine != null ? engine.effectiveRenderScale() : 0.0));
+        Thread.sleep(250L);
+    }
+
+    private static double nanosToMs(long nanos) {
+        return nanos < 0L ? -1.0 : nanos / 1_000_000.0;
     }
 
     private static void setCameraMotion(Engine engine, Canvas canvas, boolean active) throws Exception {
@@ -628,6 +728,10 @@ public final class PreviewInteractiveSessionHarness {
         long tier50Frames = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_50_FRAMES);
         long tier40Frames = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_40_FRAMES);
         long tier33Frames = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_33_FRAMES);
+        long tier25Frames = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_25_FRAMES);
+        long tier20Frames = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_20_FRAMES);
+        long tier16Frames = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_16_FRAMES);
+        long tier12Frames = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_12_FRAMES);
         long tierSwitches = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_SWITCHES);
         long tierDownshifts = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_DOWNSHIFTS);
         long tierUpshifts = snapshot.totalCounter(kind, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_UPSHIFTS);
@@ -896,7 +1000,7 @@ public final class PreviewInteractiveSessionHarness {
                 movingHybridPath));
         System.out.println(String.format(
                 Locale.ROOT,
-                "Interactive[%s][dynamic_resolution_tiers] tier_100_frames=%d tier_90_frames=%d tier_80_frames=%d tier_70_frames=%d tier_60_frames=%d tier_50_frames=%d tier_40_frames=%d tier_33_frames=%d switches=%d downshifts=%d upshifts=%d",
+                "Interactive[%s][dynamic_resolution_tiers] tier_100_frames=%d tier_90_frames=%d tier_80_frames=%d tier_70_frames=%d tier_60_frames=%d tier_50_frames=%d tier_40_frames=%d tier_33_frames=%d tier_25_frames=%d tier_20_frames=%d tier_16_frames=%d tier_12_frames=%d switches=%d downshifts=%d upshifts=%d",
                 label,
                 tier100Frames,
                 tier90Frames,
@@ -906,6 +1010,10 @@ public final class PreviewInteractiveSessionHarness {
                 tier50Frames,
                 tier40Frames,
                 tier33Frames,
+                tier25Frames,
+                tier20Frames,
+                tier16Frames,
+                tier12Frames,
                 tierSwitches,
                 tierDownshifts,
                 tierUpshifts));
@@ -1234,7 +1342,11 @@ public final class PreviewInteractiveSessionHarness {
                                             long tier60Frames,
                                             long tier50Frames,
                                             long tier40Frames,
-                                            long tier33Frames) {
+                                            long tier33Frames,
+                                            long tier25Frames,
+                                            long tier20Frames,
+                                            long tier16Frames,
+                                            long tier12Frames) {
         StringBuilder sb = new StringBuilder();
         if (tier100Frames > 0) {
             sb.append("100,");
@@ -1259,6 +1371,18 @@ public final class PreviewInteractiveSessionHarness {
         }
         if (tier33Frames > 0) {
             sb.append("33,");
+        }
+        if (tier25Frames > 0) {
+            sb.append("25,");
+        }
+        if (tier20Frames > 0) {
+            sb.append("20,");
+        }
+        if (tier16Frames > 0) {
+            sb.append("16,");
+        }
+        if (tier12Frames > 0) {
+            sb.append("12,");
         }
         if (sb.length() == 0) {
             return "none";

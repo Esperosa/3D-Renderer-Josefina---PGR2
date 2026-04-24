@@ -212,6 +212,10 @@ public final class RuntimeInstrumentation {
         PREVIEW_DYNAMIC_RES_TIER_50_FRAMES,
         PREVIEW_DYNAMIC_RES_TIER_40_FRAMES,
         PREVIEW_DYNAMIC_RES_TIER_33_FRAMES,
+        PREVIEW_DYNAMIC_RES_TIER_25_FRAMES,
+        PREVIEW_DYNAMIC_RES_TIER_20_FRAMES,
+        PREVIEW_DYNAMIC_RES_TIER_16_FRAMES,
+        PREVIEW_DYNAMIC_RES_TIER_12_FRAMES,
         PREVIEW_DYNAMIC_RES_TIER_SWITCHES,
         PREVIEW_DYNAMIC_RES_TIER_DOWNSHIFTS,
         PREVIEW_DYNAMIC_RES_TIER_UPSHIFTS,
@@ -227,6 +231,7 @@ public final class RuntimeInstrumentation {
 
         private final boolean noop;
         private final FrameKind kind;
+        @SuppressWarnings("unused")
         private final String label;
         private final long startNanos;
         private final AtomicLongArray stageInclusiveNanos;
