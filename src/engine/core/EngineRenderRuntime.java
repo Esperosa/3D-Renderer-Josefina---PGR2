@@ -38,6 +38,10 @@ final class EngineRenderRuntime {
     private static final double[] DYNAMIC_MOVING_POLISH_SCALE = {0.70, 0.52, 0.40, 0.30, 0.22, 0.16, 0.12, 0.08, 0.05, 0.04, 0.03, 0.02};
     private static final int[] DYNAMIC_MOVING_SECONDARY_CADENCE = {1, 3, 4, 5, 6, 7, 8, 8, 9, 10, 11, 12};
     private static final int[] DYNAMIC_MOVING_DENOISE_CADENCE = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    private static final double LIGHT_MOTION_SCALE_PHONG = 0.95;
+    private static final double LIGHT_MOTION_SCALE_DITHER = 0.95;
+    private static final double LIGHT_MOTION_SCALE_TEMPORAL = 0.95;
+    private static final double LIGHT_MOTION_SCALE_HEX = 0.95;
     private static final long INTERACTION_LINGER_NS = 220_000_000L;
     private static final long VIEWPORT_MOTION_ENTRY_BOOST_NS = 260_000_000L;
     private static final int VIEWPORT_MOTION_ENTRY_MIN_TIER = 4;
@@ -786,7 +790,7 @@ final class EngineRenderRuntime {
         if (engine == null) {
             return;
         }
-        boolean motionActive = isViewportMotionActive(engine);
+        boolean motionActive = engine.viewportCameraMotionActive || engine.viewportSceneMotionActive;
         boolean motionEntryBoostActive = motionActive && now > 0L && now < engine.viewportMotionEntryBoostUntilNanos;
         if (engine.rayTracerRenderer != null) {
             boolean movingRay = activeMode == RenderMode.RAY_TRACING && motionActive;
@@ -1343,9 +1347,8 @@ final class EngineRenderRuntime {
         }
         double targetFps = clamp(engine.viewportTargetFps, MIN_VIEWPORT_TARGET_FPS, MAX_VIEWPORT_TARGET_FPS);
         double targetMs = 1000.0 / targetFps;
-        boolean motionActive = isViewportMotionActive(engine)
-                || engine.viewportCameraMotionActive
-                || engine.viewportSceneMotionActive;
+        boolean rawMotionActive = engine.viewportCameraMotionActive || engine.viewportSceneMotionActive;
+        boolean motionActive = isViewportMotionActive(engine) || rawMotionActive;
         double measuredMs = clamp(effectiveHeavyPredictedMs(engine, now), targetMs * 0.40, targetMs * 5.0);
         double decisionMs = resolveDynamicResolutionDecisionMs(engine, measuredMs);
         if (motionActive
@@ -1367,6 +1370,10 @@ final class EngineRenderRuntime {
         boolean aggressiveIdleWarmupRescue = false;
         boolean stillReferencePriority = false;
         boolean liveMotionScaleActive = motionActive || interactionActive;
+        boolean stoppedHeavyRestore = explicitTierOverride < 0
+                && !rawMotionActive
+                && !engine.renderModeSwitchTransitionActive
+                && !engine.safetyRecoveryActive;
         boolean motionEntryBoostActive = motionActive
                 && now > 0L
                 && now < engine.viewportMotionEntryBoostUntilNanos;
@@ -1385,7 +1392,22 @@ final class EngineRenderRuntime {
             && (overloadRatio >= 1.35
             || engine.viewportFrameDropStreak >= 2
                 || engine.viewportCriticalPressureSeconds >= 1.2);
-        if (explicitTierOverride >= 0) {
+        if (stoppedHeavyRestore) {
+            tier = 0;
+            stillReferencePriority = true;
+            liveMotionScaleActive = false;
+            engine.viewportDynamicResolutionDownshiftArmFrames = 0;
+            engine.viewportDynamicResolutionRecoverStableFrames = 0;
+            engine.viewportDynamicResolutionRecoverSampleGateFrames = 0;
+            engine.viewportFrameDropStreak = 0;
+            engine.viewportScalePressureSeconds = 0.0;
+            engine.viewportCriticalPressureSeconds = 0.0;
+            engine.viewportCriticalPreviewActive = false;
+            engine.viewportCriticalPreviewStartNanos = 0L;
+            engine.viewportCriticalPreviewHoldUntilNanos = 0L;
+            engine.viewportCriticalRecoverStartNanos = 0L;
+            clearUpshiftLastBlockReason(engine);
+        } else if (explicitTierOverride >= 0) {
             engine.viewportDynamicResolutionDownshiftArmFrames = 0;
             engine.viewportDynamicResolutionRecoverStableFrames = 0;
             engine.viewportDynamicResolutionRecoverSampleGateFrames = 0;
@@ -2045,11 +2067,15 @@ final class EngineRenderRuntime {
         double targetMs = 1000.0 / targetFps;
         double measuredMs = clamp(engine.viewportSmoothedFrameMs, targetMs * 0.40, targetMs * 5.0);
         boolean heavyMode = isHeavyViewportMode(activeMode);
+        double lightMotionScale = lightMotionScaleForMode(activeMode);
+        boolean lightMotionScaleActive = interactionActive && lightMotionScale < 0.999;
         boolean sustainedPressure = engine.viewportScalePressureSeconds >= 2.0
                 || engine.viewportAdaptiveScaleApplied < 0.995;
 
         double desiredScale;
-        if (!sustainedPressure) {
+        if (lightMotionScaleActive) {
+            desiredScale = lightMotionScale;
+        } else if (!sustainedPressure) {
             desiredScale = 1.0;
         } else if (measuredMs > targetMs * 1.02) {
             desiredScale = clamp(Math.sqrt(targetMs / measuredMs), minScale, 1.0);
@@ -2064,12 +2090,20 @@ final class EngineRenderRuntime {
         }
 
         double downBlend = heavyMode ? 0.12 : 0.10;
-        double upBlend = interactionActive ? 0.06 : 0.10;
-        double blend = desiredScale < engine.viewportAdaptiveScaleCurrent ? downBlend : upBlend;
-        engine.viewportAdaptiveScaleCurrent = approach(engine.viewportAdaptiveScaleCurrent, desiredScale, blend);
-        engine.viewportAdaptiveScaleApplied = quantizeScale(
-                engine.viewportAdaptiveScaleCurrent,
-                heavyMode ? HEAVY_SCALE_STEP : GENERAL_SCALE_STEP);
+        if (lightMotionScaleActive) {
+            downBlend = 0.34;
+        }
+        double upBlend = interactionActive ? 0.06 : 0.16;
+        if (lightMotionScaleActive && desiredScale < engine.viewportAdaptiveScaleCurrent) {
+            engine.viewportAdaptiveScaleCurrent = desiredScale;
+            engine.viewportAdaptiveScaleApplied = desiredScale;
+        } else {
+            double blend = desiredScale < engine.viewportAdaptiveScaleCurrent ? downBlend : upBlend;
+            engine.viewportAdaptiveScaleCurrent = approach(engine.viewportAdaptiveScaleCurrent, desiredScale, blend);
+            engine.viewportAdaptiveScaleApplied = quantizeScale(
+                    engine.viewportAdaptiveScaleCurrent,
+                    heavyMode ? HEAVY_SCALE_STEP : GENERAL_SCALE_STEP);
+        }
 
         if (engine.viewportAdaptiveScaleApplied >= 0.995) {
             engine.viewportAdaptiveScaleCurrent = 1.0;
@@ -2091,6 +2125,19 @@ final class EngineRenderRuntime {
             engine.viewportCriticalPreviewActive = false;
             engine.viewportCriticalPreviewStartNanos = 0L;
         }
+    }
+
+    private static double lightMotionScaleForMode(RenderMode mode) {
+        if (mode == null) {
+            return 1.0;
+        }
+        return switch (mode) {
+            case PHONG -> LIGHT_MOTION_SCALE_PHONG;
+            case DITHERING -> LIGHT_MOTION_SCALE_DITHER;
+            case TEMPORAL_NOISE -> LIGHT_MOTION_SCALE_TEMPORAL;
+            case HEX_MOSAIC -> LIGHT_MOTION_SCALE_HEX;
+            default -> 1.0;
+        };
     }
 
     private static void updateHeavyCriticalFallback(

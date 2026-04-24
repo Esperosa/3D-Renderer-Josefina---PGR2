@@ -509,6 +509,7 @@ public final class PreviewInteractiveSessionHarness {
                                               RenderMode mode,
                                               long motionCaptureMs,
                                               String captureProfile) throws Exception {
+        boolean dynamicMoving = "DYNAMIC_MOVING".equalsIgnoreCase(captureProfile);
         boolean sampleSweep = "STILL_SAMPLE_SWEEP".equalsIgnoreCase(captureProfile)
                 || "SAMPLE_SWEEP".equalsIgnoreCase(captureProfile);
         if (sampleSweep) {
@@ -516,6 +517,49 @@ public final class PreviewInteractiveSessionHarness {
             return;
         }
         resetPreviewAccumulation(engine, mode);
+        if (dynamicMoving) {
+            RuntimeInstrumentation.reset();
+            setSyntheticMotion(engine, true);
+            setPreviewMotionOverride(engine, mode, true);
+            dispatchKey(canvas, KeyEvent.KEY_PRESSED, KeyEvent.VK_W);
+            dispatchKey(canvas, KeyEvent.KEY_PRESSED, KeyEvent.VK_J);
+            waitForMotionActive(engine, 5_000L);
+            Thread.sleep(Math.max(3000L, motionCaptureMs));
+            dispatchKey(canvas, KeyEvent.KEY_RELEASED, KeyEvent.VK_J);
+            dispatchKey(canvas, KeyEvent.KEY_RELEASED, KeyEvent.VK_W);
+            setSyntheticMotion(engine, false);
+            setPreviewMotionOverride(engine, mode, false);
+            Thread.sleep(Math.max(2800L, motionCaptureMs / 2));
+            RuntimeInstrumentation.Snapshot dynamicSnapshot = RuntimeInstrumentation.snapshotAndReset();
+            printSnapshot("dynamic_moving", mode, engine, dynamicSnapshot, capturePreviewState(engine, mode));
+            long switches = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_SWITCHES);
+            long downshifts = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_DOWNSHIFTS);
+            long upshifts = dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_UPSHIFTS);
+            long frameCount = Math.max(1L, dynamicSnapshot.frameCount(RuntimeInstrumentation.FrameKind.PREVIEW));
+            boolean oscillation = switches > Math.max(8L, frameCount / 2L);
+            System.out.println(String.format(
+                    Locale.ROOT,
+                    "Interactive[dynamic_moving][dynamic_moving_test] activated_tiers=%s downshifts=%d upshifts=%d total_switches=%d oscillation_detected=%s",
+                    activatedTierList(
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_100_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_90_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_80_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_70_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_60_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_50_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_40_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_33_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_25_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_20_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_16_FRAMES),
+                            dynamicSnapshot.totalCounter(RuntimeInstrumentation.FrameKind.PREVIEW, RuntimeInstrumentation.Counter.PREVIEW_DYNAMIC_RES_TIER_12_FRAMES)),
+                    downshifts,
+                    upshifts,
+                    switches,
+                    oscillation));
+            Thread.sleep(250L);
+            return;
+        }
 
         RuntimeInstrumentation.reset();
         waitForAccumulatedSamples(engine, mode, PT_STILL_ENTRY_SAMPLES, 45_000L);

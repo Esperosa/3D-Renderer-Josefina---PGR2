@@ -15,6 +15,7 @@ public final class ViewportPerformanceConfigTests {
     public static void main(String[] args) {
         testViewDistanceCullingHidesFarEntitiesOnlyInViewport();
         testRasterViewportKeepsFullScaleWhenOnBudget();
+        testLightMotionScaleForCostlierRasterModes();
         testRasterViewportAdaptiveScaleOnlyUnderPressure();
         testHeavyViewportKeepsRendererUntilCriticalFallback();
         testHeavyViewportDropsScaleImmediatelyForLiveMotion();
@@ -104,7 +105,7 @@ public final class ViewportPerformanceConfigTests {
 
     private static void testRasterViewportKeepsFullScaleWhenOnBudget() {
         Engine engine = new Engine();
-        engine.activeMode = RenderMode.PHONG;
+        engine.activeMode = RenderMode.BASIC;
         engine.progressiveViewportEnabled = true;
         engine.viewportTargetFps = 25.0;
         engine.interactiveRenderScale = 0.60;
@@ -119,7 +120,51 @@ public final class ViewportPerformanceConfigTests {
             throw new AssertionError("Viewport should stay at full quality when it is already above the FPS target.");
         }
         if (engine.viewportAdaptiveScaleApplied != 1.0) {
-            throw new AssertionError("Raster viewport should keep full resolution when frame time is on budget.");
+            throw new AssertionError("Lightweight raster viewport should keep full resolution when frame time is on budget.");
+        }
+    }
+
+    private static void testLightMotionScaleForCostlierRasterModes() {
+        Engine phong = new Engine();
+        phong.activeMode = RenderMode.PHONG;
+        phong.progressiveViewportEnabled = true;
+        phong.viewportTargetFps = 25.0;
+        phong.viewportSmoothedFrameMs = 16.0;
+        phong.viewportFastFrameMs = 16.0;
+
+        for (int i = 0; i < 6; i++) {
+            EngineRenderRuntime.recordViewportFrameTime(phong, 16.0);
+            EngineRenderRuntime.updateRealtimePerformanceState(phong, true);
+        }
+
+        if (!phong.interactiveRenderScaleActive) {
+            throw new AssertionError("PHONG should use a barely visible motion scale while navigating.");
+        }
+        if (phong.viewportAdaptiveScaleApplied < 0.94 || phong.viewportAdaptiveScaleApplied > 0.98) {
+            throw new AssertionError("PHONG motion scale should stay visually light: " + phong.viewportAdaptiveScaleApplied);
+        }
+
+        for (int i = 0; i < 12; i++) {
+            EngineRenderRuntime.recordViewportFrameTime(phong, 16.0);
+            EngineRenderRuntime.updateRealtimePerformanceState(phong, false);
+        }
+
+        if (Math.abs(phong.viewportAdaptiveScaleApplied - 1.0) > 1e-9) {
+            throw new AssertionError("PHONG should restore full resolution after navigation stops.");
+        }
+
+        Engine model = new Engine();
+        model.activeMode = RenderMode.MODEL;
+        model.progressiveViewportEnabled = true;
+        model.viewportTargetFps = 25.0;
+        model.viewportSmoothedFrameMs = 16.0;
+        for (int i = 0; i < 8; i++) {
+            EngineRenderRuntime.recordViewportFrameTime(model, 16.0);
+            EngineRenderRuntime.updateRealtimePerformanceState(model, true);
+        }
+
+        if (model.interactiveRenderScaleActive || Math.abs(model.viewportAdaptiveScaleApplied - 1.0) > 1e-9) {
+            throw new AssertionError("MODEL should remain at full scale on budget.");
         }
     }
 
@@ -319,6 +364,7 @@ public final class ViewportPerformanceConfigTests {
         engine.viewportHeavyPredictedFrameMs = 61.0;
         engine.viewportPredictedFrameMs = 61.0;
         engine.viewportLastHeavyFrameNanos = System.nanoTime() - 900_000_000L;
+        engine.viewportCameraMotionActive = true;
 
         for (int i = 0; i < 14; i++) {
             EngineRenderRuntime.recordViewportFrameTime(engine, 11.5, RenderMode.MODEL);
@@ -514,11 +560,11 @@ public final class ViewportPerformanceConfigTests {
 
         EngineRenderRuntime.updateRealtimePerformanceState(pressured, false);
 
-        if (pressured.viewportDynamicResolutionTierIndex == 0) {
-            throw new AssertionError("Idle heavy viewport should not force full resolution while frame time is over budget.");
+        if (pressured.viewportDynamicResolutionTierIndex != 0) {
+            throw new AssertionError("Idle heavy viewport should force full dynamic-resolution tier after motion stops.");
         }
-        if (pressured.viewportAdaptiveScaleApplied >= 1.0) {
-            throw new AssertionError("Idle heavy viewport should keep a reduced preview scale under sustained pressure.");
+        if (Math.abs(pressured.viewportAdaptiveScaleApplied - 1.0) > 1e-9) {
+            throw new AssertionError("Idle heavy viewport should restore full preview scale even after sustained pressure.");
         }
     }
 }
