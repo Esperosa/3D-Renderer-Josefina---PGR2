@@ -4,6 +4,7 @@ import engine.camera.PerspectiveCamera;
 import engine.geometry.MeshGenerator;
 import engine.material.PhongMaterial;
 import engine.math.Vec3;
+import engine.render.ray.preview.ProgressiveRenderDefaults;
 import engine.scene.Entity;
 import engine.scene.Scene;
 
@@ -13,6 +14,7 @@ public final class ViewportPerformanceConfigTests {
     }
 
     public static void main(String[] args) {
+        testDefaultViewportSampleSteps();
         testViewDistanceCullingHidesFarEntitiesOnlyInViewport();
         testRasterViewportKeepsFullScaleWhenOnBudget();
         testLightMotionScaleForCostlierRasterModes();
@@ -31,6 +33,22 @@ public final class ViewportPerformanceConfigTests {
         testHeavyViewportIdleSnapRestoresFullScale();
         testHeavyViewportFreezesDynamicSceneWhenIdle();
         System.out.println("ViewportPerformanceConfigTests: ALL TESTS PASSED");
+    }
+
+    private static void testDefaultViewportSampleSteps() {
+        Engine engine = new Engine();
+        if (ProgressiveRenderDefaults.RAY_VIEWPORT_SAMPLES_PER_FRAME != 4) {
+            throw new AssertionError("Ray viewport default should advance by 4 samples per frame.");
+        }
+        if (ProgressiveRenderDefaults.PATH_VIEWPORT_SAMPLES_PER_FRAME != 1) {
+            throw new AssertionError("Path viewport default should advance by 1 sample per frame.");
+        }
+        if (engine.raySamplesPerFrame != 4) {
+            throw new AssertionError("Engine should initialize Ray samples/frame to 4.");
+        }
+        if (engine.pathSamplesPerFrame != 1) {
+            throw new AssertionError("Engine should initialize Path samples/frame to 1.");
+        }
     }
 
     private static void testViewDistanceCullingHidesFarEntitiesOnlyInViewport() {

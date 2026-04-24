@@ -5,7 +5,8 @@ package engine.render.ray.preview;
  */
 public final class ProgressiveRenderDefaults {
 
-    public static final int PATH_VIEWPORT_SAMPLES_PER_FRAME = 6;
+    public static final int RAY_VIEWPORT_SAMPLES_PER_FRAME = 4;
+    public static final int PATH_VIEWPORT_SAMPLES_PER_FRAME = 1;
     public static final int RAY_VIEWPORT_ADAPTIVE_MIN_SAMPLES = 12;
     public static final double RAY_VIEWPORT_ADAPTIVE_THRESHOLD = 0.055;
     public static final int RAY_VIEWPORT_DENOISE_RADIUS = 2;

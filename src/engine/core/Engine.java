@@ -717,7 +717,7 @@ public class Engine {
         this.hexDistanceScaling = false;
         this.hexWowStrength = 0.22;
 
-        this.raySamplesPerFrame = 1;
+        this.raySamplesPerFrame = ProgressiveRenderDefaults.RAY_VIEWPORT_SAMPLES_PER_FRAME;
         this.rayTileSize = 24;
         this.rayMaxDepth = 4;
         this.rayDiffuseBounces = 4;
