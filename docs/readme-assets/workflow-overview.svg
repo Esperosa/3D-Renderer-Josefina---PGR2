@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
+  <title id="title">Workflow overview</title>
+  <desc id="desc">Editor layout and workflow overview.</desc>
+  <rect width="1280" height="320" rx="24" fill="#11161d"/>
+  <text x="64" y="60" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700">Workflow editoru</text>
+  <text x="64" y="94" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="18">Blender-like rozložení: toolbar, viewport, properties, dock.</text>
+
+  <rect x="64" y="124" width="1152" height="42" rx="12" fill="#202833" stroke="#4a5666"/>
+  <text x="92" y="151" fill="#ffbc77" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700">Toolbar</text>
+
+  <rect x="64" y="184" width="760" height="92" rx="18" fill="#18202a" stroke="#36414e"/>
+  <text x="92" y="234" fill="#eef3f8" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700">Viewport</text>
+  <text x="92" y="260" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="16">hlavní pracovní plocha, preview a navigace</text>
+
+  <rect x="844" y="184" width="372" height="92" rx="18" fill="#1c2430" stroke="#7444ff"/>
+  <text x="872" y="234" fill="#c5b5ff" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700">Properties</text>
+  <text x="872" y="260" fill="#93a0af" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="16">scéna, objekt, render, výstup</text>
+
+  <rect x="64" y="286" width="1152" height="18" rx="9" fill="#2a333f"/>
+  <text x="92" y="300" fill="#ffbc77" font-family="Segoe UI, DejaVu Sans, Arial, sans-serif" font-size="14">Bottom dock: časová osa a materiálový workspace</text>
+</svg>

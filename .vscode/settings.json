@@ -1,0 +1,7 @@
+{
+  "code-runner.runInTerminal": true,
+  "code-runner.saveFileBeforeRun": true,
+  "code-runner.executorMap": {
+    "java": "pwsh -NoProfile -ExecutionPolicy Bypass -File \"$workspaceRoot\\build.ps1\" -Run -Profile balanced"
+  }
+}
