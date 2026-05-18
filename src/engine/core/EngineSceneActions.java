@@ -18,11 +18,18 @@ import engine.scene.Entity;
 import engine.sim.water.WaterEmitterEntity;
 import engine.ui.UiStrings;
 
+import java.awt.Dimension;
 import java.awt.FileDialog;
+import java.awt.Font;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+
+import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.SwingUtilities;
 
 final class EngineSceneActions {
     private static final String[] BASIC_PRIMITIVES = {
@@ -519,5 +526,98 @@ final class EngineSceneActions {
         System.out.println("  Horní toolbar = rychlé přepínače navigace, renderu a runtime.");
         System.out.println("  Pravý panel = Scene Browser + vlastnosti: Položka, Prostředí, Zobrazení, Render, Výstup.");
         System.out.println("  Výstup = session-based render workflow pro snímek, sekvenci, GIF a AVI.");
+    }
+
+    static void showProjectHelp(Engine engine) {
+        printHelp();
+        Runnable showDialog = () -> {
+            JTextArea textArea = new JTextArea(projectHelpText());
+            textArea.setEditable(false);
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+            textArea.setCaretPosition(0);
+
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(760, 560));
+            JOptionPane.showMessageDialog(
+                    engine != null && engine.window != null ? engine.window.getFrame() : null,
+                    scrollPane,
+                    "3D Render Physics - semestrální projekt",
+                    JOptionPane.INFORMATION_MESSAGE);
+        };
+        if (SwingUtilities.isEventDispatchThread()) {
+            showDialog.run();
+        } else {
+            SwingUtilities.invokeLater(showDialog);
+        }
+    }
+
+    private static String projectHelpText() {
+        return """
+                3D Render Physics
+
+                Název projektu: 3D Render Physics - interaktivní 3D editor a renderovací sandbox
+                Autor: Jiří Pelikán
+                Předmět: PGRF II
+                Ročník studia: třetí - 2026
+                Cvičení: C01
+                Datum odevzdání: 11. 5. 2026
+
+                Zadání semestrálního projektu:
+                Vlastní návrh pro PGRF II navazující na demonstraci zobrazovacího řetězce
+                a realistické zobrazení. Cílem je interaktivní 3D editor v Javě s vlastní
+                reprezentací scény, transformacemi, kamerou, rasterizací, z-bufferem,
+                materiály, světly, jednoduchou fyzikou, animací, ray tracingem a path tracingem.
+
+                Popis:
+                Aplikace slouží k tvorbě a testování 3D scény v čisté Javě. Obsahuje vlastní matematiku,
+                import modelů, práci s materiály, světly, kamerou, jednoduchou fyzikou, animací a několik
+                renderovacích režimů od rychlého rasterizéru po ray tracing a path tracing.
+
+                Základní ovládání:
+                Q / E                 přepnutí FPS a Blender navigace
+                WASD nebo šipky       pohyb kamery
+                Myš                   rozhlížení ve FPS režimu
+                MMB                   orbit v Blender režimu
+                Shift + MMB           posun pohledu v Blender režimu
+                Kolečko myši          zoom
+                Pravé tlačítko        menu pro přidání objektů, světel, sil a emitorů
+                Levé tlačítko         výběr objektu nebo zachycení kurzoru
+                Esc                   uvolnění kurzoru / zrušení operace / ukončení
+
+                Scéna a transformace:
+                Shift + A             menu pro přidání základních primitiv
+                Delete                odstranění vybrané položky
+                Alt + G / R / S       posun / rotace / měřítko
+                X / Y / Z             omezení transformace na osu
+                Enter                 potvrzení transformace
+                F                     zaměření vybraného objektu
+                Ctrl + Numpad 1/3/7   přední / pravý / horní pohled
+
+                Render a výstup:
+                G                     modelový režim
+                1-9                   rychlé přepnutí renderovacích režimů
+                Z                     cyklus render režimů
+                F1 nebo `             přepnutí dither stylu
+                F5 / F6               frustum a backface culling
+                F7                    fyzika
+                F8                    demo auto-rotace
+                F9 / F10              paralelní raster / render scale
+                F11 / F12             počet renderovacích workerů
+
+                Animace:
+                Mezerník              přehrání / pauza časové osy v Blender režimu
+                Šipka vlevo/vpravo    předchozí / další snímek
+                Insert                vložení klíče
+                Shift + Insert        smazání klíče
+                Ctrl + Insert         klíč pro všechny animovatelné cíle
+                K / Shift + K         klíč výběru / release klíč pro fyziku
+
+                UI:
+                Horní toolbar obsahuje rychlé přepínače navigace, renderu a runtime funkcí.
+                Pravý panel obsahuje Scene Browser, vlastnosti položek, prostředí, zobrazení, render a výstup.
+                Spodní dock přepíná časovou osu a materiálový editor.
+                """;
     }
 }

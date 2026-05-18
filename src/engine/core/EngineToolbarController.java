@@ -257,7 +257,7 @@ final class EngineToolbarController {
     private static JButton createHelpButton(Engine engine) {
         JButton button = new JButton(UiStrings.Toolbar.HELP_BUTTON);
         UiTheme.styleGhostButton(button);
-        button.setToolTipText("Vypíše přehled kláves a ovládání do konzole.");
+        button.setToolTipText("Zobrazí informace o projektu a přehled ovládání.");
         button.addActionListener(e -> {
             engine.printHelp();
             engine.focusCanvas();

@@ -1026,7 +1026,7 @@ public class Engine {
     }
 
     void printHelp() {
-        EngineSceneActions.printHelp();
+        EngineSceneActions.showProjectHelp(this);
     }
 
     void toggleProjectionCamera() {
